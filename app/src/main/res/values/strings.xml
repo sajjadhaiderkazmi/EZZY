@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EZZY</string>
+
+    <string name="overlay_channel_name">Floating bar</string>
+    <string name="overlay_channel_description">Keeps the EZZY bar reachable from other apps.</string>
+    <string name="overlay_notification_title">EZZY bar is on</string>
+    <string name="overlay_notification_text">Swipe up with two fingers, or tap the floating button.</string>
+    <string name="action_turn_off">Turn off</string>
+
+    <string name="fgs_special_use">Draws the user\'s own floating shortcut bar over other apps so saved details can be copied without leaving the current app.</string>
+</resources>

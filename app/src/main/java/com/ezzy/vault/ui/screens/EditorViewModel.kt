@@ -1,0 +1,232 @@
+package com.ezzy.vault.ui.screens
+
+import android.net.Uri
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.ezzy.vault.AppContainer
+import com.ezzy.vault.data.db.CategoryEntity
+import com.ezzy.vault.data.db.TemplateEntity
+import com.ezzy.vault.data.model.AttachmentDraft
+import com.ezzy.vault.data.model.FieldDraft
+import com.ezzy.vault.data.model.FieldType
+import com.ezzy.vault.data.model.ItemDraft
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** The wizard's four steps, in order. */
+enum class EditorStep(val title: String, val caption: String) {
+    SECTION("Section", "Where does this belong?"),
+    TYPE("Type", "What kind of entry is this?"),
+    DETAILS("Details", "Fill in what you want to copy later"),
+    FILES("Files & note", "Attach photos, scans or receipts"),
+    ;
+
+    companion object {
+        val ordered: List<EditorStep> = entries
+    }
+}
+
+data class EditorUiState(
+    val draft: ItemDraft = ItemDraft(),
+    val step: EditorStep = EditorStep.SECTION,
+    val loading: Boolean = true,
+    val importing: Boolean = false,
+    val message: String? = null,
+) {
+    val canContinue: Boolean
+        get() = when (step) {
+            EditorStep.SECTION -> draft.categoryId.isNotBlank()
+            EditorStep.TYPE -> true
+            EditorStep.DETAILS -> draft.title.isNotBlank()
+            EditorStep.FILES -> draft.title.isNotBlank()
+        }
+
+    val canSave: Boolean get() = draft.categoryId.isNotBlank() && draft.title.isNotBlank()
+}
+
+class EditorViewModel(
+    private val container: AppContainer,
+    private val itemId: String?,
+    private val presetCategoryId: String?,
+) : ViewModel() {
+
+    private val repository = container.repository
+
+    private val _state = MutableStateFlow(EditorUiState())
+    val state: StateFlow<EditorUiState> = _state.asStateFlow()
+
+    val categories: StateFlow<List<CategoryEntity>> = repository.observeCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val templates: StateFlow<List<TemplateEntity>> = repository.observeTemplates()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    init {
+        viewModelScope.launch {
+            val draft = repository.draftFor(itemId, presetCategoryId.orEmpty())
+            _state.value = EditorUiState(
+                draft = draft,
+                // Editing an existing entry jumps straight to the fields; only a brand new one
+                // needs to be asked where it belongs.
+                step = when {
+                    !draft.isNew -> EditorStep.DETAILS
+                    draft.categoryId.isNotBlank() -> EditorStep.TYPE
+                    else -> EditorStep.SECTION
+                },
+                loading = false,
+            )
+        }
+    }
+
+    // ---- Navigation -------------------------------------------------------
+
+    fun goTo(step: EditorStep) = update { it.copy(step = step) }
+
+    fun next() = update { current ->
+        val index = EditorStep.ordered.indexOf(current.step)
+        current.copy(step = EditorStep.ordered.getOrElse(index + 1) { current.step })
+    }
+
+    fun back(): Boolean {
+        val index = EditorStep.ordered.indexOf(_state.value.step)
+        if (index <= 0) return false
+        update { it.copy(step = EditorStep.ordered[index - 1]) }
+        return true
+    }
+
+    fun consumeMessage() = update { it.copy(message = null) }
+
+    // ---- Draft edits ------------------------------------------------------
+
+    fun setCategory(categoryId: String) = updateDraft { it.copy(categoryId = categoryId) }
+
+    fun setTitle(title: String) = updateDraft { it.copy(title = title) }
+
+    fun setSubtitle(subtitle: String) = updateDraft { it.copy(subtitle = subtitle) }
+
+    fun setNote(note: String) = updateDraft { it.copy(note = note) }
+
+    fun setPinned(pinned: Boolean) = updateDraft { it.copy(isPinned = pinned) }
+
+    /**
+     * Applies a template's field list. Anything the user already typed is preserved by matching
+     * on the label, so switching type by mistake does not wipe the entry.
+     */
+    fun applyTemplate(template: TemplateEntity?) {
+        viewModelScope.launch {
+            if (template == null) {
+                updateDraft { it.copy(templateId = null) }
+                return@launch
+            }
+            val spec = repository.decodeSpec(template.specJson)
+            val existing = _state.value.draft.fields
+            val merged = spec.fields.map { templateField ->
+                val carried = existing.firstOrNull { it.label.equals(templateField.label, true) }
+                FieldDraft(
+                    label = templateField.label,
+                    value = carried?.value.orEmpty(),
+                    type = templateField.type,
+                )
+            }
+            val extras = existing.filter { field ->
+                field.value.isNotBlank() &&
+                    spec.fields.none { it.label.equals(field.label, true) }
+            }
+            updateDraft { it.copy(templateId = template.id, fields = merged + extras) }
+        }
+    }
+
+    fun updateField(id: String, transform: (FieldDraft) -> FieldDraft) = updateDraft { draft ->
+        draft.copy(fields = draft.fields.map { if (it.id == id) transform(it) else it })
+    }
+
+    fun addField(label: String = "", type: FieldType = FieldType.TEXT) = updateDraft { draft ->
+        draft.copy(fields = draft.fields + FieldDraft(label = label, type = type))
+    }
+
+    fun removeField(id: String) = updateDraft { draft ->
+        draft.copy(fields = draft.fields.filterNot { it.id == id })
+    }
+
+    fun moveField(id: String, delta: Int) = updateDraft { draft ->
+        val fields = draft.fields.toMutableList()
+        val index = fields.indexOfFirst { it.id == id }
+        val target = index + delta
+        if (index < 0 || target !in fields.indices) return@updateDraft draft
+        fields.add(target, fields.removeAt(index))
+        draft.copy(fields = fields)
+    }
+
+    // ---- Attachments ------------------------------------------------------
+
+    fun addAttachments(uris: List<Uri>, resolveName: (Uri) -> Pair<String, String>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            update { it.copy(importing = true) }
+            var failures = 0
+            val added = mutableListOf<AttachmentDraft>()
+            uris.forEach { uri ->
+                val stored = container.attachmentStore.import(uri)
+                if (stored == null) {
+                    failures++
+                    return@forEach
+                }
+                val (name, mime) = withContext(Dispatchers.IO) { resolveName(uri) }
+                added += AttachmentDraft(
+                    displayName = name,
+                    mimeType = mime,
+                    storedName = stored.storedName,
+                    sizeBytes = stored.sizeBytes,
+                )
+            }
+            _state.value = _state.value.let { current ->
+                current.copy(
+                    draft = current.draft.copy(attachments = current.draft.attachments + added),
+                    importing = false,
+                    message = when {
+                        failures == 0 -> null
+                        added.isEmpty() -> "Could not add that file (over 25 MB or unreadable)"
+                        else -> "$failures file(s) could not be added"
+                    },
+                )
+            }
+        }
+    }
+
+    fun removeAttachment(id: String) {
+        val target = _state.value.draft.attachments.firstOrNull { it.id == id } ?: return
+        updateDraft { draft -> draft.copy(attachments = draft.attachments.filterNot { it.id == id }) }
+        // Only sweep the file once it is no longer referenced by the saved row either.
+        viewModelScope.launch {
+            val stillReferenced = repository.item(_state.value.draft.id)
+                ?.attachments.orEmpty()
+                .any { it.storedName == target.storedName }
+            if (!stillReferenced) container.attachmentStore.delete(target.storedName)
+        }
+    }
+
+    // ---- Persistence ------------------------------------------------------
+
+    fun save(onSaved: (String) -> Unit) {
+        val draft = _state.value.draft
+        if (draft.categoryId.isBlank() || draft.title.isBlank()) return
+        viewModelScope.launch {
+            val id = repository.saveItem(draft)
+            onSaved(id)
+        }
+    }
+
+    private fun update(transform: (EditorUiState) -> EditorUiState) {
+        _state.value = transform(_state.value)
+    }
+
+    private fun updateDraft(transform: (ItemDraft) -> ItemDraft) {
+        _state.value = _state.value.copy(draft = transform(_state.value.draft))
+    }
+}

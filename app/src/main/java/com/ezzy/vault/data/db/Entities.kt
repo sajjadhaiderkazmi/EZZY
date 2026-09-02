@@ -1,0 +1,99 @@
+package com.ezzy.vault.data.db
+
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
+import com.ezzy.vault.data.model.FieldType
+
+@Entity(tableName = "categories")
+data class CategoryEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val iconKey: String,
+    val colorKey: String,
+    val sortOrder: Int,
+    val createdAt: Long,
+)
+
+@Entity(tableName = "templates")
+data class TemplateEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val iconKey: String,
+    /** Serialized [com.ezzy.vault.data.model.TemplateSpec]. */
+    val specJson: String,
+    val isBuiltIn: Boolean,
+    val sortOrder: Int,
+)
+
+@Entity(
+    tableName = "items",
+    foreignKeys = [
+        ForeignKey(
+            entity = CategoryEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["categoryId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("categoryId"), Index("isPinned"), Index("lastUsedAt")],
+)
+data class ItemEntity(
+    @PrimaryKey val id: String,
+    val categoryId: String,
+    val templateId: String?,
+    val title: String,
+    val subtitle: String,
+    val note: String,
+    val isPinned: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val lastUsedAt: Long,
+)
+
+@Entity(
+    tableName = "fields",
+    foreignKeys = [
+        ForeignKey(
+            entity = ItemEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["itemId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("itemId")],
+)
+data class FieldEntity(
+    @PrimaryKey val id: String,
+    val itemId: String,
+    val label: String,
+    val value: String,
+    @ColumnInfo(defaultValue = "TEXT") val type: FieldType,
+    val sortOrder: Int,
+)
+
+@Entity(
+    tableName = "attachments",
+    foreignKeys = [
+        ForeignKey(
+            entity = ItemEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["itemId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("itemId")],
+)
+data class AttachmentEntity(
+    @PrimaryKey val id: String,
+    val itemId: String,
+    val displayName: String,
+    val mimeType: String,
+    /** File name inside the app's private, encrypted attachment directory. */
+    val storedName: String,
+    val sizeBytes: Long,
+    val sortOrder: Int,
+    val createdAt: Long,
+)
