@@ -54,8 +54,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezzy.vault.appContainer
@@ -142,6 +144,12 @@ fun OverlayPanel(
 
     val locked = requireUnlock && !unlocked
 
+    // The sheet plus the 60dp rail must fit a 360dp phone, so the sheet takes what is left
+    // rather than a fixed width that would push the rail off screen.
+    val configuration = LocalConfiguration.current
+    val sheetWidth = (configuration.screenWidthDp.dp - 92.dp).coerceIn(200.dp, 320.dp)
+    val panelMaxHeight = (configuration.screenHeightDp.dp - 96.dp).coerceIn(280.dp, 560.dp)
+
     EzzyTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Tapping anywhere outside closes the bar — same as any sheet.
@@ -160,7 +168,7 @@ fun OverlayPanel(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 8.dp)
-                    .heightIn(max = 560.dp),
+                    .heightIn(max = panelMaxHeight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Flipped after the first frame so the sheet actually plays its slide-in
@@ -174,7 +182,7 @@ fun OverlayPanel(
                     exit = slideOutHorizontally(tween(140)) { it / 2 } + fadeOut(tween(140)),
                 ) {
                     Surface(
-                        modifier = Modifier.width(300.dp),
+                        modifier = Modifier.width(sheetWidth),
                         shape = RoundedCornerShape(22.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLowest,
                         shadowElevation = 16.dp,
@@ -185,6 +193,7 @@ fun OverlayPanel(
                             PanelSheet(
                                 view = view,
                                 categories = categories,
+                                maxListHeight = panelMaxHeight - 60.dp,
                                 maskSecrets = maskSecrets,
                                 copiedLabel = copiedLabel,
                                 onNavigate = { view = it },
@@ -334,6 +343,7 @@ private fun LockedSheet(onUnlock: () -> Unit) {
 private fun PanelSheet(
     view: PanelView,
     categories: List<CategoryEntity>,
+    maxListHeight: Dp,
     maskSecrets: Boolean,
     copiedLabel: String?,
     onNavigate: (PanelView) -> Unit,
@@ -396,6 +406,7 @@ private fun PanelSheet(
                         )
                     },
                     categoriesById = categories.associateBy { it.id },
+                    maxListHeight = maxListHeight,
                     emptyMessage = "Pin the entries you use most and they will wait for you right here.",
                     onOpen = { onNavigate(PanelView.Entry(it, null)) },
                 )
@@ -415,6 +426,7 @@ private fun PanelSheet(
                         )
                     },
                     categoriesById = categories.associateBy { it.id },
+                    maxListHeight = maxListHeight,
                     emptyMessage = "Nothing saved in this section yet.",
                     onOpen = { onNavigate(PanelView.Entry(it, view.categoryId)) },
                 )
@@ -429,7 +441,7 @@ private fun PanelSheet(
                     Spacer(Modifier.height(120.dp))
                 } else {
                     LazyColumn(
-                        modifier = Modifier.heightIn(max = 440.dp),
+                        modifier = Modifier.heightIn(max = maxListHeight),
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 14.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -543,6 +555,7 @@ private fun PanelHeader(
 private fun PanelEntryList(
     entries: List<PanelEntry>,
     categoriesById: Map<String, CategoryEntity>,
+    maxListHeight: Dp,
     emptyMessage: String,
     onOpen: (String) -> Unit,
 ) {
@@ -570,7 +583,7 @@ private fun PanelEntryList(
     }
 
     LazyColumn(
-        modifier = Modifier.heightIn(max = 440.dp),
+        modifier = Modifier.heightIn(max = maxListHeight),
         contentPadding = PaddingValues(start = 10.dp, end = 10.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
