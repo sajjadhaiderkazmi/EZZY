@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The only directory EZZY ever hands out to another app: a staging folder inside its own cache,
+  holding one decrypted copy of a file the user explicitly chose to copy or share. The vault
+  itself is never exposed here.
+-->
+<paths>
+    <cache-path name="ezzy_shared" path="shared/" />
+</paths>

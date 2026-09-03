@@ -26,11 +26,17 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +47,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +68,9 @@ import androidx.lifecycle.viewModelScope
 import com.ezzy.vault.AppContainer
 import com.ezzy.vault.data.db.AttachmentEntity
 import com.ezzy.vault.data.db.CategoryEntity
+import com.ezzy.vault.data.db.FieldEntity
 import com.ezzy.vault.data.db.ItemWithDetails
+import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.components.EncryptedImage
 import com.ezzy.vault.ui.components.FieldValueRow
@@ -69,6 +78,7 @@ import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.components.VoiceNoteRow
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.ui.icons.IconCatalog
+import com.ezzy.vault.ui.rememberAttachmentActions
 import com.ezzy.vault.ui.rememberCopier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -77,7 +87,12 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ItemDetailViewModel(
@@ -253,6 +268,10 @@ fun ItemDetailScreen(
                 }
             }
 
+            expiryStatusOf(details.fields)?.let { status ->
+                item { ExpiryBanner(status) }
+            }
+
             if (details.fields.isNotEmpty()) {
                 item {
                     Button(
@@ -396,6 +415,7 @@ private fun HeroChip(text: String) {
 @Composable
 private fun AttachmentThumb(attachment: AttachmentEntity, onClick: () -> Unit) {
     val isImage = attachment.mimeType.startsWith("image/")
+    val isPdf = attachment.mimeType == "application/pdf"
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -411,18 +431,32 @@ private fun AttachmentThumb(attachment: AttachmentEntity, onClick: () -> Unit) {
                         .aspectRatio(1f),
                 )
             } else {
-                Box(
+                // A PDF gets its own mark and the red everyone already reads as "PDF" — a
+                // scanned document is the common case here, and a generic page icon made every
+                // file look the same.
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f),
-                    contentAlignment = Alignment.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Description,
+                        imageVector = if (isPdf) Icons.Rounded.PictureAsPdf
+                        else Icons.Rounded.Description,
                         contentDescription = null,
                         modifier = Modifier.size(34.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (isPdf) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (isPdf) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "PDF",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
             Text(
@@ -439,6 +473,7 @@ private fun AttachmentThumb(attachment: AttachmentEntity, onClick: () -> Unit) {
 
 @Composable
 private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () -> Unit) {
+    val isPdf = attachment.mimeType == "application/pdf"
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = MaterialTheme.shapes.large,
@@ -475,15 +510,17 @@ private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () 
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(220.dp),
+                            .height(200.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Description,
+                            imageVector = if (isPdf) Icons.Rounded.PictureAsPdf
+                            else Icons.Rounded.Description,
                             contentDescription = null,
                             modifier = Modifier.size(46.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (isPdf) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(10.dp))
                         Text(
@@ -493,7 +530,217 @@ private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () 
                         )
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+
+                AttachmentActionRow(attachment = attachment)
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Copy, Share and — for anything that is not a picture — Open, on the file the user is looking
+ * at. Each one decrypts a single copy into EZZY's staging folder and hands the other app a
+ * one-off read grant for that file alone; the vault stays sealed.
+ */
+@Composable
+private fun AttachmentActionRow(attachment: AttachmentEntity) {
+    val actions = rememberAttachmentActions()
+    val isImage = attachment.mimeType.startsWith("image/")
+    val label = attachment.caption.ifBlank { attachment.displayName }
+
+    // The app's snackbar host sits behind this dialog's own window, so a message sent there
+    // would never be seen. The result is reported in the dialog instead.
+    var status by remember(attachment.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(status) {
+        if (status != null) {
+            delay(2200)
+            status = null
+        }
+    }
+
+    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AttachmentAction(
+                icon = Icons.Rounded.ContentCopy,
+                label = "Copy",
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    actions.copy(attachment.storedName, label, attachment.mimeType) { ok ->
+                        status = if (ok) "Copied — paste it in any app" else "Could not copy it"
+                    }
+                },
+            )
+            AttachmentAction(
+                icon = Icons.Rounded.Share,
+                label = "Share",
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    actions.share(attachment.storedName, label, attachment.mimeType) { ok ->
+                        if (!ok) status = "No app on this phone can receive it"
+                    }
+                },
+            )
+            if (!isImage) {
+                AttachmentAction(
+                    icon = Icons.Rounded.OpenInNew,
+                    label = "Open",
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        actions.open(attachment.storedName, label, attachment.mimeType) { ok ->
+                            if (!ok) status = "No app on this phone can open it"
+                        }
+                    },
+                )
+            }
+        }
+        status?.let { message ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AttachmentAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(17.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+// ---- Expiry ------------------------------------------------------------------
+
+/**
+ * What a document's expiry date means today. A CNIC or a passport is mostly worth storing so
+ * you can see, at a glance, whether it is still good — so the date is read back and stated in
+ * days rather than left as one more line of text to work out for yourself.
+ */
+private data class ExpiryStatus(
+    val label: String,
+    val detail: String,
+    val expired: Boolean,
+    val soon: Boolean,
+)
+
+/** The format the editor's date picker writes, so a stored date always reads back cleanly. */
+private val STORED_DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+private val EXPIRY_WORDS = listOf("expir", "ends", "valid", "renew")
+
+private fun expiryStatusOf(fields: List<FieldEntity>): ExpiryStatus? {
+    val field = fields.firstOrNull { candidate ->
+        val label = candidate.label.lowercase(Locale.ROOT)
+        candidate.type == FieldType.DATE &&
+            candidate.value.isNotBlank() &&
+            EXPIRY_WORDS.any { label.contains(it) } &&
+            // "Valid from" and "Issued on" are the opposite of an expiry.
+            !label.contains("from") &&
+            !label.contains("issue")
+    } ?: return null
+
+    val parsed = runCatching { STORED_DATE_FORMAT.parse(field.value) }.getOrNull() ?: return null
+
+    fun midnight(millis: Long): Long = Calendar.getInstance().apply {
+        timeInMillis = millis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    val days = TimeUnit.MILLISECONDS.toDays(
+        midnight(parsed.time) - midnight(System.currentTimeMillis())
+    )
+
+    return when {
+        days < 0 -> ExpiryStatus(
+            label = if (days == -1L) "Expired yesterday" else "Expired ${-days} days ago",
+            detail = "${field.label} · ${field.value}",
+            expired = true,
+            soon = false,
+        )
+
+        days == 0L -> ExpiryStatus("Expires today", "${field.label} · ${field.value}", false, true)
+
+        days <= 60 -> ExpiryStatus(
+            label = if (days == 1L) "Expires tomorrow" else "Expires in $days days",
+            detail = "${field.label} · ${field.value}",
+            expired = false,
+            soon = true,
+        )
+
+        else -> ExpiryStatus(
+            label = "Valid for $days more days",
+            detail = "${field.label} · ${field.value}",
+            expired = false,
+            soon = false,
+        )
+    }
+}
+
+@Composable
+private fun ExpiryBanner(status: ExpiryStatus) {
+    val container = when {
+        status.expired -> MaterialTheme.colorScheme.errorContainer
+        status.soon -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val foreground = when {
+        status.expired -> MaterialTheme.colorScheme.onErrorContainer
+        status.soon -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = container,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (status.expired) Icons.Rounded.ErrorOutline
+                else Icons.Rounded.EventAvailable,
+                contentDescription = null,
+                tint = foreground,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = status.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = foreground,
+                )
+                Text(
+                    text = status.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = foreground.copy(alpha = 0.8f),
+                )
             }
         }
     }

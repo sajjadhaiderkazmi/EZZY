@@ -18,6 +18,13 @@ data class SeedCategory(
 
 object Seed {
 
+    /**
+     * Entry types the floating bar re-checks with a fingerprint before showing, even when the
+     * vault is already open. A password or an ID number on screen over someone else's app is
+     * the case worth one extra tap; a phone number is not.
+     */
+    val guardedTemplateIds: Set<String> = setOf("tpl_login", "tpl_document")
+
     val categories: List<SeedCategory> = listOf(
         SeedCategory("cat_bank", "Bank & Cards", "bank", "indigo"),
         SeedCategory("cat_documents", "Documents & IDs", "id_card", "blue"),
@@ -66,9 +73,9 @@ object Seed {
             spec = TemplateSpec(
                 fields = listOf(
                     TemplateField("Document Name", FieldType.TEXT, "e.g. CNIC, Passport", required = true),
-                    TemplateField("Number", FieldType.SECRET, "Document or ID number"),
+                    TemplateField("ID Number", FieldType.SECRET, "The number printed on it"),
                     TemplateField("Issued On", FieldType.DATE, ""),
-                    TemplateField("Expires On", FieldType.DATE, "Reminders use this date"),
+                    TemplateField("Expires On", FieldType.DATE, "The entry says how long is left"),
                     TemplateField("Issued By", FieldType.TEXT, "Authority or office"),
                 ),
                 titleHint = "e.g. My CNIC",

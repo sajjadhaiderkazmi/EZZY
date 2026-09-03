@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -25,33 +24,31 @@ import androidx.lifecycle.withResumed
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ezzy.vault.ui.icons.EzzyMark
 
-/** The app's mark: a rounded indigo tile with a bolt, matching the launcher icon. */
+/**
+ * The app's mark, drawn from the same bolt and the same flat indigo as the launcher icon, at
+ * the same proportions — the glyph covers a little over half the tile's height, so the margin
+ * around it stays even and nothing runs into an edge.
+ */
 @Composable
 fun EzzyLogo(size: androidx.compose.ui.unit.Dp = 88.dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(RoundedCornerShape(size / 3.4f))
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.tertiary,
-                    )
-                )
-            ),
+            .clip(RoundedCornerShape(size / 3.6f))
+            .background(EzzyMark.Brand),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = Icons.Rounded.Bolt,
+            imageVector = EzzyMark.Bolt,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(size * 0.55f),
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.74f),
         )
     }
 }

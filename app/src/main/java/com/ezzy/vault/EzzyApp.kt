@@ -9,6 +9,7 @@ import com.ezzy.vault.data.crypto.DatabaseKey
 import com.ezzy.vault.data.db.EzzyDatabase
 import com.ezzy.vault.data.repo.VaultRepository
 import com.ezzy.vault.security.AppLock
+import com.ezzy.vault.security.SecureShare
 import com.ezzy.vault.util.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,7 @@ class AppContainer(context: Context) {
     suspend fun eraseEverything() {
         runCatching { database.clearAllTables() }
         attachmentStore.deleteAll()
+        SecureShare.clear(appContext)
         databaseKey.destroy()
         appContext.deleteDatabase(EzzyDatabase.NAME)
     }
@@ -49,6 +51,9 @@ class EzzyApp : Application() {
         super.onCreate()
         // A keystore or database failure here must not take the launcher icon down with it.
         container.scope.launch { runCatching { container.repository.seedIfEmpty() } }
+        // A copy or share staged in the previous run is plain bytes sitting in the cache. The
+        // receiving app has long since read it, so the first thing this run does is wipe it.
+        SecureShare.clear(this)
         registerActivityLifecycleCallbacks(LockWatcher())
     }
 

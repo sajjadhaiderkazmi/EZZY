@@ -31,14 +31,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,10 +57,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -67,11 +69,15 @@ import com.ezzy.vault.appContainer
 import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.security.SecureClipboard
+import com.ezzy.vault.data.db.AttachmentEntity
+import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.ui.components.EncryptedImage
 import com.ezzy.vault.ui.components.FieldValueRow
 import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.nav.Routes
+import com.ezzy.vault.ui.icons.EzzyMark
+import com.ezzy.vault.ui.rememberAttachmentActions
 import com.ezzy.vault.ui.theme.Accents
 import com.ezzy.vault.ui.theme.EzzyTheme
 import com.ezzy.vault.ui.theme.LocalIsDarkTheme
@@ -86,21 +92,16 @@ fun OverlayBubble() {
                 .size(56.dp)
                 .shadow(10.dp, CircleShape)
                 .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.tertiary,
-                        )
-                    )
-                ),
+                .background(EzzyMark.Brand),
             contentAlignment = Alignment.Center,
         ) {
+            // Same proportion as the launcher icon: the bolt fills a little over half the
+            // circle's height, so it never crowds the edge.
             Icon(
-                imageVector = Icons.Rounded.Bolt,
+                imageVector = EzzyMark.Bolt,
                 contentDescription = "Open EZZY",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(28.dp),
+                tint = Color.White,
+                modifier = Modifier.size(38.dp),
             )
         }
     }
@@ -165,13 +166,15 @@ fun OverlayPanel(
     onDismiss: () -> Unit,
     onOpenApp: (String?) -> Unit,
     onInteraction: () -> Unit,
-    onRequestUnlock: () -> Unit,
+    // null asks for the vault itself; an item id asks again for that one guarded entry.
+    onRequestUnlock: (String?) -> Unit,
 ) {
     val context = LocalContext.current
     val repository = remember { context.appContainer.repository }
     val categories by remember { repository.observeCategories() }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val unlocked by AppLock.unlocked.collectAsStateWithLifecycle()
+    val confirmedItems by AppLock.confirmedItems.collectAsStateWithLifecycle()
 
     var view by remember { mutableStateOf<PanelView>(PanelView.Quick) }
     var copiedLabel by remember { mutableStateOf<String?>(null) }
@@ -227,7 +230,7 @@ fun OverlayPanel(
                         shadowElevation = 16.dp,
                     ) {
                         if (locked) {
-                            LockedSheet(onUnlock = onRequestUnlock)
+                            LockedSheet(onUnlock = { onRequestUnlock(null) })
                         } else {
                             PanelSheet(
                                 view = view,
@@ -235,7 +238,10 @@ fun OverlayPanel(
                                 maxListHeight = panelMaxHeight - 60.dp,
                                 maskSecrets = maskSecrets,
                                 copiedLabel = copiedLabel,
+                                confirmedItems = confirmedItems,
+                                onNotify = { copiedLabel = it },
                                 onNavigate = ::navigate,
+                                onRequestUnlock = onRequestUnlock,
                                 onCopy = { label, value, sensitive ->
                                     onInteraction()
                                     val ok = SecureClipboard.copy(
@@ -386,7 +392,10 @@ private fun PanelSheet(
     maxListHeight: Dp,
     maskSecrets: Boolean,
     copiedLabel: String?,
+    confirmedItems: Set<String>,
+    onNotify: (String) -> Unit,
     onNavigate: (PanelView) -> Unit,
+    onRequestUnlock: (String?) -> Unit,
     onCopy: (String, String, Boolean) -> Unit,
     onOpenApp: (String?) -> Unit,
     onClose: () -> Unit,
@@ -477,8 +486,19 @@ private fun PanelSheet(
                     .collectAsStateWithLifecycle(initialValue = null)
                 val details = entry
 
+                // Logins and documents ask for the fingerprint again, every time the bar
+                // opens them — the panel is drawn over whatever app is in front.
+                val guarded = details != null &&
+                    Seed.guardedTemplateIds.contains(details.item.templateId.orEmpty()) &&
+                    !confirmedItems.contains(details.item.id)
+
                 if (details == null) {
                     Spacer(Modifier.height(120.dp))
+                } else if (guarded) {
+                    GuardedSheet(
+                        title = details.item.title,
+                        onConfirm = { onRequestUnlock(details.item.id) },
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier.heightIn(max = maxListHeight),
@@ -536,13 +556,10 @@ private fun PanelSheet(
                         }
                         if (images.isNotEmpty()) {
                             items(images, key = { it.id }) { attachment ->
-                                EncryptedImage(
-                                    storedName = attachment.storedName,
-                                    contentDescription = attachment.displayName,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(150.dp)
-                                        .clip(RoundedCornerShape(12.dp)),
+                                PanelImage(
+                                    attachment = attachment,
+                                    onCopied = { onNotify(attachment.caption.ifBlank { attachment.displayName }) },
+                                    onShared = onClose,
                                 )
                             }
                         }
@@ -690,6 +707,106 @@ private fun PanelEntryList(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * What a login or a document shows in the floating bar until the fingerprint comes back. The
+ * bar draws on top of whatever app is open, so the one place a password should never appear
+ * unasked is right here.
+ */
+@Composable
+private fun GuardedSheet(title: String, onConfirm: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 26.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Fingerprint,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(38.dp),
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Confirm it is you to see this one.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onConfirm) { Text("Use fingerprint") }
+    }
+}
+
+/**
+ * A stored picture in the bar, with the two things worth doing to it from inside another app:
+ * copy it so it can be pasted straight into a chat, or hand it to the share sheet.
+ */
+@Composable
+private fun PanelImage(
+    attachment: AttachmentEntity,
+    onCopied: () -> Unit,
+    onShared: () -> Unit,
+) {
+    val actions = rememberAttachmentActions()
+    val label = attachment.caption.ifBlank { attachment.displayName }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        EncryptedImage(
+            storedName = attachment.storedName,
+            contentDescription = attachment.displayName,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .clip(RoundedCornerShape(12.dp)),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilledTonalButton(
+                onClick = {
+                    actions.copy(attachment.storedName, label, attachment.mimeType) { ok ->
+                        if (ok) onCopied()
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ContentCopy,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(5.dp))
+                Text("Copy", maxLines = 1, style = MaterialTheme.typography.labelMedium)
+            }
+            FilledTonalButton(
+                onClick = {
+                    actions.share(attachment.storedName, label, attachment.mimeType) { ok ->
+                        // The bar sits over everything, including the share sheet.
+                        if (ok) onShared()
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Share,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(5.dp))
+                Text("Share", maxLines = 1, style = MaterialTheme.typography.labelMedium)
             }
         }
     }

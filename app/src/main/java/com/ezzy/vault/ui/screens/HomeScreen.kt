@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
@@ -48,11 +49,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -64,6 +67,7 @@ import com.ezzy.vault.ui.components.EmptyState
 import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.components.StatCard
+import com.ezzy.vault.ui.icons.EzzyMark
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.util.EzzySettings
 import kotlinx.coroutines.flow.SharingStarted
@@ -130,7 +134,42 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {},
+                // The bar used to carry nothing but the search icon, leaving the whole left
+                // side blank. The name and the promise underneath it fill that space and say
+                // what the app is every time it opens.
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(EzzyMark.Brand),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = EzzyMark.Bolt,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "EZZY",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "Your phone, your data",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
                 actions = {
                     IconButton(onClick = onOpenSearch) {
                         Icon(Icons.Rounded.Search, contentDescription = "Search")

@@ -44,27 +44,6 @@
             </intent-filter>
         </activity>
 
-        <!--
-          Adds EZZY to Android's text selection menu. Long-press text in any app and the
-          floating toolbar offers Cut / Copy / Paste plus whatever has registered here; picking
-          EZZY lets a saved value be inserted straight into the field. The label shown in that
-          toolbar is this activity's label.
-        -->
-        <activity
-            android:name=".ProcessTextActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.Ezzy"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.PROCESS_TEXT" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-        </activity>
-
         <activity
             android:name=".UnlockActivity"
             android:excludeFromRecents="true"
@@ -72,6 +51,21 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/Theme.Ezzy.Transparent" />
+
+        <!--
+          Hands a single decrypted file to another app when the user taps Copy or Share on a
+          picture or a PDF. exported="false" plus grantUriPermissions means nothing can read it
+          without the one-off grant that travels with the intent or the clipboard item.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <service
             android:name=".overlay.OverlayService"

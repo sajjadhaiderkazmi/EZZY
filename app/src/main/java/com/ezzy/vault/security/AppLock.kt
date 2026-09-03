@@ -20,6 +20,22 @@ object AppLock {
 
     private var backgroundedAt = 0L
 
+    /**
+     * Entries that have been confirmed one at a time, on top of the vault being open at all.
+     * Logins and documents are worth a second check before the floating bar puts them on screen
+     * over somebody else's app, so the bar clears this every time it closes.
+     */
+    private val _confirmedItems = MutableStateFlow<Set<String>>(emptySet())
+    val confirmedItems: StateFlow<Set<String>> = _confirmedItems.asStateFlow()
+
+    fun confirmItem(itemId: String) {
+        _confirmedItems.value = _confirmedItems.value + itemId
+    }
+
+    fun clearItemConfirmations() {
+        _confirmedItems.value = emptySet()
+    }
+
     fun unlock() {
         _unlocked.value = true
         backgroundedAt = 0L
@@ -28,6 +44,7 @@ object AppLock {
     fun lock() {
         _unlocked.value = false
         backgroundedAt = 0L
+        clearItemConfirmations()
     }
 
     fun onBackgrounded() {

@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Crop
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
@@ -357,6 +358,12 @@ private fun DetailsStep(
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
 
+    // A CNIC, a passport or a degree arrives as a scan just as often as a photo, so the
+    // document step takes a PDF on the same screen rather than hiding it behind a later step.
+    val pdfPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
     val contactPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -433,50 +440,55 @@ private fun DetailsStep(
         if (state.needsPhoto) {
             item {
                 SectionHeader(
-                    text = "Picture",
+                    text = "Photo or PDF",
                     modifier = Modifier.padding(top = 6.dp),
-                    trailing = {
-                        TextButton(
-                            enabled = !state.importing,
-                            onClick = {
-                                runCatching {
-                                    photoPicker.launch(
-                                        PickVisualMediaRequest(
-                                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                                        )
-                                    )
-                                }
-                            },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.AddPhotoAlternate,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text("Add photo", style = MaterialTheme.typography.labelMedium)
-                        }
-                    },
                 )
             }
 
-            val photos = draft.attachments.filter { it.isImage }
-            if (photos.isEmpty()) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AttachButton(
+                        icon = Icons.Rounded.AddPhotoAlternate,
+                        label = "Photo",
+                        enabled = !state.importing,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            runCatching {
+                                photoPicker.launch(
+                                    PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
+                            }
+                        },
+                    )
+                    AttachButton(
+                        icon = Icons.Rounded.PictureAsPdf,
+                        label = "PDF",
+                        enabled = !state.importing,
+                        modifier = Modifier.weight(1f),
+                        onClick = { runCatching { pdfPicker.launch(PDF_MIME_TYPES) } },
+                    )
+                }
+            }
+
+            val scans = draft.attachments.filter { it.isImage || it.isPdf }
+            if (scans.isEmpty()) {
                 item {
                     Text(
-                        text = "Add a photo of the document, and write on it what it shows.",
+                        text = "Add a photo or a PDF of the document, and write on it what it shows.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            items(photos, key = { "photo-" + it.id }) { photo ->
+            items(scans, key = { "scan-" + it.id }) { scan ->
                 AttachmentEditorRow(
-                    attachment = photo,
-                    onCaptionChange = { viewModel.setAttachmentCaption(photo.id, it) },
-                    canCrop = true,
-                    onCrop = { cropping = photo.id },
-                    onRemove = { viewModel.removeAttachment(photo.id) },
+                    attachment = scan,
+                    onCaptionChange = { viewModel.setAttachmentCaption(scan.id, it) },
+                    canCrop = scan.isImage,
+                    onCrop = { cropping = scan.id },
+                    onRemove = { viewModel.removeAttachment(scan.id) },
                 )
             }
         }
@@ -1031,9 +1043,11 @@ private fun AttachmentEditorRow(
                 } else {
                     Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Rounded.Description,
+                            imageVector = if (attachment.isPdf) Icons.Rounded.PictureAsPdf
+                            else Icons.Rounded.Description,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (attachment.isPdf) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -1148,6 +1162,9 @@ private data class PickedContact(val name: String, val phone: String)
 // ---- Helpers ----------------------------------------------------------------
 
 private val DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+/** What the document step's "PDF" button will accept. */
+private val PDF_MIME_TYPES = arrayOf("application/pdf")
 
 /** What the "File" button will accept: scans, office documents and plain text. */
 private val DOCUMENT_MIME_TYPES = arrayOf(

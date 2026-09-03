@@ -25,6 +25,7 @@ import androidx.core.content.getSystemService
 import com.ezzy.vault.MainActivity
 import com.ezzy.vault.R
 import com.ezzy.vault.UnlockActivity
+import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.appContainer
 import com.ezzy.vault.util.EzzySettings
 import com.ezzy.vault.util.TriggerMode
@@ -431,10 +432,15 @@ class OverlayService : Service() {
                     )
                 },
                 onInteraction = { restartAutoHide() },
-                onRequestUnlock = {
+                onRequestUnlock = { itemId ->
                     startActivity(
                         Intent(this, UnlockActivity::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            .apply {
+                                if (itemId != null) {
+                                    putExtra(UnlockActivity.EXTRA_ITEM_ID, itemId)
+                                }
+                            }
                     )
                 },
             )
@@ -496,6 +502,8 @@ class OverlayService : Service() {
     private fun hidePanel(fromOnDestroy: Boolean = false) {
         autoHideJob?.cancel()
         autoHideJob = null
+        // A guarded entry is confirmed for one visit of the bar, not for the rest of the day.
+        AppLock.clearItemConfirmations()
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelHost?.stop()
         panelView = null
