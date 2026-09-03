@@ -44,6 +44,27 @@
             </intent-filter>
         </activity>
 
+        <!--
+          Adds EZZY to Android's text selection menu. Long-press text in any app and the
+          floating toolbar offers Cut / Copy / Paste plus whatever has registered here; picking
+          EZZY lets a saved value be inserted straight into the field. The label shown in that
+          toolbar is this activity's label.
+        -->
+        <activity
+            android:name=".ProcessTextActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Ezzy"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".UnlockActivity"
             android:excludeFromRecents="true"

@@ -62,8 +62,10 @@ import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.ezzyViewModel
+import com.ezzy.vault.util.AutoHide
 import com.ezzy.vault.util.Gesture
 import com.ezzy.vault.util.GestureArea
+import com.ezzy.vault.util.TriggerMode
 import com.ezzy.vault.util.ThemeMode
 import kotlinx.coroutines.launch
 
@@ -72,8 +74,8 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     private val store = container.settings
 
     fun setOverlayEnabled(value: Boolean) = launch { store.setOverlayEnabled(value) }
-    fun setBubble(value: Boolean) = launch { store.setBubbleTrigger(value) }
-    fun setGestureEnabled(value: Boolean) = launch { store.setGestureEnabled(value) }
+    fun setTriggerMode(value: TriggerMode) = launch { store.setTriggerMode(value) }
+    fun setAutoHide(value: AutoHide) = launch { store.setAutoHide(value) }
     fun setGesture(value: Gesture) = launch { store.setGesture(value) }
     fun setGestureArea(value: GestureArea) = launch { store.setGestureArea(value) }
     fun setBiometric(value: Boolean) = launch { store.setBiometricLock(value) }
@@ -118,7 +120,10 @@ fun SettingsScreen(
     // service in that window is refused, so the start is deferred to the next resume.
     var startWhenResumed by remember { mutableStateOf(false) }
 
+    var askMode by remember { mutableStateOf(false) }
+
     fun turnOn() {
+        if (!settings.triggerModeChosen) askMode = true
         viewModel.setOverlayEnabled(true)
         val failure = OverlayService.start(context)
         if (failure != null) {
@@ -234,28 +239,29 @@ fun SettingsScreen(
             }
 
             item {
-                SwitchRow(
-                    title = "Always on",
-                    subtitle = "A small draggable button that stays on screen. The most reliable way in.",
-                    checked = settings.bubbleTrigger,
+                ChoiceRow(
+                    title = "Mode",
+                    current = settings.triggerMode.label,
                     enabled = settings.overlayEnabled,
-                    onCheckedChange = {
-                        viewModel.setBubble(it)
+                    options = TriggerMode.entries.map { it.label to it },
+                    onSelect = {
+                        viewModel.setTriggerMode(it)
                         if (settings.overlayEnabled) OverlayService.start(context)
                     },
                 )
             }
 
             item {
-                SwitchRow(
-                    title = "Gestures",
-                    subtitle = "Open the bar with a gesture instead of a button",
-                    checked = settings.gestureEnabled,
+                InfoNote(settings.triggerMode.hint)
+            }
+
+            item {
+                ChoiceRow(
+                    title = "Hide the bar",
+                    current = settings.autoHide.label,
                     enabled = settings.overlayEnabled,
-                    onCheckedChange = {
-                        viewModel.setGestureEnabled(it)
-                        if (settings.overlayEnabled) OverlayService.start(context)
-                    },
+                    options = AutoHide.entries.map { it.label to it },
+                    onSelect = viewModel::setAutoHide,
                 )
             }
 
@@ -263,7 +269,8 @@ fun SettingsScreen(
                 ChoiceRow(
                     title = "Gesture",
                     current = settings.gesture.label,
-                    enabled = settings.overlayEnabled && settings.gestureEnabled,
+                    enabled = settings.overlayEnabled &&
+                        settings.triggerMode == TriggerMode.ON_TRIGGER,
                     options = Gesture.entries.map { it.label to it },
                     onSelect = {
                         viewModel.setGesture(it)
@@ -276,12 +283,21 @@ fun SettingsScreen(
                 ChoiceRow(
                     title = "Gesture area",
                     current = settings.gestureArea.label,
-                    enabled = settings.overlayEnabled && settings.gestureEnabled,
+                    enabled = settings.overlayEnabled &&
+                        settings.triggerMode == TriggerMode.ON_TRIGGER,
                     options = GestureArea.entries.map { it.label to it },
                     onSelect = {
                         viewModel.setGestureArea(it)
                         if (settings.overlayEnabled) OverlayService.start(context)
                     },
+                )
+            }
+
+            item {
+                InfoNote(
+                    "In Always active mode, drag the floating button onto the cross at the " +
+                        "bottom of the screen to switch the bar off, the way a chat head is " +
+                        "dismissed."
                 )
             }
 
@@ -419,6 +435,34 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+
+    if (askMode) {
+        AlertDialog(
+            onDismissRequest = {
+                // Dismissing still settles on a mode, so the question is not asked again.
+                viewModel.setTriggerMode(settings.triggerMode)
+                askMode = false
+            },
+            title = { Text("Choose one") },
+            text = {
+                Column {
+                    TriggerMode.entries.forEach { mode ->
+                        NavigationRow(
+                            title = mode.label,
+                            subtitle = mode.hint,
+                            onClick = {
+                                viewModel.setTriggerMode(mode)
+                                askMode = false
+                                OverlayService.start(context)
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            },
+            confirmButton = {},
+        )
     }
 
     if (confirmErase) {

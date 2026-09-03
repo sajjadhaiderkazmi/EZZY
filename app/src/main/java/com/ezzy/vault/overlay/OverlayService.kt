@@ -18,6 +18,7 @@ import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Toast
 import android.widget.FrameLayout
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
@@ -26,13 +27,17 @@ import com.ezzy.vault.R
 import com.ezzy.vault.UnlockActivity
 import com.ezzy.vault.appContainer
 import com.ezzy.vault.util.EzzySettings
+import com.ezzy.vault.util.TriggerMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
@@ -55,6 +60,13 @@ class OverlayService : Service() {
     private var bubbleParams: WindowManager.LayoutParams? = null
 
     private var gestureView: View? = null
+
+    /** The drop target shown while the bubble is being dragged. */
+    private var dismissHost: OverlayViewHost? = null
+    private var dismissView: View? = null
+    private val dismissArmed = mutableStateOf(false)
+
+    private var autoHideJob: Job? = null
 
     private var panelHost: OverlayViewHost? = null
     private var panelView: View? = null
@@ -89,6 +101,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         hidePanel()
+        hideDismissTarget()
         removeTriggers()
         scope.cancel()
         super.onDestroy()
@@ -155,13 +168,12 @@ class OverlayService : Service() {
         removeTriggers()
         // Settings.canDrawOverlays() is unreliable on some OEM skins — MIUI reports false even
         // after the user has allowed it — so the real test is whether addView succeeds.
-        if (settings.bubbleTrigger) addBubble()
-        if (settings.gestureEnabled) addGestureCatcher()
+        when (settings.triggerMode) {
+            TriggerMode.ALWAYS_ACTIVE -> addBubble()
+            TriggerMode.ON_TRIGGER -> addGestureCatcher()
+        }
 
-        if ((settings.bubbleTrigger || settings.gestureEnabled) &&
-            bubbleView == null &&
-            gestureView == null
-        ) {
+        if (bubbleView == null && gestureView == null) {
             // A trigger was asked for but nothing could be placed on screen, so the permission
             // really is missing. Say so — silently doing nothing is the worst outcome here.
             Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG).show()
@@ -238,6 +250,62 @@ class OverlayService : Service() {
         runCatching { windowManager.addView(view, params) }.onSuccess { gestureView = view }
     }
 
+    /**
+     * The circle the bubble is dropped onto to switch the bar off, the way a chat head is
+     * dismissed. Purely visual: it is not touchable, and the drag listener does the hit test.
+     */
+    private fun showDismissTarget() {
+        if (dismissView != null) return
+        dismissArmed.value = false
+
+        val host = OverlayViewHost(this).also { it.start() }
+        val view = host.composeView { DismissTarget(armed = dismissArmed.value) }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayWindowType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = dp(DISMISS_MARGIN_DP)
+        }
+
+        runCatching { windowManager.addView(view, params) }
+            .onSuccess {
+                dismissHost = host
+                dismissView = view
+            }
+            .onFailure { host.stop() }
+    }
+
+    private fun hideDismissTarget() {
+        dismissView?.let { runCatching { windowManager.removeView(it) } }
+        dismissHost?.stop()
+        dismissView = null
+        dismissHost = null
+        dismissArmed.value = false
+    }
+
+    /** True while the dragged bubble is close enough to the target to be released onto it. */
+    private fun isOverDismissTarget(bubbleCenterX: Int, bubbleCenterY: Int): Boolean {
+        val targetX = screenWidth() / 2f
+        val targetY = screenHeight() - dp(DISMISS_MARGIN_DP) - dp(DISMISS_SIZE_DP) / 2f
+        val dx = bubbleCenterX - targetX
+        val dy = bubbleCenterY - targetY
+        return hypot(dx, dy) <= dp(DISMISS_HIT_DP)
+    }
+
+    private fun turnOffFromBubble() {
+        Toast.makeText(this, R.string.overlay_turned_off, Toast.LENGTH_SHORT).show()
+        // Written on the application scope, not the service's: stopSelf() cancels the service
+        // scope, and a half-finished write would leave the switch showing on next launch.
+        appContainer.scope.launch { appContainer.settings.setOverlayEnabled(false) }
+        stopSelf()
+    }
+
     /** Drags the bubble, and treats a short, still press as a tap that opens the panel. */
     private inner class BubbleDragListener(
         private val params: WindowManager.LayoutParams,
@@ -265,21 +333,31 @@ class OverlayService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - downX
                     val dy = event.rawY - downY
-                    if (!moved && (abs(dx) > slop || abs(dy) > slop)) moved = true
+                    if (!moved && (abs(dx) > slop || abs(dy) > slop)) {
+                        moved = true
+                        showDismissTarget()
+                    }
                     if (moved) {
+                        val size = view.width.coerceAtLeast(dp(56))
                         params.x = (startX + dx).roundToInt()
-                            .coerceIn(0, screenWidth() - view.width.coerceAtLeast(dp(56)))
+                            .coerceIn(0, screenWidth() - size)
                         params.y = (startY + dy).roundToInt()
                             .coerceIn(0, screenHeight() - view.height.coerceAtLeast(dp(56)))
                         runCatching { windowManager.updateViewLayout(view, params) }
+                        dismissArmed.value = isOverDismissTarget(
+                            bubbleCenterX = params.x + size / 2,
+                            bubbleCenterY = params.y + view.height.coerceAtLeast(dp(56)) / 2,
+                        )
                     }
                 }
 
-                MotionEvent.ACTION_UP -> {
-                    if (!moved && System.currentTimeMillis() - downAt < TAP_TIMEOUT_MS) {
-                        showPanel()
-                    } else if (moved) {
-                        snapToEdge(view)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val overTarget = moved && dismissArmed.value
+                    hideDismissTarget()
+                    when {
+                        overTarget -> turnOffFromBubble()
+                        !moved && System.currentTimeMillis() - downAt < TAP_TIMEOUT_MS -> showPanel()
+                        moved -> snapToEdge(view)
                     }
                 }
             }
@@ -316,6 +394,7 @@ class OverlayService : Service() {
                             .putExtra(MainActivity.EXTRA_ROUTE, route)
                     )
                 },
+                onInteraction = { restartAutoHide() },
                 onRequestUnlock = {
                     startActivity(
                         Intent(this, UnlockActivity::class.java)
@@ -360,9 +439,23 @@ class OverlayService : Service() {
 
         panelHost = host
         panelView = root
+        restartAutoHide()
+    }
+
+    /** The bar closes itself after the chosen quiet period; any interaction restarts it. */
+    private fun restartAutoHide() {
+        autoHideJob?.cancel()
+        val seconds = settings.autoHide.seconds
+        if (seconds <= 0) return
+        autoHideJob = scope.launch {
+            delay(seconds * 1000L)
+            hidePanel()
+        }
     }
 
     private fun hidePanel() {
+        autoHideJob?.cancel()
+        autoHideJob = null
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelHost?.stop()
         panelView = null
@@ -392,6 +485,11 @@ class OverlayService : Service() {
         private const val CHANNEL_ID = "ezzy_overlay"
         private const val NOTIFICATION_ID = 4211
         private const val TAP_TIMEOUT_MS = 400L
+
+        /** Geometry of the drop target, shared by the window placement and the hit test. */
+        private const val DISMISS_MARGIN_DP = 96
+        private const val DISMISS_SIZE_DP = 64
+        private const val DISMISS_HIT_DP = 60
 
         /**
          * @return null on success, or a message explaining why the bar could not be started.

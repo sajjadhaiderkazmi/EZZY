@@ -17,11 +17,12 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 data class EzzySettings(
     val overlayEnabled: Boolean = false,
-    /** The draggable button that stays on screen. */
-    val bubbleTrigger: Boolean = true,
-    val gestureEnabled: Boolean = false,
+    val triggerMode: TriggerMode = TriggerMode.default,
+    /** False until the user has been asked which mode they want. */
+    val triggerModeChosen: Boolean = false,
     val gesture: Gesture = Gesture.default,
     val gestureArea: GestureArea = GestureArea.THIRD,
+    val autoHide: AutoHide = AutoHide.default,
     /** Off until the user opts in — a fresh install must not open on a lock screen. */
     val biometricLock: Boolean = false,
     val autoLockMinutes: Int = 1,
@@ -39,11 +40,12 @@ class SettingsStore(context: Context) {
     val settings: Flow<EzzySettings> = store.data.map { prefs ->
         EzzySettings(
             overlayEnabled = prefs[Keys.OVERLAY] ?: false,
-            bubbleTrigger = prefs[Keys.BUBBLE] ?: true,
-            gestureEnabled = prefs[Keys.GESTURE_ON] ?: false,
+            triggerMode = TriggerMode.from(prefs[Keys.MODE]),
+            triggerModeChosen = prefs[Keys.MODE_CHOSEN] ?: false,
             gesture = Gesture.from(prefs[Keys.GESTURE]),
             gestureArea = runCatching { GestureArea.valueOf(prefs[Keys.GESTURE_AREA] ?: "") }
                 .getOrDefault(GestureArea.THIRD),
+            autoHide = AutoHide.from(prefs[Keys.AUTO_HIDE]),
             biometricLock = prefs[Keys.BIOMETRIC] ?: false,
             autoLockMinutes = prefs[Keys.AUTO_LOCK] ?: 1,
             clipboardClearSeconds = prefs[Keys.CLIP_CLEAR] ?: 45,
@@ -56,14 +58,25 @@ class SettingsStore(context: Context) {
     }
 
     suspend fun setOverlayEnabled(value: Boolean) = put(Keys.OVERLAY, value)
-    suspend fun setBubbleTrigger(value: Boolean) = put(Keys.BUBBLE, value)
-    suspend fun setGestureEnabled(value: Boolean) = put(Keys.GESTURE_ON, value)
+
     suspend fun setBiometricLock(value: Boolean) = put(Keys.BIOMETRIC, value)
     suspend fun setMaskSecrets(value: Boolean) = put(Keys.MASK, value)
     suspend fun setBlockScreenshots(value: Boolean) = put(Keys.NO_SCREENSHOT, value)
     suspend fun setDynamicColor(value: Boolean) = put(Keys.DYNAMIC, value)
     suspend fun setAutoLockMinutes(value: Int) = put(Keys.AUTO_LOCK, value)
     suspend fun setClipboardClearSeconds(value: Int) = put(Keys.CLIP_CLEAR, value)
+
+    /** Records the choice and that it has been made, so the prompt is shown only once. */
+    suspend fun setTriggerMode(value: TriggerMode) {
+        store.edit {
+            it[Keys.MODE] = value.name
+            it[Keys.MODE_CHOSEN] = true
+        }
+    }
+
+    suspend fun setAutoHide(value: AutoHide) {
+        store.edit { it[Keys.AUTO_HIDE] = value.name }
+    }
 
     suspend fun setGesture(value: Gesture) {
         store.edit { it[Keys.GESTURE] = value.name }
@@ -87,8 +100,9 @@ class SettingsStore(context: Context) {
 
     private object Keys {
         val OVERLAY = booleanPreferencesKey("overlay_enabled")
-        val BUBBLE = booleanPreferencesKey("trigger_bubble")
-        val GESTURE_ON = booleanPreferencesKey("gesture_enabled")
+        val MODE = stringPreferencesKey("trigger_mode")
+        val MODE_CHOSEN = booleanPreferencesKey("trigger_mode_chosen")
+        val AUTO_HIDE = stringPreferencesKey("auto_hide")
         val GESTURE = stringPreferencesKey("gesture")
         val GESTURE_AREA = stringPreferencesKey("gesture_area")
         val BIOMETRIC = booleanPreferencesKey("biometric_lock")

@@ -1,6 +1,7 @@
 package com.ezzy.vault.overlay
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -41,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -103,6 +106,36 @@ fun OverlayBubble() {
     }
 }
 
+/**
+ * The circle the bubble is dropped onto to switch the floating bar off. Grows and turns red
+ * once the bubble is close enough to release, the way a chat head's dismiss target does.
+ */
+@Composable
+fun DismissTarget(armed: Boolean) {
+    EzzyTheme {
+        val size by animateDpAsState(if (armed) 74.dp else 64.dp, label = "dismiss-size")
+        Box(
+            modifier = Modifier
+                .size(size)
+                .shadow(if (armed) 12.dp else 6.dp, CircleShape)
+                .clip(CircleShape)
+                .background(
+                    if (armed) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.surfaceContainerHighest
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Turn the floating bar off",
+                tint = if (armed) MaterialTheme.colorScheme.onError
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(if (armed) 34.dp else 28.dp),
+            )
+        }
+    }
+}
+
 /** One row in the panel's list — flattened so the sheet never re-queries while drawing. */
 private data class PanelEntry(
     val id: String,
@@ -131,6 +164,7 @@ fun OverlayPanel(
     dynamicColor: Boolean,
     onDismiss: () -> Unit,
     onOpenApp: (String?) -> Unit,
+    onInteraction: () -> Unit,
     onRequestUnlock: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -141,6 +175,11 @@ fun OverlayPanel(
 
     var view by remember { mutableStateOf<PanelView>(PanelView.Quick) }
     var copiedLabel by remember { mutableStateOf<String?>(null) }
+
+    fun navigate(target: PanelView) {
+        onInteraction()
+        view = target
+    }
 
     val locked = requireUnlock && !unlocked
 
@@ -196,8 +235,9 @@ fun OverlayPanel(
                                 maxListHeight = panelMaxHeight - 60.dp,
                                 maskSecrets = maskSecrets,
                                 copiedLabel = copiedLabel,
-                                onNavigate = { view = it },
+                                onNavigate = ::navigate,
                                 onCopy = { label, value, sensitive ->
+                                    onInteraction()
                                     val ok = SecureClipboard.copy(
                                         context = context,
                                         label = label,
@@ -220,8 +260,8 @@ fun OverlayPanel(
                     categories = categories,
                     activeCategoryId = (view as? PanelView.Section)?.categoryId,
                     quickActive = view is PanelView.Quick,
-                    onQuick = { view = PanelView.Quick },
-                    onSection = { view = PanelView.Section(it) },
+                    onQuick = { navigate(PanelView.Quick) },
+                    onSection = { navigate(PanelView.Section(it)) },
                     onClose = onDismiss,
                 )
             }
@@ -446,11 +486,40 @@ private fun PanelSheet(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         item {
-                            Text(
-                                text = details.item.title,
-                                style = MaterialTheme.typography.titleSmall,
+                            Row(
                                 modifier = Modifier.padding(bottom = 4.dp),
-                            )
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = details.item.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (details.fields.isNotEmpty()) {
+                                    TextButton(
+                                        onClick = {
+                                            val all = details.sortedFields.joinToString("\n") {
+                                                "${it.label}: ${it.value}"
+                                            }
+                                            onCopy("All details", all, true)
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ContentCopy,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = "Copy all",
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    }
+                                }
+                            }
                         }
                         items(details.sortedFields, key = { it.id }) { field ->
                             FieldValueRow(
