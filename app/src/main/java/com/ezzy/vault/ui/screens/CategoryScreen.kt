@@ -110,7 +110,7 @@ fun CategoryScreen(
             ExtendedFloatingActionButton(
                 onClick = onAddItem,
                 icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                text = { Text("Add entry") },
+                text = { Text("Add") },
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -124,7 +124,7 @@ fun CategoryScreen(
                     .fillMaxSize()
                     .padding(padding),
                 action = {
-                    Button(onClick = onAddItem) { Text("Add entry") }
+                    Button(onClick = onAddItem) { Text("Add") }
                 },
             )
         } else {

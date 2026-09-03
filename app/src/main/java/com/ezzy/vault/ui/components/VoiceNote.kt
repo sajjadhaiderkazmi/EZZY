@@ -174,7 +174,7 @@ fun VoiceNoteDialog(
                                 stopRecorder()
                             } else {
                                 permissionDenied = false
-                                micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                runCatching { micPermission.launch(Manifest.permission.RECORD_AUDIO) }
                             }
                         },
                         modifier = Modifier.size(84.dp),

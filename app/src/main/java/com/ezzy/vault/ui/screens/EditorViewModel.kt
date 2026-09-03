@@ -34,6 +34,11 @@ enum class EditorStep(val title: String, val caption: String) {
 
 data class EditorUiState(
     val draft: ItemDraft = ItemDraft(),
+    /**
+     * Only the steps this particular entry needs. Opening "Add" from inside a section already
+     * answers the section question, so that step is dropped rather than asked again.
+     */
+    val steps: List<EditorStep> = EditorStep.ordered,
     val step: EditorStep = EditorStep.SECTION,
     val loading: Boolean = true,
     val importing: Boolean = false,
@@ -70,15 +75,19 @@ class EditorViewModel(
     init {
         viewModelScope.launch {
             val draft = repository.draftFor(itemId, presetCategoryId.orEmpty())
+            val steps = when {
+                // Editing an existing entry: its section and type are already settled.
+                !draft.isNew -> listOf(EditorStep.DETAILS, EditorStep.FILES)
+                // Started from inside a section: never ask which section again.
+                draft.categoryId.isNotBlank() ->
+                    listOf(EditorStep.TYPE, EditorStep.DETAILS, EditorStep.FILES)
+
+                else -> EditorStep.ordered
+            }
             _state.value = EditorUiState(
                 draft = draft,
-                // Editing an existing entry jumps straight to the fields; only a brand new one
-                // needs to be asked where it belongs.
-                step = when {
-                    !draft.isNew -> EditorStep.DETAILS
-                    draft.categoryId.isNotBlank() -> EditorStep.TYPE
-                    else -> EditorStep.SECTION
-                },
+                steps = steps,
+                step = steps.first(),
                 loading = false,
             )
         }
@@ -89,14 +98,15 @@ class EditorViewModel(
     fun goTo(step: EditorStep) = update { it.copy(step = step) }
 
     fun next() = update { current ->
-        val index = EditorStep.ordered.indexOf(current.step)
-        current.copy(step = EditorStep.ordered.getOrElse(index + 1) { current.step })
+        val index = current.steps.indexOf(current.step)
+        current.copy(step = current.steps.getOrElse(index + 1) { current.step })
     }
 
     fun back(): Boolean {
-        val index = EditorStep.ordered.indexOf(_state.value.step)
+        val current = _state.value
+        val index = current.steps.indexOf(current.step)
         if (index <= 0) return false
-        update { it.copy(step = EditorStep.ordered[index - 1]) }
+        update { it.copy(step = current.steps[index - 1]) }
         return true
     }
 

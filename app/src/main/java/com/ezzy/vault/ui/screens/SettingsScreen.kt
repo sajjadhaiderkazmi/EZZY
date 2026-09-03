@@ -181,7 +181,8 @@ fun SettingsScreen(
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            // Only decides whether the ongoing notice is visible — never block the bar on it.
+            runCatching { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
         }
         turnOn()
     }

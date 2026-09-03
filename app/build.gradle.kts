@@ -87,6 +87,11 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.biometric)
+    // biometric 1.1.0 still pulls fragment 1.2.5, whose FragmentActivity rejects any
+    // request code above 16 bits — which is every code the Compose ActivityResultRegistry
+    // generates, so every picker and permission prompt in the app would crash. Pinning a
+    // modern fragment removes that check.
+    implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.documentfile)
     implementation(libs.kotlinx.serialization.json)
 }

@@ -45,6 +45,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -127,7 +128,7 @@ fun EditorScreen(
         }
     }
 
-    val stepIndex = EditorStep.ordered.indexOf(state.step)
+    val stepIndex = state.steps.indexOf(state.step).coerceAtLeast(0)
 
     Scaffold(
         topBar = {
@@ -140,7 +141,7 @@ fun EditorScreen(
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
-                                text = "Step ${stepIndex + 1} of ${EditorStep.ordered.size} · ${state.step.title}",
+                                text = "Step ${stepIndex + 1} of ${state.steps.size} · ${state.step.title}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -161,7 +162,7 @@ fun EditorScreen(
                     ),
                 )
                 LinearProgressIndicator(
-                    progress = { (stepIndex + 1f) / EditorStep.ordered.size },
+                    progress = { (stepIndex + 1f) / state.steps.size },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -169,7 +170,7 @@ fun EditorScreen(
         bottomBar = {
             EditorBottomBar(
                 state = state,
-                isLastStep = state.step == EditorStep.FILES,
+                isLastStep = state.step == state.steps.last(),
                 onBack = { viewModel.back() },
                 onNext = { viewModel.next() },
                 onSave = { viewModel.save(onSaved) },
@@ -208,7 +209,11 @@ fun EditorScreen(
                     },
                 )
 
-                EditorStep.DETAILS -> DetailsStep(viewModel = viewModel, state = state)
+                EditorStep.DETAILS -> DetailsStep(
+                    viewModel = viewModel,
+                    state = state,
+                    categories = categories,
+                )
 
                 EditorStep.FILES -> FilesStep(viewModel = viewModel, state = state)
             }
@@ -232,7 +237,7 @@ private fun EditorBottomBar(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (state.step != EditorStep.ordered.first()) {
+            if (state.step != state.steps.first()) {
                 TextButton(onClick = onBack) { Text("Back") }
             }
             Spacer(Modifier.weight(1f))
@@ -370,7 +375,11 @@ private fun TypeStep(
 // ---- Step 3: details --------------------------------------------------------
 
 @Composable
-private fun DetailsStep(viewModel: EditorViewModel, state: EditorUiState) {
+private fun DetailsStep(
+    viewModel: EditorViewModel,
+    state: EditorUiState,
+    categories: List<CategoryEntity>,
+) {
     val draft = state.draft
     val context = LocalContext.current
 
@@ -384,6 +393,13 @@ private fun DetailsStep(viewModel: EditorViewModel, state: EditorUiState) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            SectionChooserRow(
+                categories = categories,
+                selectedId = draft.categoryId,
+                onSelect = viewModel::setCategory,
+            )
+        }
         item {
             OutlinedTextField(
                 value = draft.title,
@@ -663,9 +679,13 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton(
                     onClick = {
-                        photoPicker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                        runCatching {
+                            photoPicker.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        }
                     },
                     modifier = Modifier.weight(1f),
                     enabled = !state.importing,
@@ -858,6 +878,81 @@ private fun readPickedContact(context: Context, uri: Uri): PickedContact? = runC
 }.getOrNull()
 
 private data class PickedContact(val name: String, val phone: String)
+
+/**
+ * Shows which section the entry lands in and lets it be changed without walking back through
+ * the wizard — a free-form note in particular often needs re-filing after it is written.
+ */
+@Composable
+private fun SectionChooserRow(
+    categories: List<CategoryEntity>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    val selected = categories.firstOrNull { it.id == selectedId }
+
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box {
+            Row(
+                modifier = Modifier
+                    .clickable { open = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconAvatar(
+                    iconKey = selected?.iconKey,
+                    colorKey = selected?.colorKey,
+                    size = 36.dp,
+                    iconSize = 18.dp,
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Section",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = selected?.name ?: "Choose a section",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Rounded.ExpandMore,
+                    contentDescription = "Change section",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                categories.forEach { category ->
+                    DropdownMenuItem(
+                        text = { Text(category.name) },
+                        onClick = {
+                            onSelect(category.id)
+                            open = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = IconCatalog.image(category.iconKey),
+                                contentDescription = null,
+                            )
+                        },
+                        trailingIcon = {
+                            if (category.id == selectedId) {
+                                Icon(Icons.Rounded.Check, contentDescription = null)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
 
 // ---- Helpers ----------------------------------------------------------------
 
