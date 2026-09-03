@@ -276,15 +276,16 @@ fun HomeScreen(
  * action, and Settings. Sub-screens keep the back-arrow top bar they already had — this bar is
  * Home-only, not a persistent app-wide shell.
  *
- * The Add button rides above the bar's top edge, so it is a sibling of the bar inside a taller
- * Box rather than a child of it: a child that overflows a Surface gets clipped to the Surface's
- * bounds, which sliced the top off the circle.
+ * There is deliberately no panel behind the actions. A filled bar drew a lighter band with a
+ * hard top edge running out either side of the round Add button, which read as a strip stuck
+ * across the bottom of the page. The actions now sit straight on the page background; the
+ * Scaffold still reserves this whole height, so the grid never scrolls underneath them.
  */
 @Composable
 private fun HomeBottomBar(onAdd: () -> Unit, onSettings: () -> Unit) {
     val barHeight = 66.dp
     val addSize = 58.dp
-    // How far the button stands proud of the bar, and therefore the extra room the Box needs.
+    // How far the button stands proud of the action row, and the extra room the Box needs.
     val lift = 24.dp
     // Headroom above the button so its drop shadow has somewhere to land.
     val headroom = 8.dp
@@ -295,36 +296,29 @@ private fun HomeBottomBar(onAdd: () -> Unit, onSettings: () -> Unit) {
             .navigationBarsPadding()
             .height(barHeight + lift + headroom),
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            tonalElevation = 3.dp,
+        Row(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .height(barHeight)
-                .align(Alignment.BottomCenter),
+                .padding(horizontal = 28.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 28.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BottomBarAction(
-                    icon = Icons.Rounded.Home,
-                    label = "Home",
-                    selected = true,
-                    onClick = {},
-                )
-                // Keeps the two labels clear of the raised button sitting between them.
-                Spacer(Modifier.width(addSize))
-                BottomBarAction(
-                    icon = Icons.Rounded.Settings,
-                    label = "Settings",
-                    selected = false,
-                    onClick = onSettings,
-                )
-            }
+            BottomBarAction(
+                icon = Icons.Rounded.Home,
+                label = "Home",
+                selected = true,
+                onClick = {},
+            )
+            // Keeps the two labels clear of the raised button sitting between them.
+            Spacer(Modifier.width(addSize))
+            BottomBarAction(
+                icon = Icons.Rounded.Settings,
+                label = "Settings",
+                selected = false,
+                onClick = onSettings,
+            )
         }
 
         Surface(
