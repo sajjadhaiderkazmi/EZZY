@@ -43,9 +43,11 @@ import kotlin.math.roundToInt
 /**
  * Keeps EZZY reachable from inside other apps.
  *
- * It owns up to three windows: a draggable bubble, an invisible edge strip that watches for the
- * opening swipe, and the panel itself. Only the panel is interactive when it is open; the
- * triggers stay out of the way so the app underneath behaves exactly as it did before.
+ * In "Always active" mode it owns a draggable bubble that stays on screen and a foreground
+ * notification that keeps it alive. In "On trigger" mode it owns nothing at all until summoned
+ * — the [EzzyTileService] Quick Settings tile is the only way in — and steps aside again (via
+ * [stopSelf]) the moment the panel it opened closes, so there is no persistent button, listener
+ * or notification while idle. The panel itself is shared by both modes.
  */
 class OverlayService : Service() {
 
@@ -58,8 +60,6 @@ class OverlayService : Service() {
     private var bubbleHost: OverlayViewHost? = null
     private var bubbleView: ComposeView? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
-
-    private var gestureView: View? = null
 
     /** The drop target shown while the bubble is being dragged. */
     private var dismissHost: OverlayViewHost? = null
@@ -100,7 +100,7 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
-        hidePanel()
+        hidePanel(fromOnDestroy = true)
         hideDismissTarget()
         removeTriggers()
         scope.cancel()
@@ -166,18 +166,26 @@ class OverlayService : Service() {
 
     private fun rebuildTriggers() {
         removeTriggers()
-        // Settings.canDrawOverlays() is unreliable on some OEM skins — MIUI reports false even
-        // after the user has allowed it — so the real test is whether addView succeeds.
         when (settings.triggerMode) {
-            TriggerMode.ALWAYS_ACTIVE -> addBubble()
-            TriggerMode.ON_TRIGGER -> addGestureCatcher()
-        }
+            TriggerMode.ALWAYS_ACTIVE -> {
+                // Settings.canDrawOverlays() is unreliable on some OEM skins — MIUI reports
+                // false even after the user has allowed it — so the real test is whether the
+                // bubble could actually be placed.
+                addBubble()
+                if (bubbleView == null) {
+                    Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG)
+                        .show()
+                    stopSelf()
+                }
+            }
 
-        if (bubbleView == null && gestureView == null) {
-            // A trigger was asked for but nothing could be placed on screen, so the permission
-            // really is missing. Say so — silently doing nothing is the worst outcome here.
-            Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG).show()
-            stopSelf()
+            TriggerMode.ON_TRIGGER -> {
+                // Nothing lives on screen in this mode — only the Quick Settings tile opens the
+                // panel, via openPanel() — so there is nothing here for the service to stay
+                // alive for. Stepping aside now means no button, no listener, and no ongoing
+                // notification until the tile is actually tapped.
+                stopSelf()
+            }
         }
     }
 
@@ -187,9 +195,6 @@ class OverlayService : Service() {
         bubbleView = null
         bubbleHost = null
         bubbleParams = null
-
-        gestureView?.let { runCatching { windowManager.removeView(it) } }
-        gestureView = null
     }
 
     private fun addBubble() {
@@ -219,35 +224,6 @@ class OverlayService : Service() {
         bubbleHost = host
         bubbleView = view
         bubbleParams = params
-    }
-
-    /**
-     * Places the gesture window across the lower part of the screen.
-     *
-     * It has to be full width and genuinely tall: a four-finger gesture only registers when
-     * every finger lands inside the window, since fingers outside it go to the app below. It is
-     * also offset above the navigation area so the system's own Home swipe still works.
-     */
-    private fun addGestureCatcher() {
-        val view = GestureCatcherView(
-            context = this,
-            gesture = settings.gesture,
-            onTriggered = { showPanel() },
-        )
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            (screenHeight() * settings.gestureArea.fraction).roundToInt(),
-            overlayWindowType(),
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = dp(48)
-        }
-
-        runCatching { windowManager.addView(view, params) }.onSuccess { gestureView = view }
     }
 
     /**
@@ -453,13 +429,22 @@ class OverlayService : Service() {
         }
     }
 
-    private fun hidePanel() {
+    /**
+     * @param fromOnDestroy true when called as part of the service's own teardown — stopSelf()
+     * must never be called again from inside that teardown.
+     */
+    private fun hidePanel(fromOnDestroy: Boolean = false) {
         autoHideJob?.cancel()
         autoHideJob = null
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelHost?.stop()
         panelView = null
         panelHost = null
+
+        if (!fromOnDestroy && settings.triggerMode == TriggerMode.ON_TRIGGER) {
+            // The panel was the only thing this mode was hosting — step aside again.
+            stopSelf()
+        }
     }
 
     // ---- Small helpers ----------------------------------------------------
@@ -508,6 +493,18 @@ class OverlayService : Service() {
             null
         }.getOrElse { error ->
             error.message ?: "Android refused to start the floating bar service"
+        }
+
+        /** Shows the panel directly, regardless of trigger mode. Used by the Quick Settings tile. */
+        fun openPanel(context: Context) {
+            runCatching {
+                val intent = Intent(context, OverlayService::class.java).setAction(ACTION_OPEN_PANEL)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }
         }
 
         fun stop(context: Context) {

@@ -20,8 +20,6 @@ data class EzzySettings(
     val triggerMode: TriggerMode = TriggerMode.default,
     /** False until the user has been asked which mode they want. */
     val triggerModeChosen: Boolean = false,
-    val gesture: Gesture = Gesture.default,
-    val gestureArea: GestureArea = GestureArea.THIRD,
     val autoHide: AutoHide = AutoHide.default,
     /** Off until the user opts in — a fresh install must not open on a lock screen. */
     val biometricLock: Boolean = false,
@@ -42,9 +40,6 @@ class SettingsStore(context: Context) {
             overlayEnabled = prefs[Keys.OVERLAY] ?: false,
             triggerMode = TriggerMode.from(prefs[Keys.MODE]),
             triggerModeChosen = prefs[Keys.MODE_CHOSEN] ?: false,
-            gesture = Gesture.from(prefs[Keys.GESTURE]),
-            gestureArea = runCatching { GestureArea.valueOf(prefs[Keys.GESTURE_AREA] ?: "") }
-                .getOrDefault(GestureArea.THIRD),
             autoHide = AutoHide.from(prefs[Keys.AUTO_HIDE]),
             biometricLock = prefs[Keys.BIOMETRIC] ?: false,
             autoLockMinutes = prefs[Keys.AUTO_LOCK] ?: 1,
@@ -78,14 +73,6 @@ class SettingsStore(context: Context) {
         store.edit { it[Keys.AUTO_HIDE] = value.name }
     }
 
-    suspend fun setGesture(value: Gesture) {
-        store.edit { it[Keys.GESTURE] = value.name }
-    }
-
-    suspend fun setGestureArea(value: GestureArea) {
-        store.edit { it[Keys.GESTURE_AREA] = value.name }
-    }
-
     suspend fun setThemeMode(value: ThemeMode) {
         store.edit { it[Keys.THEME] = value.name }
     }
@@ -103,8 +90,6 @@ class SettingsStore(context: Context) {
         val MODE = stringPreferencesKey("trigger_mode")
         val MODE_CHOSEN = booleanPreferencesKey("trigger_mode_chosen")
         val AUTO_HIDE = stringPreferencesKey("auto_hide")
-        val GESTURE = stringPreferencesKey("gesture")
-        val GESTURE_AREA = stringPreferencesKey("gesture_area")
         val BIOMETRIC = booleanPreferencesKey("biometric_lock")
         val AUTO_LOCK = intPreferencesKey("auto_lock_minutes")
         val CLIP_CLEAR = intPreferencesKey("clipboard_clear_seconds")

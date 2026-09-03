@@ -5,9 +5,11 @@
     <string name="overlay_channel_name">Floating bar</string>
     <string name="overlay_channel_description">Keeps the EZZY bar reachable from other apps.</string>
     <string name="overlay_notification_title">EZZY bar is on</string>
-    <string name="overlay_notification_text">Use your gesture, or tap the floating button.</string>
+    <string name="overlay_notification_text">Tap the floating button, or the EZZY tile in Quick Settings.</string>
     <string name="action_turn_off">Turn off</string>
     <string name="overlay_turned_off">Floating bar turned off</string>
+    <string name="tile_subtitle_on">Tap to open</string>
+    <string name="tile_subtitle_off">Bar is off</string>
     <string name="overlay_permission_missing">EZZY needs the \"Display over other apps\" permission to show the floating bar.</string>
 
     <string name="fgs_special_use">Draws the user\'s own floating shortcut bar over other apps so saved details can be copied without leaving the current app.</string>

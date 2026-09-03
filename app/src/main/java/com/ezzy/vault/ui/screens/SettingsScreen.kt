@@ -1,6 +1,9 @@
 package com.ezzy.vault.ui.screens
 
 import android.Manifest
+import android.app.StatusBarManager
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -33,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -56,6 +60,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.withResumed
 import com.ezzy.vault.AppContainer
+import com.ezzy.vault.R
+import com.ezzy.vault.overlay.EzzyTileService
 import com.ezzy.vault.overlay.OverlayService
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.ui.LocalSettings
@@ -63,10 +69,10 @@ import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.util.AutoHide
-import com.ezzy.vault.util.Gesture
-import com.ezzy.vault.util.GestureArea
-import com.ezzy.vault.util.TriggerMode
 import com.ezzy.vault.util.ThemeMode
+import com.ezzy.vault.util.TriggerMode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(private val container: AppContainer) : ViewModel() {
@@ -76,8 +82,6 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     fun setOverlayEnabled(value: Boolean) = launch { store.setOverlayEnabled(value) }
     fun setTriggerMode(value: TriggerMode) = launch { store.setTriggerMode(value) }
     fun setAutoHide(value: AutoHide) = launch { store.setAutoHide(value) }
-    fun setGesture(value: Gesture) = launch { store.setGesture(value) }
-    fun setGestureArea(value: GestureArea) = launch { store.setGestureArea(value) }
     fun setBiometric(value: Boolean) = launch { store.setBiometricLock(value) }
     fun setAutoLock(minutes: Int) = launch { store.setAutoLockMinutes(minutes) }
     fun setClipboardClear(seconds: Int) = launch { store.setClipboardClearSeconds(seconds) }
@@ -92,9 +96,9 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         onDone()
     }
 
-    private fun launch(block: suspend () -> Unit) {
-        viewModelScope.launch { block() }
-    }
+    // Returns the Job so a caller that needs the write to land before doing anything else
+    // (restarting the overlay service, in particular) can .join() it.
+    private fun launch(block: suspend () -> Unit): Job = viewModelScope.launch { block() }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,10 +128,14 @@ fun SettingsScreen(
 
     fun turnOn() {
         if (!settings.triggerModeChosen) askMode = true
-        viewModel.setOverlayEnabled(true)
-        val failure = OverlayService.start(context)
-        if (failure != null) {
-            scope.launch { snackbar.showSnackbar("Could not start the bar: $failure") }
+        // The write has to land before the service starts and reads it back — starting it
+        // synchronously right after firing the write off could still read the old value.
+        scope.launch {
+            viewModel.setOverlayEnabled(true).join()
+            val failure = OverlayService.start(context)
+            if (failure != null) {
+                snackbar.showSnackbar("Could not start the bar: $failure")
+            }
         }
     }
 
@@ -244,9 +252,13 @@ fun SettingsScreen(
                     current = settings.triggerMode.label,
                     enabled = settings.overlayEnabled,
                     options = TriggerMode.entries.map { it.label to it },
-                    onSelect = {
-                        viewModel.setTriggerMode(it)
-                        if (settings.overlayEnabled) OverlayService.start(context)
+                    onSelect = { mode ->
+                        // Same ordering as turnOn(): the write must land before the service
+                        // restarts and reads it, or it can still pick up the old mode.
+                        scope.launch {
+                            viewModel.setTriggerMode(mode).join()
+                            if (settings.overlayEnabled) OverlayService.start(context)
+                        }
                     },
                 )
             }
@@ -266,30 +278,14 @@ fun SettingsScreen(
             }
 
             item {
-                ChoiceRow(
-                    title = "Gesture",
-                    current = settings.gesture.label,
-                    enabled = settings.overlayEnabled &&
-                        settings.triggerMode == TriggerMode.ON_TRIGGER,
-                    options = Gesture.entries.map { it.label to it },
-                    onSelect = {
-                        viewModel.setGesture(it)
-                        if (settings.overlayEnabled) OverlayService.start(context)
+                NavigationRow(
+                    title = "Add Quick Settings tile",
+                    subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        "Puts EZZY next to Wi-Fi and Bluetooth"
+                    } else {
+                        "Open the notification shade, tap the pencil, then drag EZZY in"
                     },
-                )
-            }
-
-            item {
-                ChoiceRow(
-                    title = "Gesture area",
-                    current = settings.gestureArea.label,
-                    enabled = settings.overlayEnabled &&
-                        settings.triggerMode == TriggerMode.ON_TRIGGER,
-                    options = GestureArea.entries.map { it.label to it },
-                    onSelect = {
-                        viewModel.setGestureArea(it)
-                        if (settings.overlayEnabled) OverlayService.start(context)
-                    },
+                    onClick = { requestQuickSettingsTile(context, scope, snackbar) },
                 )
             }
 
@@ -298,16 +294,6 @@ fun SettingsScreen(
                     "In Always active mode, drag the floating button onto the cross at the " +
                         "bottom of the screen to switch the bar off, the way a chat head is " +
                         "dismissed."
-                )
-            }
-
-            item {
-                InfoNote(
-                    "The gesture is watched in a band across the bottom of the screen. Android " +
-                        "gives no way to look at a touch and still let it reach the app " +
-                        "underneath, so touches in that band go to EZZY — a taller band is " +
-                        "easier to hit, a smaller one leaves more of the app below untouched. " +
-                        "Four fingers need a tall band: every finger has to land inside it."
                 )
             }
 
@@ -441,7 +427,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = {
                 // Dismissing still settles on a mode, so the question is not asked again.
-                viewModel.setTriggerMode(settings.triggerMode)
+                scope.launch { viewModel.setTriggerMode(settings.triggerMode).join() }
                 askMode = false
             },
             title = { Text("Choose one") },
@@ -452,9 +438,11 @@ fun SettingsScreen(
                             title = mode.label,
                             subtitle = mode.hint,
                             onClick = {
-                                viewModel.setTriggerMode(mode)
                                 askMode = false
-                                OverlayService.start(context)
+                                scope.launch {
+                                    viewModel.setTriggerMode(mode).join()
+                                    OverlayService.start(context)
+                                }
                             },
                         )
                         Spacer(Modifier.height(8.dp))
@@ -645,6 +633,46 @@ private fun InfoNote(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
     )
+}
+
+/**
+ * Prompts the system to add the EZZY tile to Quick Settings (Android 13+), where the user
+ * approves or dismisses it themselves — no app can add its own tile silently. Older Android has
+ * no such API at all, so the only path there is the manual one, explained instead.
+ */
+private fun requestQuickSettingsTile(
+    context: Context,
+    scope: CoroutineScope,
+    snackbar: SnackbarHostState,
+) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        scope.launch {
+            snackbar.showSnackbar(
+                "Open the notification shade, tap the pencil (Edit), then drag EZZY into your tiles."
+            )
+        }
+        return
+    }
+
+    val manager = context.getSystemService(StatusBarManager::class.java)
+    val opened = manager != null && runCatching {
+        manager.requestAddTileService(
+            ComponentName(context, EzzyTileService::class.java),
+            context.getString(R.string.app_name),
+            android.graphics.drawable.Icon.createWithResource(context, R.drawable.ic_notification),
+            { command -> command.run() },
+            { /* The system already shows its own result to the user. */ },
+        )
+    }.isSuccess
+
+    if (!opened) {
+        scope.launch {
+            snackbar.showSnackbar(
+                "Could not open that automatically. Open the notification shade, tap the " +
+                    "pencil (Edit), then drag EZZY into your tiles."
+            )
+        }
+    }
 }
 
 private fun autoLockLabel(minutes: Int): String = when (minutes) {
