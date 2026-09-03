@@ -1,8 +1,6 @@
 package com.ezzy.vault.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -235,21 +233,13 @@ fun FieldValueRow(
                     justCopied = true
                 }
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    AnimatedVisibility(visible = !justCopied, enter = fadeIn(), exit = fadeOut()) {
-                        Icon(
-                            imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = "Copy $label",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    AnimatedVisibility(visible = justCopied, enter = fadeIn(), exit = fadeOut()) {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = "Copied",
-                            tint = MaterialTheme.colorScheme.tertiary,
-                        )
-                    }
+                Crossfade(targetState = justCopied, label = "copy-feedback") { copied ->
+                    Icon(
+                        imageVector = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
+                        contentDescription = if (copied) "Copied" else "Copy $label",
+                        tint = if (copied) MaterialTheme.colorScheme.tertiary
+                        else MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
         }
