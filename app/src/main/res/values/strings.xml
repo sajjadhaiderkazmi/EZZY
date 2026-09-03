@@ -5,7 +5,7 @@
     <string name="overlay_channel_name">Floating bar</string>
     <string name="overlay_channel_description">Keeps the EZZY bar reachable from other apps.</string>
     <string name="overlay_notification_title">EZZY bar is on</string>
-    <string name="overlay_notification_text">Swipe up with two fingers, or tap the floating button.</string>
+    <string name="overlay_notification_text">Use your gesture, or tap the floating button.</string>
     <string name="action_turn_off">Turn off</string>
     <string name="overlay_permission_missing">EZZY needs the \"Display over other apps\" permission to show the floating bar.</string>
 

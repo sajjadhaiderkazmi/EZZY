@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
@@ -62,7 +63,8 @@ import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.ezzyViewModel
-import com.ezzy.vault.util.EdgeSide
+import com.ezzy.vault.util.Gesture
+import com.ezzy.vault.util.StripLength
 import com.ezzy.vault.util.ThemeMode
 import kotlinx.coroutines.launch
 
@@ -72,9 +74,10 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setOverlayEnabled(value: Boolean) = launch { store.setOverlayEnabled(value) }
     fun setBubble(value: Boolean) = launch { store.setBubbleTrigger(value) }
-    fun setEdge(value: Boolean) = launch { store.setEdgeTrigger(value) }
-    fun setEdgeSide(value: EdgeSide) = launch { store.setEdgeSide(value) }
-    fun setTwoFinger(value: Boolean) = launch { store.setTwoFingerOnly(value) }
+    fun setGesture(gesture: Gesture, enabled: Boolean) =
+        launch { store.setGestureEnabled(gesture, enabled) }
+
+    fun setStripLength(value: StripLength) = launch { store.setStripLength(value) }
     fun setBiometric(value: Boolean) = launch { store.setBiometricLock(value) }
     fun setAutoLock(minutes: Int) = launch { store.setAutoLockMinutes(minutes) }
     fun setClipboardClear(seconds: Int) = launch { store.setClipboardClearSeconds(seconds) }
@@ -245,14 +248,25 @@ fun SettingsScreen(
                 )
             }
 
+            item { SettingsGroup("Gestures") }
+
             item {
+                InfoNote(
+                    "Gestures are watched on thin strips along the screen edges. Only two- and " +
+                        "four-finger swipes are offered: three fingers are the screenshot " +
+                        "shortcut on most phones, and one finger belongs to Back, Home and the " +
+                        "notification shade."
+                )
+            }
+
+            items(Gesture.entries.toList(), key = { it.name }) { gesture ->
                 SwitchRow(
-                    title = "Edge swipe",
-                    subtitle = "Swipe up from an invisible strip on the chosen edge.",
-                    checked = settings.edgeTrigger,
+                    title = gesture.label,
+                    subtitle = gesture.hint,
+                    checked = gesture in settings.gestures,
                     enabled = settings.overlayEnabled,
                     onCheckedChange = {
-                        viewModel.setEdge(it)
+                        viewModel.setGesture(gesture, it)
                         if (settings.overlayEnabled) OverlayService.start(context)
                     },
                 )
@@ -260,35 +274,22 @@ fun SettingsScreen(
 
             item {
                 ChoiceRow(
-                    title = "Swipe from",
-                    current = when (settings.edgeSide) {
-                        EdgeSide.LEFT -> "Left edge"
-                        EdgeSide.RIGHT -> "Right edge"
-                        EdgeSide.BOTTOM -> "Bottom (above the nav bar)"
-                    },
-                    enabled = settings.overlayEnabled && settings.edgeTrigger,
-                    options = listOf(
-                        "Bottom (above the nav bar)" to EdgeSide.BOTTOM,
-                        "Right edge" to EdgeSide.RIGHT,
-                        "Left edge" to EdgeSide.LEFT,
-                    ),
+                    title = "Strip length",
+                    current = settings.stripLength.label,
+                    enabled = settings.overlayEnabled && settings.gestures.isNotEmpty(),
+                    options = StripLength.entries.map { it.label to it },
                     onSelect = {
-                        viewModel.setEdgeSide(it)
+                        viewModel.setStripLength(it)
                         if (settings.overlayEnabled) OverlayService.start(context)
                     },
                 )
             }
 
             item {
-                SwitchRow(
-                    title = "Two fingers only",
-                    subtitle = "Requires a two-finger swipe, so a stray one-finger swipe never opens the bar.",
-                    checked = settings.twoFingerOnly,
-                    enabled = settings.overlayEnabled && settings.edgeTrigger,
-                    onCheckedChange = {
-                        viewModel.setTwoFinger(it)
-                        if (settings.overlayEnabled) OverlayService.start(context)
-                    },
+                InfoNote(
+                    "A strip does not pass touches through to the app underneath it, so a " +
+                        "shorter strip leaves more of the screen — corners and bottom " +
+                        "navigation especially — behaving normally."
                 )
             }
 
