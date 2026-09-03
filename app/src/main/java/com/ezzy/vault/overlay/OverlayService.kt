@@ -217,8 +217,8 @@ class OverlayService : Service() {
     /**
      * Places one strip on [edge] listening for exactly the [gestures] assigned to it.
      *
-     * Each edge is offset clear of the system's own gesture zone: the bottom strip sits above
-     * the navigation area so Home still works, and the top strip sits below the status bar so a
+     * Both strips are offset clear of the system's own gesture zone: the bottom one sits above
+     * the navigation area so Home still works, and the top one below the status bar so a
      * two-finger pull there does not open quick settings instead.
      */
     private fun addEdgeStrip(edge: GestureEdge, gestures: List<Gesture>) {
@@ -230,12 +230,9 @@ class OverlayService : Service() {
             onTriggered = { showPanel() },
         )
 
-        val fraction = settings.stripLength.fraction
-        val horizontal = edge == GestureEdge.TOP || edge == GestureEdge.BOTTOM
-
         val params = WindowManager.LayoutParams(
-            if (horizontal) (screenWidth() * fraction).roundToInt() else dp(34),
-            if (horizontal) dp(30) else (screenHeight() * fraction).roundToInt(),
+            (screenWidth() * settings.stripLength.fraction).roundToInt(),
+            dp(34),
             overlayWindowType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
@@ -251,9 +248,6 @@ class OverlayService : Service() {
                     gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                     y = statusBarHeight() + dp(8)
                 }
-
-                GestureEdge.LEFT -> gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                GestureEdge.RIGHT -> gravity = Gravity.CENTER_VERTICAL or Gravity.END
             }
         }
 

@@ -19,10 +19,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The wizard's four steps, in order. */
+/** The wizard's steps, in order. */
 enum class EditorStep(val title: String, val caption: String) {
     SECTION("Section", "Where does this belong?"),
-    TYPE("Type", "What kind of entry is this?"),
     DETAILS("Details", "Fill in what you want to copy later"),
     FILES("Files & note", "Attach photos, scans or receipts"),
     ;
@@ -40,6 +39,8 @@ data class EditorUiState(
      */
     val steps: List<EditorStep> = EditorStep.ordered,
     val step: EditorStep = EditorStep.SECTION,
+    /** Example text under the Title box, taken from whichever type is selected. */
+    val titleHint: String = DEFAULT_TITLE_HINT,
     val loading: Boolean = true,
     val importing: Boolean = false,
     val message: String? = null,
@@ -47,7 +48,6 @@ data class EditorUiState(
     val canContinue: Boolean
         get() = when (step) {
             EditorStep.SECTION -> draft.categoryId.isNotBlank()
-            EditorStep.TYPE -> true
             EditorStep.DETAILS -> draft.title.isNotBlank()
             EditorStep.FILES -> draft.title.isNotBlank()
         }
@@ -75,19 +75,21 @@ class EditorViewModel(
     init {
         viewModelScope.launch {
             val draft = repository.draftFor(itemId, presetCategoryId.orEmpty())
-            val steps = when {
-                // Editing an existing entry: its section and type are already settled.
-                !draft.isNew -> listOf(EditorStep.DETAILS, EditorStep.FILES)
-                // Started from inside a section: never ask which section again.
-                draft.categoryId.isNotBlank() ->
-                    listOf(EditorStep.TYPE, EditorStep.DETAILS, EditorStep.FILES)
-
-                else -> EditorStep.ordered
+            // Once the section is known there is nothing left to ask before the form itself:
+            // the type is chosen inside it, next to everything it changes.
+            val steps = if (draft.categoryId.isNotBlank()) {
+                listOf(EditorStep.DETAILS, EditorStep.FILES)
+            } else {
+                EditorStep.ordered
             }
             _state.value = EditorUiState(
                 draft = draft,
                 steps = steps,
                 step = steps.first(),
+                titleHint = draft.templateId
+                    ?.let { repository.templateSpec(it)?.titleHint }
+                    ?.takeIf { it.isNotBlank() }
+                    ?: DEFAULT_TITLE_HINT,
                 loading = false,
             )
         }
@@ -131,6 +133,7 @@ class EditorViewModel(
     fun applyTemplate(template: TemplateEntity?) {
         viewModelScope.launch {
             if (template == null) {
+                update { it.copy(titleHint = DEFAULT_TITLE_HINT) }
                 updateDraft { it.copy(templateId = null) }
                 return@launch
             }
@@ -142,12 +145,14 @@ class EditorViewModel(
                     label = templateField.label,
                     value = carried?.value.orEmpty(),
                     type = templateField.type,
+                    fromTemplate = true,
                 )
             }
             val extras = existing.filter { field ->
                 field.value.isNotBlank() &&
                     spec.fields.none { it.label.equals(field.label, true) }
             }
+            update { it.copy(titleHint = spec.titleHint.ifBlank { DEFAULT_TITLE_HINT }) }
             updateDraft { it.copy(templateId = template.id, fields = merged + extras) }
         }
     }
@@ -156,21 +161,22 @@ class EditorViewModel(
         draft.copy(fields = draft.fields.map { if (it.id == id) transform(it) else it })
     }
 
-    fun addField(label: String = "", type: FieldType = FieldType.TEXT) = updateDraft { draft ->
-        draft.copy(fields = draft.fields + FieldDraft(label = label, type = type))
+    fun addField(label: String, type: FieldType) = updateDraft { draft ->
+        draft.copy(
+            fields = draft.fields + FieldDraft(
+                label = label.trim(),
+                type = type,
+                fromTemplate = false,
+            )
+        )
+    }
+
+    fun renameField(id: String, label: String, type: FieldType) = updateField(id) {
+        it.copy(label = label.trim(), type = type)
     }
 
     fun removeField(id: String) = updateDraft { draft ->
         draft.copy(fields = draft.fields.filterNot { it.id == id })
-    }
-
-    fun moveField(id: String, delta: Int) = updateDraft { draft ->
-        val fields = draft.fields.toMutableList()
-        val index = fields.indexOfFirst { it.id == id }
-        val target = index + delta
-        if (index < 0 || target !in fields.indices) return@updateDraft draft
-        fields.add(target, fields.removeAt(index))
-        draft.copy(fields = fields)
     }
 
     // ---- Attachments ------------------------------------------------------
@@ -306,3 +312,6 @@ class EditorViewModel(
         _state.value = _state.value.copy(draft = transform(_state.value.draft))
     }
 }
+
+/** Used until a type with its own example is picked. */
+const val DEFAULT_TITLE_HINT = "Give this entry a name"

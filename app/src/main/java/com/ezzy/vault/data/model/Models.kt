@@ -38,4 +38,6 @@ data class TemplateField(
 data class TemplateSpec(
     val fields: List<TemplateField> = emptyList(),
     val allowsAttachments: Boolean = true,
+    /** Example shown under the Title box, so every type suggests something of its own. */
+    val titleHint: String = "",
 )

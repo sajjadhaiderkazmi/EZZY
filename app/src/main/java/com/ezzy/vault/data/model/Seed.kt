@@ -40,6 +40,7 @@ object Seed {
                     TemplateField("Bank Name", FieldType.TEXT, "e.g. Meezan Bank"),
                     TemplateField("Branch / Code", FieldType.TEXT, "Branch name or code"),
                 ),
+                titleHint = "e.g. HBL Current Account",
             ),
         ),
         SeedTemplate(
@@ -54,6 +55,7 @@ object Seed {
                     TemplateField("CVV", FieldType.SECRET, "3 digits on the back"),
                     TemplateField("Issuing Bank", FieldType.TEXT, ""),
                 ),
+                titleHint = "e.g. Meezan Debit Card",
             ),
         ),
         SeedTemplate(
@@ -68,6 +70,7 @@ object Seed {
                     TemplateField("Expires On", FieldType.DATE, "Reminders use this date"),
                     TemplateField("Issued By", FieldType.TEXT, "Authority or office"),
                 ),
+                titleHint = "e.g. My CNIC",
             ),
         ),
         SeedTemplate(
@@ -83,6 +86,7 @@ object Seed {
                     TemplateField("Contact Number", FieldType.PHONE, ""),
                     TemplateField("Summary", FieldType.MULTILINE, "What it says, in your own words"),
                 ),
+                titleHint = "e.g. Property Affidavit",
             ),
         ),
         SeedTemplate(
@@ -97,6 +101,7 @@ object Seed {
                     TemplateField("Shop / Vendor", FieldType.TEXT, ""),
                     TemplateField("Payment Method", FieldType.TEXT, "Cash, card, transfer"),
                 ),
+                titleHint = "e.g. AC purchase receipt",
             ),
         ),
         SeedTemplate(
@@ -112,6 +117,7 @@ object Seed {
                     TemplateField("Serial Number", FieldType.TEXT, ""),
                     TemplateField("Support Number", FieldType.PHONE, ""),
                 ),
+                titleHint = "e.g. Haier AC 1.5 ton",
             ),
         ),
         SeedTemplate(
@@ -126,6 +132,7 @@ object Seed {
                     TemplateField("Email", FieldType.EMAIL, ""),
                     TemplateField("Address", FieldType.MULTILINE, ""),
                 ),
+                titleHint = "e.g. Dr. Ahmed — dentist",
             ),
         ),
         SeedTemplate(
@@ -140,6 +147,7 @@ object Seed {
                     TemplateField("Website", FieldType.URL, ""),
                     TemplateField("Recovery Note", FieldType.MULTILINE, "Backup codes, hints"),
                 ),
+                titleHint = "e.g. Gmail",
             ),
         ),
         SeedTemplate(
@@ -154,6 +162,7 @@ object Seed {
                     TemplateField("Chassis Number", FieldType.TEXT, ""),
                     TemplateField("Insurance Expiry", FieldType.DATE, ""),
                 ),
+                titleHint = "e.g. Honda City 2021",
             ),
         ),
         SeedTemplate(
@@ -166,6 +175,7 @@ object Seed {
                     TemplateField("Password", FieldType.SECRET, ""),
                     TemplateField("Location", FieldType.TEXT, "Home, office, cafe"),
                 ),
+                titleHint = "e.g. Home Wi-Fi",
             ),
         ),
         SeedTemplate(
@@ -177,13 +187,14 @@ object Seed {
                     TemplateField("Title", FieldType.TEXT, "What this shows", required = true),
                     TemplateField("Note", FieldType.MULTILINE, ""),
                 ),
+                titleHint = "e.g. Payment confirmation",
             ),
         ),
         SeedTemplate(
             id = "tpl_blank",
             name = "Free Form",
             iconKey = "note",
-            spec = TemplateSpec(fields = emptyList()),
+            spec = TemplateSpec(fields = emptyList(), titleHint = "e.g. Locker combination"),
         ),
     )
 }

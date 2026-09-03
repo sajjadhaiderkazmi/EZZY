@@ -1,30 +1,37 @@
 package com.ezzy.vault.util
 
 /** Which screen edge a trigger strip is pinned to. */
-enum class GestureEdge { BOTTOM, TOP, LEFT, RIGHT }
+enum class GestureEdge { BOTTOM, TOP }
 
 /** The way a swipe travels, once the dominant axis has been decided. */
-enum class SwipeDirection { UP, DOWN, LEFT, RIGHT }
+enum class SwipeDirection { UP, DOWN }
+
+/** Swipes need travel; taps need stillness. The detector treats them differently. */
+enum class GestureKind { SWIPE, TAP, DOUBLE_TAP }
 
 /**
  * The gestures EZZY will listen for.
  *
- * Finger count is the whole safety story. Three fingers are claimed by the screenshot shortcut
- * on Xiaomi, Samsung, Oppo, Realme, Vivo, Honor and OnePlus, and by app switching on a few
- * others, so they are deliberately absent. Two and four fingers are unclaimed on every skin —
- * the one exception being a two-finger pull inside the status bar, which the top strip stays
- * clear of. The system's own Back and Home gestures are single-finger, so a two-finger swipe
- * from an edge never competes with them.
+ * Finger count is most of the safety story. Three fingers are claimed by the screenshot
+ * shortcut on Xiaomi, Samsung, Oppo, Realme, Vivo, Honor and OnePlus, and by app switching on a
+ * few others, so they are deliberately absent. One finger belongs to Back, Home and the
+ * notification shade. Two and four are unclaimed on every skin — the one exception being a
+ * two-finger pull inside the status bar, which the top strip stays clear of.
+ *
+ * Side edges are not offered at all: a strip there sits exactly where apps expect their own
+ * horizontal scrolling and edge swipes, and the two fight.
  */
 enum class Gesture(
     val fingers: Int,
-    val direction: SwipeDirection,
+    val kind: GestureKind,
+    val direction: SwipeDirection?,
     val edge: GestureEdge,
     val label: String,
     val hint: String,
 ) {
     TWO_UP(
         fingers = 2,
+        kind = GestureKind.SWIPE,
         direction = SwipeDirection.UP,
         edge = GestureEdge.BOTTOM,
         label = "2 fingers · swipe up",
@@ -32,6 +39,7 @@ enum class Gesture(
     ),
     FOUR_UP(
         fingers = 4,
+        kind = GestureKind.SWIPE,
         direction = SwipeDirection.UP,
         edge = GestureEdge.BOTTOM,
         label = "4 fingers · swipe up",
@@ -39,6 +47,7 @@ enum class Gesture(
     ),
     TWO_DOWN(
         fingers = 2,
+        kind = GestureKind.SWIPE,
         direction = SwipeDirection.DOWN,
         edge = GestureEdge.TOP,
         label = "2 fingers · swipe down",
@@ -46,24 +55,27 @@ enum class Gesture(
     ),
     FOUR_DOWN(
         fingers = 4,
+        kind = GestureKind.SWIPE,
         direction = SwipeDirection.DOWN,
         edge = GestureEdge.TOP,
         label = "4 fingers · swipe down",
         hint = "From the strip below the status bar",
     ),
-    TWO_FROM_RIGHT(
-        fingers = 2,
-        direction = SwipeDirection.LEFT,
-        edge = GestureEdge.RIGHT,
-        label = "2 fingers · swipe in from the right",
-        hint = "Back is a one-finger gesture, so this never collides with it",
+    FOUR_TAP(
+        fingers = 4,
+        kind = GestureKind.TAP,
+        direction = null,
+        edge = GestureEdge.BOTTOM,
+        label = "4 fingers · tap",
+        hint = "One tap with four fingers on the bottom strip. No phone uses this.",
     ),
-    TWO_FROM_LEFT(
+    TWO_DOUBLE_TAP(
         fingers = 2,
-        direction = SwipeDirection.RIGHT,
-        edge = GestureEdge.LEFT,
-        label = "2 fingers · swipe in from the left",
-        hint = "Back is a one-finger gesture, so this never collides with it",
+        kind = GestureKind.DOUBLE_TAP,
+        direction = null,
+        edge = GestureEdge.BOTTOM,
+        label = "2 fingers · double tap",
+        hint = "Two quick taps with two fingers on the bottom strip",
     ),
     ;
 

@@ -34,8 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
-import androidx.compose.material.icons.rounded.ArrowDownward
-import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Contacts
@@ -43,12 +41,13 @@ import androidx.compose.material.icons.rounded.Crop
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -60,6 +59,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -84,6 +84,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezzy.vault.data.db.CategoryEntity
@@ -200,19 +201,11 @@ fun EditorScreen(
                     },
                 )
 
-                EditorStep.TYPE -> TypeStep(
-                    templates = templates,
-                    selectedId = state.draft.templateId,
-                    onSelect = {
-                        viewModel.applyTemplate(it)
-                        viewModel.next()
-                    },
-                )
-
                 EditorStep.DETAILS -> DetailsStep(
                     viewModel = viewModel,
                     state = state,
                     categories = categories,
+                    templates = templates,
                 )
 
                 EditorStep.FILES -> FilesStep(viewModel = viewModel, state = state)
@@ -261,7 +254,7 @@ private fun EditorBottomBar(
     }
 }
 
-// ---- Step 1: section --------------------------------------------------------
+// ---- Section step -----------------------------------------------------------
 
 @Composable
 private fun SectionStep(
@@ -309,79 +302,19 @@ private fun SectionStep(
     }
 }
 
-// ---- Step 2: type -----------------------------------------------------------
-
-@Composable
-private fun TypeStep(
-    templates: List<TemplateEntity>,
-    selectedId: String?,
-    onSelect: (TemplateEntity?) -> Unit,
-) {
-    LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item {
-            Text(
-                text = "Pick a type and EZZY pre-fills the right fields. You can rename, add or " +
-                    "remove any of them on the next step.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp),
-            )
-        }
-        items(templates, key = { it.id }) { template ->
-            val selected = template.id == selectedId
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerLow,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .clickable { onSelect(template) }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = IconCatalog.image(template.iconKey),
-                        contentDescription = null,
-                        tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Text(
-                        text = template.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (selected) {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ---- Step 3: details --------------------------------------------------------
+// ---- Details step -----------------------------------------------------------
 
 @Composable
 private fun DetailsStep(
     viewModel: EditorViewModel,
     state: EditorUiState,
     categories: List<CategoryEntity>,
+    templates: List<TemplateEntity>,
 ) {
     val draft = state.draft
     val context = LocalContext.current
+    var newField by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<FieldDraft?>(null) }
 
     val contactPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -389,42 +322,52 @@ private fun DetailsStep(
         val uri = result.data?.data ?: return@rememberLauncherForActivityResult
         readPickedContact(context, uri)?.let { viewModel.applyContact(it.name, it.phone) }
     }
+
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            SectionChooserRow(
-                categories = categories,
+            ChooserRow(
+                caption = "Section",
+                value = categories.firstOrNull { it.id == draft.categoryId }?.name
+                    ?: "Choose a section",
+                iconKey = categories.firstOrNull { it.id == draft.categoryId }?.iconKey,
+                colorKey = categories.firstOrNull { it.id == draft.categoryId }?.colorKey,
+                options = categories.map { Triple(it.id, it.name, it.iconKey) },
                 selectedId = draft.categoryId,
                 onSelect = viewModel::setCategory,
             )
         }
+
+        item {
+            ChooserRow(
+                caption = "Type",
+                value = templates.firstOrNull { it.id == draft.templateId }?.name
+                    ?: "Choose a type",
+                iconKey = templates.firstOrNull { it.id == draft.templateId }?.iconKey,
+                colorKey = null,
+                options = templates.map { Triple(it.id, it.name, it.iconKey) },
+                selectedId = draft.templateId.orEmpty(),
+                onSelect = { id -> viewModel.applyTemplate(templates.firstOrNull { it.id == id }) },
+            )
+        }
+
         item {
             OutlinedTextField(
                 value = draft.title,
                 onValueChange = viewModel::setTitle,
-                label = { Text("Name this entry") },
-                placeholder = { Text("e.g. HBL Current Account") },
+                label = { Text("Title") },
+                placeholder = { Text(state.titleHint) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             )
         }
-        item {
-            OutlinedTextField(
-                value = draft.subtitle,
-                onValueChange = viewModel::setSubtitle,
-                label = { Text("Short description (optional)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+
         item {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -449,7 +392,7 @@ private fun DetailsStep(
         item {
             SectionHeader(
                 text = "Fields",
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 6.dp),
                 trailing = {
                     TextButton(
                         onClick = {
@@ -478,7 +421,7 @@ private fun DetailsStep(
         if (draft.fields.isEmpty()) {
             item {
                 Text(
-                    text = "No fields yet. Add one for every value you want to copy later.",
+                    text = "Pick a type above to get its usual fields, or add your own.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -486,18 +429,18 @@ private fun DetailsStep(
         }
 
         items(draft.fields, key = { it.id }) { field ->
-            FieldEditorCard(
+            FieldInput(
                 field = field,
-                onChange = { updated -> viewModel.updateField(field.id) { updated } },
+                onValueChange = { text -> viewModel.updateField(field.id) { it.copy(value = text) } },
+                canRename = !field.fromTemplate,
+                onRename = { renaming = field },
                 onRemove = { viewModel.removeField(field.id) },
-                onMoveUp = { viewModel.moveField(field.id, -1) },
-                onMoveDown = { viewModel.moveField(field.id, 1) },
             )
         }
 
         item {
             FilledTonalButton(
-                onClick = { viewModel.addField() },
+                onClick = { newField = true },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -506,146 +449,288 @@ private fun DetailsStep(
             }
         }
     }
+
+    if (newField) {
+        FieldNameDialog(
+            title = "New field",
+            initialLabel = "",
+            initialType = FieldType.TEXT,
+            onDismiss = { newField = false },
+            onConfirm = { label, type ->
+                newField = false
+                viewModel.addField(label, type)
+            },
+        )
+    }
+
+    renaming?.let { field ->
+        FieldNameDialog(
+            title = "Rename field",
+            initialLabel = field.label,
+            initialType = field.type,
+            onDismiss = { renaming = null },
+            onConfirm = { label, type ->
+                renaming = null
+                viewModel.renameField(field.id, label, type)
+            },
+        )
+    }
+}
+
+/**
+ * One stored value. The name sits above as a caption and only the data below it is typed in —
+ * a field that came from the entry's type has a fixed name, and one the user added was named
+ * when it was created, so neither needs an editable name box sitting in the form.
+ */
+@Composable
+private fun FieldInput(
+    field: FieldDraft,
+    onValueChange: (String) -> Unit,
+    canRename: Boolean,
+    onRename: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    var revealed by remember { mutableStateOf(false) }
+    var datePickerOpen by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = field.label.ifBlank { "Untitled field" }.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 0.8.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (canRename) {
+                IconButton(onClick = onRename, modifier = Modifier.size(30.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = "Rename ${field.label}",
+                        modifier = Modifier.size(15.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "Remove ${field.label}",
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        OutlinedTextField(
+            value = field.value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = field.type != FieldType.MULTILINE,
+            minLines = if (field.type == FieldType.MULTILINE) 3 else 1,
+            readOnly = field.type == FieldType.DATE,
+            visualTransformation = if (field.type.isMasked && !revealed) {
+                PasswordVisualTransformation()
+            } else {
+                VisualTransformation.None
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = field.type.keyboardType()),
+            trailingIcon = {
+                when {
+                    field.type.isMasked -> IconButton(onClick = { revealed = !revealed }) {
+                        Icon(
+                            imageVector = if (revealed) Icons.Rounded.VisibilityOff
+                            else Icons.Rounded.Visibility,
+                            contentDescription = if (revealed) "Hide value" else "Show value",
+                        )
+                    }
+
+                    field.type == FieldType.DATE -> IconButton(onClick = { datePickerOpen = true }) {
+                        Icon(Icons.Rounded.CalendarMonth, contentDescription = "Pick a date")
+                    }
+
+                    else -> Unit
+                }
+            },
+        )
+    }
+
+    if (datePickerOpen) {
+        DatePickerSheet(
+            onDismiss = { datePickerOpen = false },
+            onPicked = { millis ->
+                datePickerOpen = false
+                onValueChange(DATE_FORMAT.format(Date(millis)))
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FieldEditorCard(
-    field: FieldDraft,
-    onChange: (FieldDraft) -> Unit,
-    onRemove: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+private fun DatePickerSheet(onDismiss: () -> Unit, onPicked: (Long) -> Unit) {
+    val pickerState = rememberDatePickerState()
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = { pickerState.selectedDateMillis?.let(onPicked) ?: onDismiss() }
+            ) {
+                Text("Set")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    ) {
+        DatePicker(state = pickerState)
+    }
+}
+
+/** Naming comes first: a field is created with a name and a kind, then it holds data. */
+@Composable
+private fun FieldNameDialog(
+    title: String,
+    initialLabel: String,
+    initialType: FieldType,
+    onDismiss: () -> Unit,
+    onConfirm: (String, FieldType) -> Unit,
 ) {
+    var label by remember { mutableStateOf(initialLabel) }
+    var type by remember { mutableStateOf(initialType) }
     var typeMenuOpen by remember { mutableStateOf(false) }
-    var revealed by remember { mutableStateOf(false) }
-    var datePickerOpen by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text("Field name") },
+                    placeholder = { Text("e.g. Branch code") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+                Box {
+                    OutlinedButton(
+                        onClick = { typeMenuOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(type.displayName(), modifier = Modifier.weight(1f))
+                        Icon(Icons.Rounded.ExpandMore, contentDescription = null)
+                    }
+                    DropdownMenu(
+                        expanded = typeMenuOpen,
+                        onDismissRequest = { typeMenuOpen = false },
+                    ) {
+                        FieldType.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.displayName()) },
+                                onClick = {
+                                    type = option
+                                    typeMenuOpen = false
+                                },
+                                trailingIcon = {
+                                    if (option == type) {
+                                        Icon(Icons.Rounded.Check, contentDescription = null)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = label.isNotBlank(),
+                onClick = { onConfirm(label, type) },
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Shared row for the two things an entry is filed under: its section and its type. */
+@Composable
+private fun ChooserRow(
+    caption: String,
+    value: String,
+    iconKey: String?,
+    colorKey: String?,
+    options: List<Triple<String, String, String>>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
 
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = field.label,
-                    onValueChange = { onChange(field.copy(label = it)) },
-                    label = { Text("Field name") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
+        Box {
+            Row(
+                modifier = Modifier
+                    .clickable { open = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconAvatar(
+                    iconKey = iconKey,
+                    colorKey = colorKey,
+                    size = 36.dp,
+                    iconSize = 18.dp,
                 )
-                Spacer(Modifier.width(6.dp))
-                Column {
-                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowUpward,
-                            contentDescription = "Move up",
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowDownward,
-                            contentDescription = "Move down",
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(text = value, style = MaterialTheme.typography.bodyLarge)
                 }
-                IconButton(onClick = onRemove) {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = "Remove field",
-                        tint = MaterialTheme.colorScheme.error,
+                Icon(
+                    imageVector = Icons.Rounded.ExpandMore,
+                    contentDescription = "Change $caption",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                options.forEach { (id, name, icon) ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            onSelect(id)
+                            open = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = IconCatalog.image(icon),
+                                contentDescription = null,
+                            )
+                        },
+                        trailingIcon = {
+                            if (id == selectedId) {
+                                Icon(Icons.Rounded.Check, contentDescription = null)
+                            }
+                        },
                     )
                 }
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = field.value,
-                onValueChange = { onChange(field.copy(value = it)) },
-                label = { Text("Data") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = field.type != FieldType.MULTILINE,
-                minLines = if (field.type == FieldType.MULTILINE) 3 else 1,
-                readOnly = field.type == FieldType.DATE,
-                visualTransformation = if (field.type.isMasked && !revealed) {
-                    PasswordVisualTransformation()
-                } else {
-                    VisualTransformation.None
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = field.type.keyboardType()),
-                trailingIcon = {
-                    when {
-                        field.type.isMasked -> IconButton(onClick = { revealed = !revealed }) {
-                            Icon(
-                                imageVector = if (revealed) Icons.Rounded.VisibilityOff
-                                else Icons.Rounded.Visibility,
-                                contentDescription = if (revealed) "Hide value" else "Show value",
-                            )
-                        }
-
-                        field.type == FieldType.DATE -> IconButton(onClick = { datePickerOpen = true }) {
-                            Icon(Icons.Rounded.CalendarMonth, contentDescription = "Pick a date")
-                        }
-
-                        else -> Unit
-                    }
-                },
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Box {
-                TextButton(onClick = { typeMenuOpen = true }) {
-                    Text(field.type.displayName())
-                }
-                DropdownMenu(expanded = typeMenuOpen, onDismissRequest = { typeMenuOpen = false }) {
-                    FieldType.entries.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.displayName()) },
-                            onClick = {
-                                onChange(field.copy(type = type))
-                                typeMenuOpen = false
-                            },
-                            trailingIcon = {
-                                if (type == field.type) {
-                                    Icon(Icons.Rounded.Check, contentDescription = null)
-                                }
-                            },
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    if (datePickerOpen) {
-        val pickerState = rememberDatePickerState()
-        DatePickerDialog(
-            onDismissRequest = { datePickerOpen = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pickerState.selectedDateMillis?.let {
-                            onChange(field.copy(value = DATE_FORMAT.format(Date(it))))
-                        }
-                        datePickerOpen = false
-                    }
-                ) { Text("Set") }
-            },
-            dismissButton = {
-                TextButton(onClick = { datePickerOpen = false }) { Text("Cancel") }
-            },
-        ) {
-            DatePicker(state = pickerState)
         }
     }
 }
 
-// ---- Step 4: files ----------------------------------------------------------
+// ---- Files step -------------------------------------------------------------
 
 @Composable
 private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
@@ -663,9 +748,12 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
         name to (context.contentResolver.getType(uri) ?: "application/octet-stream")
     }
 
+    // Single select on purpose: on several OEM gallery pickers a tap in multi-select mode only
+    // opens a preview and Done comes back empty. Picking one photo returns immediately, and the
+    // button can simply be tapped again for the next one.
     val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(10)
-    ) { uris -> viewModel.addAttachments(uris, resolveName) }
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -878,81 +966,6 @@ private fun readPickedContact(context: Context, uri: Uri): PickedContact? = runC
 }.getOrNull()
 
 private data class PickedContact(val name: String, val phone: String)
-
-/**
- * Shows which section the entry lands in and lets it be changed without walking back through
- * the wizard — a free-form note in particular often needs re-filing after it is written.
- */
-@Composable
-private fun SectionChooserRow(
-    categories: List<CategoryEntity>,
-    selectedId: String,
-    onSelect: (String) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    val selected = categories.firstOrNull { it.id == selectedId }
-
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Box {
-            Row(
-                modifier = Modifier
-                    .clickable { open = true }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconAvatar(
-                    iconKey = selected?.iconKey,
-                    colorKey = selected?.colorKey,
-                    size = 36.dp,
-                    iconSize = 18.dp,
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Section",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = selected?.name ?: "Choose a section",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-                Icon(
-                    imageVector = Icons.Rounded.ExpandMore,
-                    contentDescription = "Change section",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                categories.forEach { category ->
-                    DropdownMenuItem(
-                        text = { Text(category.name) },
-                        onClick = {
-                            onSelect(category.id)
-                            open = false
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = IconCatalog.image(category.iconKey),
-                                contentDescription = null,
-                            )
-                        },
-                        trailingIcon = {
-                            if (category.id == selectedId) {
-                                Icon(Icons.Rounded.Check, contentDescription = null)
-                            }
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
 
 // ---- Helpers ----------------------------------------------------------------
 

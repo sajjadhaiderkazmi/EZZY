@@ -8,6 +8,11 @@ data class FieldDraft(
     val label: String = "",
     val value: String = "",
     val type: FieldType = FieldType.TEXT,
+    /**
+     * True when the name came from the entry's type. Those names are shown rather than edited —
+     * only the data below them is typed in — while a field the user adds is named up front.
+     */
+    val fromTemplate: Boolean = false,
 ) {
     val isBlank: Boolean get() = label.isBlank() && value.isBlank()
 }

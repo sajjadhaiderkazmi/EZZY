@@ -192,6 +192,14 @@ class VaultRepository(
     /** Builds an editable draft from a stored item, or a blank one for a new entry. */
     suspend fun draftFor(itemId: String?, categoryId: String): ItemDraft {
         val stored = itemId?.let { db.itemDao().getById(it) } ?: return ItemDraft(categoryId = categoryId)
+        // Which names came from the entry's type is not stored, so it is recovered by matching
+        // the saved labels against the type's own — those stay read-only in the editor.
+        val templateLabels = stored.item.templateId
+            ?.let { templateSpec(it) }
+            ?.fields
+            ?.mapTo(mutableSetOf()) { it.label.lowercase() }
+            .orEmpty()
+
         return ItemDraft(
             id = stored.item.id,
             isNew = false,
@@ -202,7 +210,13 @@ class VaultRepository(
             note = stored.item.note,
             isPinned = stored.item.isPinned,
             fields = stored.sortedFields.map {
-                FieldDraft(id = it.id, label = it.label, value = it.value, type = it.type)
+                FieldDraft(
+                    id = it.id,
+                    label = it.label,
+                    value = it.value,
+                    type = it.type,
+                    fromTemplate = it.label.lowercase() in templateLabels,
+                )
             },
             attachments = stored.sortedAttachments.map {
                 AttachmentDraft(
