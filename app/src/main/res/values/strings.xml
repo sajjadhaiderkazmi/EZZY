@@ -8,7 +8,7 @@
     <string name="overlay_notification_text">Tap the floating button, or the EZZY tile in Quick Settings.</string>
     <string name="action_turn_off">Turn off</string>
     <string name="overlay_turned_off">Floating bar turned off</string>
-    <string name="tile_subtitle_on">Tap to open</string>
+    <string name="tile_subtitle_on">Tap for the button</string>
     <string name="tile_subtitle_off">Bar is off</string>
     <string name="overlay_permission_missing">EZZY needs the \"Display over other apps\" permission to show the floating bar.</string>
 

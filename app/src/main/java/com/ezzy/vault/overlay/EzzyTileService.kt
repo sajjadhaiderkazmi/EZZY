@@ -22,9 +22,16 @@ import kotlinx.coroutines.launch
  * Puts EZZY next to Wi-Fi, Bluetooth and Hotspot in Quick Settings.
  *
  * This is the sole way in while the floating bar is in "On trigger" mode: nothing sits on
- * screen until this tile is tapped, and the panel it opens closes itself again after the chosen
- * quiet period. In "Always active" mode the tile still works — it is just a second way to reach
- * the same panel the draggable button already opens.
+ * screen until this tile is tapped. The tap does not jump straight to the panel — it brings up
+ * the same draggable button "Always active" mode keeps up permanently, except this one is
+ * temporary, closing itself after the chosen quiet period (or sooner, if dropped on the
+ * dismiss target). Tapping that button is what actually opens the panel. In "Always active"
+ * mode the button is already on screen, so the tile just opens the panel directly there.
+ *
+ * The tile always renders as inactive rather than reflecting whether something is currently
+ * on screen — it is a "do something" tile, like a screen-recorder shortcut, not a live on/off
+ * toggle, and a permanently-lit tile would misread as "something is happening" when usually
+ * nothing is.
  */
 class EzzyTileService : TileService() {
 
@@ -61,7 +68,7 @@ class EzzyTileService : TileService() {
         // cases (already unlocked runs immediately), which is the documented safe pattern.
         unlockAndRun {
             if (latest.overlayEnabled) {
-                OverlayService.openPanel(this)
+                OverlayService.showTrigger(this)
             } else {
                 // Nothing to trigger yet — send the user to turn the bar on first.
                 openSettings()
@@ -73,7 +80,8 @@ class EzzyTileService : TileService() {
         val tile = qsTile ?: return
         tile.icon = Icon.createWithResource(this, R.drawable.ic_notification)
         tile.label = getString(R.string.app_name)
-        tile.state = if (settings.overlayEnabled) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        // Always inactive — see the class doc for why this never switches to STATE_ACTIVE.
+        tile.state = Tile.STATE_INACTIVE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Tile.subtitle does not exist on the framework before Q — setting it on an older
             // device would throw, not just render blank.

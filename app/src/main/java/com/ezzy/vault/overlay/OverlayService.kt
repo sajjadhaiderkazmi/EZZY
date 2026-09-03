@@ -44,10 +44,12 @@ import kotlin.math.roundToInt
  * Keeps EZZY reachable from inside other apps.
  *
  * In "Always active" mode it owns a draggable bubble that stays on screen and a foreground
- * notification that keeps it alive. In "On trigger" mode it owns nothing at all until summoned
- * — the [EzzyTileService] Quick Settings tile is the only way in — and steps aside again (via
- * [stopSelf]) the moment the panel it opened closes, so there is no persistent button, listener
- * or notification while idle. The panel itself is shared by both modes.
+ * notification that keeps it alive. In "On trigger" mode it owns nothing at all until the
+ * [EzzyTileService] Quick Settings tile is tapped — which brings up that same bubble rather
+ * than jumping straight to the panel, so the tap only puts a button within reach and the user
+ * still chooses when to open it. That bubble times out on its own (or can be dropped on the
+ * dismiss target early), and the moment nothing is left on screen the service steps aside via
+ * [stopSelf], so there is no persistent button, listener or notification while idle.
  */
 class OverlayService : Service() {
 
@@ -67,6 +69,10 @@ class OverlayService : Service() {
     private val dismissArmed = mutableStateOf(false)
 
     private var autoHideJob: Job? = null
+
+    /** Times out the button the tile summoned in "On trigger" mode — separate from [autoHideJob],
+     * which times out the panel. */
+    private var bubbleAutoHideJob: Job? = null
 
     private var panelHost: OverlayViewHost? = null
     private var panelView: View? = null
@@ -89,6 +95,16 @@ class OverlayService : Service() {
             ACTION_OPEN_PANEL -> scope.launch {
                 refreshSettings()
                 showPanel()
+            }
+
+            ACTION_SHOW_TRIGGER -> scope.launch {
+                refreshSettings()
+                when (settings.triggerMode) {
+                    // The button is already permanent here, so tapping the tile can go
+                    // straight to what it opens — there is nothing to "summon" first.
+                    TriggerMode.ALWAYS_ACTIVE -> showPanel()
+                    TriggerMode.ON_TRIGGER -> showTemporaryBubble()
+                }
             }
 
             else -> scope.launch {
@@ -180,10 +196,10 @@ class OverlayService : Service() {
             }
 
             TriggerMode.ON_TRIGGER -> {
-                // Nothing lives on screen in this mode — only the Quick Settings tile opens the
-                // panel, via openPanel() — so there is nothing here for the service to stay
-                // alive for. Stepping aside now means no button, no listener, and no ongoing
-                // notification until the tile is actually tapped.
+                // Nothing lives on screen in this mode by default — only the Quick Settings
+                // tile brings up a button, via showTrigger() — so there is nothing here for
+                // the service to stay alive for. Stepping aside now means no button, no
+                // listener, and no ongoing notification until the tile is actually tapped.
                 stopSelf()
             }
         }
@@ -224,6 +240,34 @@ class OverlayService : Service() {
         bubbleHost = host
         bubbleView = view
         bubbleParams = params
+    }
+
+    /**
+     * What the Quick Settings tile summons in "On trigger" mode: the very same draggable
+     * button "Always active" mode keeps up permanently, except this one is temporary — it
+     * times out on its own, or can be dropped on the dismiss target early, and tapping it
+     * opens the panel exactly like the permanent one does. The tap only puts a button within
+     * reach; it never jumps straight to the panel on its own.
+     */
+    private fun showTemporaryBubble() {
+        if (bubbleView == null) addBubble()
+        if (bubbleView == null) {
+            Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG).show()
+            stopSelf()
+            return
+        }
+        restartBubbleAutoHide()
+    }
+
+    private fun restartBubbleAutoHide() {
+        bubbleAutoHideJob?.cancel()
+        val seconds = settings.autoHide.seconds
+        if (seconds <= 0) return
+        bubbleAutoHideJob = scope.launch {
+            delay(seconds * 1000L)
+            // Nothing else is being hosted in this mode, so the whole service can step aside.
+            stopSelf()
+        }
     }
 
     /**
@@ -274,12 +318,25 @@ class OverlayService : Service() {
         return hypot(dx, dy) <= dp(DISMISS_HIT_DP)
     }
 
-    private fun turnOffFromBubble() {
-        Toast.makeText(this, R.string.overlay_turned_off, Toast.LENGTH_SHORT).show()
-        // Written on the application scope, not the service's: stopSelf() cancels the service
-        // scope, and a half-finished write would leave the switch showing on next launch.
-        appContainer.scope.launch { appContainer.settings.setOverlayEnabled(false) }
-        stopSelf()
+    /**
+     * What dropping the button onto the dismiss target does. In "Always active" mode that
+     * button is the permanent one, so this really does turn the floating bar off. In "On
+     * trigger" mode it is only the temporary one the tile just summoned, so dropping it just
+     * ends this appearance early — the tile is still there for next time.
+     */
+    private fun dismissBubble() {
+        when (settings.triggerMode) {
+            TriggerMode.ALWAYS_ACTIVE -> {
+                Toast.makeText(this, R.string.overlay_turned_off, Toast.LENGTH_SHORT).show()
+                // Written on the application scope, not the service's: stopSelf() cancels the
+                // service scope, and a half-finished write would leave the switch showing on
+                // next launch.
+                appContainer.scope.launch { appContainer.settings.setOverlayEnabled(false) }
+                stopSelf()
+            }
+
+            TriggerMode.ON_TRIGGER -> stopSelf()
+        }
     }
 
     /** Drags the bubble, and treats a short, still press as a tap that opens the panel. */
@@ -331,7 +388,7 @@ class OverlayService : Service() {
                     val overTarget = moved && dismissArmed.value
                     hideDismissTarget()
                     when {
-                        overTarget -> turnOffFromBubble()
+                        overTarget -> dismissBubble()
                         !moved && System.currentTimeMillis() - downAt < TAP_TIMEOUT_MS -> showPanel()
                         moved -> snapToEdge(view)
                     }
@@ -352,6 +409,9 @@ class OverlayService : Service() {
 
     private fun showPanel() {
         if (panelView != null) return
+        // The button's own countdown no longer applies once the panel is what's on screen.
+        bubbleAutoHideJob?.cancel()
+        bubbleAutoHideJob = null
 
         val host = OverlayViewHost(this).also { it.start() }
         val view = host.composeView {
@@ -466,6 +526,7 @@ class OverlayService : Service() {
     companion object {
         const val ACTION_STOP = "com.ezzy.vault.overlay.STOP"
         const val ACTION_OPEN_PANEL = "com.ezzy.vault.overlay.OPEN_PANEL"
+        const val ACTION_SHOW_TRIGGER = "com.ezzy.vault.overlay.SHOW_TRIGGER"
 
         private const val CHANNEL_ID = "ezzy_overlay"
         private const val NOTIFICATION_ID = 4211
@@ -495,10 +556,26 @@ class OverlayService : Service() {
             error.message ?: "Android refused to start the floating bar service"
         }
 
-        /** Shows the panel directly, regardless of trigger mode. Used by the Quick Settings tile. */
+        /** Shows the panel directly, regardless of trigger mode. */
         fun openPanel(context: Context) {
             runCatching {
                 val intent = Intent(context, OverlayService::class.java).setAction(ACTION_OPEN_PANEL)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }
+        }
+
+        /**
+         * What the Quick Settings tile calls. In "Always active" mode the button is already
+         * permanent, so this opens the panel directly; in "On trigger" mode it brings up a
+         * temporary button instead of jumping straight to the panel.
+         */
+        fun showTrigger(context: Context) {
+            runCatching {
+                val intent = Intent(context, OverlayService::class.java).setAction(ACTION_SHOW_TRIGGER)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
                 } else {
