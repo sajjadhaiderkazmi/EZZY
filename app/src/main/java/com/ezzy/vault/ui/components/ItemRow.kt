@@ -33,8 +33,14 @@ fun ItemRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val subtitle = item.item.subtitle.ifBlank {
-        item.sortedFields.firstOrNull { !it.type.isMasked && it.value.isNotBlank() }?.value.orEmpty()
+    // A masked field (account number, card, IBAN…) makes a far more useful preview than the
+    // full value would — "•••• 4321" says which one at a glance without showing it in a list.
+    val maskedField = item.sortedFields.firstOrNull { it.type.isMasked && it.value.isNotBlank() }
+    val subtitle = when {
+        maskedField != null -> "•••• " + maskedField.value.takeLast(4)
+        else -> item.item.subtitle.ifBlank {
+            item.sortedFields.firstOrNull { !it.type.isMasked && it.value.isNotBlank() }?.value.orEmpty()
+        }
     }
 
     Surface(

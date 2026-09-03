@@ -37,6 +37,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -52,6 +54,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -79,6 +82,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     private val store = container.settings
 
+    fun setDisplayName(value: String) = launch { store.setDisplayName(value) }
     fun setOverlayEnabled(value: Boolean) = launch { store.setOverlayEnabled(value) }
     fun setTriggerMode(value: TriggerMode) = launch { store.setTriggerMode(value) }
     fun setAutoHide(value: AutoHide) = launch { store.setAutoHide(value) }
@@ -224,6 +228,35 @@ fun SettingsScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            item { SettingsGroup("Profile") }
+
+            item {
+                var nameField by remember { mutableStateOf(settings.displayName) }
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    OutlinedTextField(
+                        value = nameField,
+                        onValueChange = {
+                            nameField = it
+                            viewModel.setDisplayName(it)
+                        },
+                        label = { Text("Your name") },
+                        placeholder = { Text("Used only for the Home greeting") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent,
+                        ),
+                    )
+                }
+            }
+
             item { SettingsGroup("Floating bar") }
 
             item {
@@ -399,7 +432,7 @@ fun SettingsScreen(
 
             item {
                 NavigationRow(
-                    title = "Entry types",
+                    title = "Manage entry types",
                     subtitle = "Edit which fields each kind of entry asks for",
                     onClick = onOpenTemplates,
                 )

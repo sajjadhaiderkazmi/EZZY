@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Visibility
@@ -56,10 +59,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -77,6 +80,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
@@ -134,44 +138,39 @@ fun EditorScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                text = if (state.draft.isNew) "New entry" else "Edit entry",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = "Step ${stepIndex + 1} of ${state.steps.size} · ${state.step.title}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { if (!viewModel.back()) onClose() }) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = onClose) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Discard")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
-                )
-                LinearProgressIndicator(
-                    progress = { (stepIndex + 1f) / state.steps.size },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = if (state.draft.isNew) "New entry" else "Edit entry",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = "Step ${stepIndex + 1} of ${state.steps.size} · ${state.step.title}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = { if (!viewModel.back()) onClose() }) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Discard")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
         },
         bottomBar = {
             EditorBottomBar(
                 state = state,
+                stepIndex = stepIndex,
                 isLastStep = state.step == state.steps.last(),
                 onBack = { viewModel.back() },
                 onNext = { viewModel.next() },
@@ -218,39 +217,74 @@ fun EditorScreen(
 @Composable
 private fun EditorBottomBar(
     state: EditorUiState,
+    stepIndex: Int,
     isLastStep: Boolean,
     onBack: () -> Unit,
     onNext: () -> Unit,
     onSave: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (state.step != state.steps.first()) {
-                TextButton(onClick = onBack) { Text("Back") }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (state.steps.size > 1) {
+                StepDots(
+                    total = state.steps.size,
+                    current = stepIndex,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                )
             }
-            Spacer(Modifier.weight(1f))
-
-            // Once the entry has a name it can be saved from any step — no need to walk
-            // through files just to store a phone number.
-            if (!isLastStep && state.canSave) {
-                TextButton(onClick = onSave) { Text("Save now") }
-            }
-
-            if (isLastStep) {
-                Button(onClick = onSave, enabled = state.canSave) {
-                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Save entry")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (state.step != state.steps.first()) {
+                    TextButton(onClick = onBack) { Text("Back") }
                 }
-            } else {
-                Button(onClick = onNext, enabled = state.canContinue) { Text("Continue") }
+                Spacer(Modifier.weight(1f))
+
+                // Once the entry has a name it can be saved from any step — no need to walk
+                // through files just to store a phone number.
+                if (!isLastStep && state.canSave) {
+                    TextButton(onClick = onSave) { Text("Save now") }
+                }
+
+                if (isLastStep) {
+                    Button(onClick = onSave, enabled = state.canSave) {
+                        Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Save entry")
+                    }
+                } else {
+                    Button(onClick = onNext, enabled = state.canContinue) { Text("Continue") }
+                }
             }
+        }
+    }
+}
+
+/** The step progress as dots rather than a bar — reads clearly at a glance for 2–4 steps. */
+@Composable
+private fun StepDots(total: Int, current: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(total) { index ->
+            val active = index == current
+            Box(
+                modifier = Modifier
+                    .size(if (active) 8.dp else 6.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant
+                    )
+            )
         }
     }
 }
@@ -557,6 +591,7 @@ private fun FieldInput(
 ) {
     var revealed by remember { mutableStateOf(false) }
     var datePickerOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -569,23 +604,41 @@ private fun FieldInput(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (canRename) {
-                IconButton(onClick = onRename, modifier = Modifier.size(30.dp)) {
+            Box {
+                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(30.dp)) {
                     Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = "Rename ${field.label}",
-                        modifier = Modifier.size(15.dp),
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = "${field.label} options",
+                        modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-            IconButton(onClick = onRemove, modifier = Modifier.size(30.dp)) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = "Remove ${field.label}",
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (canRename) {
+                        DropdownMenuItem(
+                            text = { Text("Rename") },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                onRename()
+                            },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Remove", color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = {
+                            menuOpen = false
+                            onRemove()
+                        },
+                    )
+                }
             }
         }
 
@@ -595,6 +648,7 @@ private fun FieldInput(
             value = field.value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
             singleLine = field.type != FieldType.MULTILINE,
             minLines = if (field.type == FieldType.MULTILINE) 3 else 1,
             readOnly = field.type == FieldType.DATE,
@@ -604,6 +658,14 @@ private fun FieldInput(
                 VisualTransformation.None
             },
             keyboardOptions = KeyboardOptions(keyboardType = field.type.keyboardType()),
+            // Filled and borderless rather than an outlined box: a soft tonal field reads as
+            // "part of this card" instead of a separate boxed input sitting on top of it.
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                unfocusedBorderColor = Color.Transparent,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+            ),
             trailingIcon = {
                 when {
                     field.type.isMasked -> IconButton(onClick = { revealed = !revealed }) {

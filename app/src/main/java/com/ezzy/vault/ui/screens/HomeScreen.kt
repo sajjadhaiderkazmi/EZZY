@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,16 +29,17 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -48,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -60,12 +63,14 @@ import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.ui.components.EmptyState
 import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.SectionHeader
+import com.ezzy.vault.ui.components.StatCard
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.util.EzzySettings
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 class HomeViewModel(container: AppContainer) : ViewModel() {
 
@@ -113,26 +118,22 @@ fun HomeScreen(
         .take(8)
     val categoryLookup = categories.associateBy { it.category.id }
 
+    val greeting = remember {
+        when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..20 -> "Good evening"
+            else -> "Good night"
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text("EZZY", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            text = if (itemCount == 0) "Your vault is empty"
-                            else "$itemCount saved · ${categories.size} sections",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
+                title = {},
                 actions = {
                     IconButton(onClick = onOpenSearch) {
                         Icon(Icons.Rounded.Search, contentDescription = "Search")
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "Settings")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -140,12 +141,8 @@ fun HomeScreen(
                 ),
             )
         },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddItem,
-                icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                text = { Text("Add") },
-            )
+        bottomBar = {
+            HomeBottomBar(onAdd = onAddItem, onSettings = onOpenSettings)
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
@@ -154,10 +151,30 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    text = buildString {
+                        append(greeting)
+                        if (settings.displayName.isNotBlank()) append(", ${settings.displayName}")
+                        append(" 👋")
+                    },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            item(span = { GridItemSpan(1) }) {
+                StatCard(value = "$itemCount", label = if (itemCount == 1) "Total item" else "Total items")
+            }
+            item(span = { GridItemSpan(1) }) {
+                StatCard(value = "${pinned.size}", label = "Pinned")
+            }
+
             if (!settings.overlayEnabled) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SetupCard(
@@ -190,7 +207,18 @@ fun HomeScreen(
 
             if (quickAccess.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    SectionHeader("Quick access", modifier = Modifier.padding(top = 4.dp))
+                    SectionHeader(
+                        text = "Quick access",
+                        modifier = Modifier.padding(top = 4.dp),
+                        trailing = {
+                            TextButton(
+                                onClick = onOpenSearch,
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                            ) {
+                                Text("See all", style = MaterialTheme.typography.labelMedium)
+                            }
+                        },
+                    )
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     LazyRow(
@@ -211,7 +239,7 @@ fun HomeScreen(
 
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(
-                    text = "Sections",
+                    text = "My Sections",
                     modifier = Modifier.padding(top = 8.dp),
                     trailing = {
                         IconButton(onClick = onAddCategory, modifier = Modifier.size(32.dp)) {
@@ -240,6 +268,76 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Home's own bottom bar: Home (already here), a raised Add button for the single most common
+ * action, and Settings. Sub-screens keep the back-arrow top bar they already had — this bar is
+ * Home-only, not a persistent app-wide shell.
+ */
+@Composable
+private fun HomeBottomBar(onAdd: () -> Unit, onSettings: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 3.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(68.dp)
+                .padding(horizontal = 32.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BottomBarAction(icon = Icons.Rounded.Home, label = "Home", selected = true, onClick = {})
+
+            Surface(
+                onClick = onAdd,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .size(52.dp)
+                    .offset(y = (-14).dp),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Add entry",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+
+            BottomBarAction(
+                icon = Icons.Rounded.Settings,
+                label = "Settings",
+                selected = false,
+                onClick = onSettings,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomBarAction(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (selected) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(imageVector = icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.height(2.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = tint)
     }
 }
 

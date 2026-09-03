@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -24,12 +25,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.ezzy.vault.ui.components.EzzyChip
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -81,6 +85,15 @@ fun SearchScreen(
     val results by viewModel.results.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
 
+    // Narrows the already-fetched results rather than re-querying — the list is short enough
+    // that filtering it in place is simpler than plumbing a category filter into the DAO.
+    var categoryFilter by remember { mutableStateOf<String?>(null) }
+    val visibleResults = if (categoryFilter == null) {
+        results
+    } else {
+        results.filter { it.item.categoryId == categoryFilter }
+    }
+
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
 
@@ -129,6 +142,32 @@ fun SearchScreen(
                 )
             }
 
+            if (query.isNotBlank() && categories.isNotEmpty()) {
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 2.dp),
+                    ) {
+                        item(key = "all") {
+                            EzzyChip(
+                                text = "All",
+                                selected = categoryFilter == null,
+                                onClick = { categoryFilter = null },
+                            )
+                        }
+                        items(categories.values.toList(), key = { it.id }) { category ->
+                            EzzyChip(
+                                text = category.name,
+                                selected = categoryFilter == category.id,
+                                onClick = {
+                                    categoryFilter = if (categoryFilter == category.id) null else category.id
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
             when {
                 query.isBlank() -> item {
                     EmptyState(
@@ -138,7 +177,7 @@ fun SearchScreen(
                     )
                 }
 
-                results.isEmpty() -> item {
+                visibleResults.isEmpty() -> item {
                     EmptyState(
                         icon = Icons.Rounded.SearchOff,
                         title = "Nothing found",
@@ -146,7 +185,7 @@ fun SearchScreen(
                     )
                 }
 
-                else -> items(results, key = { it.item.id }) { entry ->
+                else -> items(visibleResults, key = { it.item.id }) { entry ->
                     val category = categories[entry.item.categoryId]
                     ItemRow(
                         item = entry,

@@ -1,5 +1,6 @@
 package com.ezzy.vault.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,14 +28,12 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,7 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -60,12 +64,11 @@ import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.data.db.ItemWithDetails
 import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.components.EncryptedImage
-import com.ezzy.vault.ui.components.EzzyChip
 import com.ezzy.vault.ui.components.FieldValueRow
-import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.components.VoiceNoteRow
 import com.ezzy.vault.ui.ezzyViewModel
+import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.rememberCopier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -186,41 +189,64 @@ fun ItemDetailScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    ),
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconAvatar(
-                            iconKey = category?.iconKey,
-                            colorKey = category?.colorKey,
-                            size = 52.dp,
-                            iconSize = 26.dp,
-                        )
-                        Spacer(Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = details.item.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            if (details.item.subtitle.isNotBlank()) {
-                                Text(
-                                    text = details.item.subtitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // A consistent brand banner rather than a per-category tint: ten accent colours
+                // as full-bleed backgrounds would fight each other entry to entry, and this is
+                // the one screen worth spending the app's identity on.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.large)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.tertiary,
                                 )
-                            }
-                            Spacer(Modifier.height(8.dp))
+                            )
+                        ),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 26.dp, horizontal = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.22f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = IconCatalog.image(category?.iconKey),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp),
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = details.item.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (details.item.subtitle.isNotBlank()) {
+                            Text(
+                                text = details.item.subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.85f),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        if (category != null || templateName != null) {
+                            Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                category?.let { EzzyChip(text = it.name) }
-                                templateName?.let { EzzyChip(text = it) }
+                                category?.let { HeroChip(it.name) }
+                                templateName?.let { HeroChip(it) }
                             }
                         }
                     }
@@ -229,28 +255,30 @@ fun ItemDetailScreen(
 
             if (details.fields.isNotEmpty()) {
                 item {
+                    Button(
+                        onClick = {
+                            val all = details.sortedFields.joinToString("\n") {
+                                "${it.label}: ${it.value}"
+                            }
+                            copy("All details", all, sensitive = true)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Copy all")
+                    }
+                }
+                item {
                     SectionHeader(
                         text = "Details",
-                        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
-                        trailing = {
-                            OutlinedButton(
-                                onClick = {
-                                    val all = details.sortedFields.joinToString("\n") {
-                                        "${it.label}: ${it.value}"
-                                    }
-                                    copy("All details", all, sensitive = true)
-                                },
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.ContentCopy,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(15.dp),
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text("Copy all", style = MaterialTheme.typography.labelMedium)
-                            }
-                        },
+                        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
                     )
                 }
                 items(details.sortedFields, key = { it.id }) { field ->
@@ -345,6 +373,22 @@ fun ItemDetailScreen(
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
             },
+        )
+    }
+}
+
+/** Small translucent pill for the category/type labels sitting on the gradient banner. */
+@Composable
+private fun HeroChip(text: String) {
+    Surface(
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.2f),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
 }
