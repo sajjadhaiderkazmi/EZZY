@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
@@ -64,7 +63,7 @@ import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.util.Gesture
-import com.ezzy.vault.util.StripLength
+import com.ezzy.vault.util.GestureArea
 import com.ezzy.vault.util.ThemeMode
 import kotlinx.coroutines.launch
 
@@ -74,10 +73,9 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setOverlayEnabled(value: Boolean) = launch { store.setOverlayEnabled(value) }
     fun setBubble(value: Boolean) = launch { store.setBubbleTrigger(value) }
-    fun setGesture(gesture: Gesture, enabled: Boolean) =
-        launch { store.setGestureEnabled(gesture, enabled) }
-
-    fun setStripLength(value: StripLength) = launch { store.setStripLength(value) }
+    fun setGestureEnabled(value: Boolean) = launch { store.setGestureEnabled(value) }
+    fun setGesture(value: Gesture) = launch { store.setGesture(value) }
+    fun setGestureArea(value: GestureArea) = launch { store.setGestureArea(value) }
     fun setBiometric(value: Boolean) = launch { store.setBiometricLock(value) }
     fun setAutoLock(minutes: Int) = launch { store.setAutoLockMinutes(minutes) }
     fun setClipboardClear(seconds: Int) = launch { store.setClipboardClearSeconds(seconds) }
@@ -237,8 +235,8 @@ fun SettingsScreen(
 
             item {
                 SwitchRow(
-                    title = "Floating button",
-                    subtitle = "A small draggable button, always on screen. The most reliable way in.",
+                    title = "Always on",
+                    subtitle = "A small draggable button that stays on screen. The most reliable way in.",
                     checked = settings.bubbleTrigger,
                     enabled = settings.overlayEnabled,
                     onCheckedChange = {
@@ -248,25 +246,14 @@ fun SettingsScreen(
                 )
             }
 
-            item { SettingsGroup("Gestures") }
-
             item {
-                InfoNote(
-                    "Gestures are watched on thin strips along the screen edges. Only two- and " +
-                        "four-finger swipes are offered: three fingers are the screenshot " +
-                        "shortcut on most phones, and one finger belongs to Back, Home and the " +
-                        "notification shade."
-                )
-            }
-
-            items(Gesture.entries.toList(), key = { it.name }) { gesture ->
                 SwitchRow(
-                    title = gesture.label,
-                    subtitle = gesture.hint,
-                    checked = gesture in settings.gestures,
+                    title = "Gestures",
+                    subtitle = "Open the bar with a gesture instead of a button",
+                    checked = settings.gestureEnabled,
                     enabled = settings.overlayEnabled,
                     onCheckedChange = {
-                        viewModel.setGesture(gesture, it)
+                        viewModel.setGestureEnabled(it)
                         if (settings.overlayEnabled) OverlayService.start(context)
                     },
                 )
@@ -274,12 +261,25 @@ fun SettingsScreen(
 
             item {
                 ChoiceRow(
-                    title = "Strip length",
-                    current = settings.stripLength.label,
-                    enabled = settings.overlayEnabled && settings.gestures.isNotEmpty(),
-                    options = StripLength.entries.map { it.label to it },
+                    title = "Gesture",
+                    current = settings.gesture.label,
+                    enabled = settings.overlayEnabled && settings.gestureEnabled,
+                    options = Gesture.entries.map { it.label to it },
                     onSelect = {
-                        viewModel.setStripLength(it)
+                        viewModel.setGesture(it)
+                        if (settings.overlayEnabled) OverlayService.start(context)
+                    },
+                )
+            }
+
+            item {
+                ChoiceRow(
+                    title = "Gesture area",
+                    current = settings.gestureArea.label,
+                    enabled = settings.overlayEnabled && settings.gestureEnabled,
+                    options = GestureArea.entries.map { it.label to it },
+                    onSelect = {
+                        viewModel.setGestureArea(it)
                         if (settings.overlayEnabled) OverlayService.start(context)
                     },
                 )
@@ -287,9 +287,11 @@ fun SettingsScreen(
 
             item {
                 InfoNote(
-                    "A strip does not pass touches through to the app underneath it, so a " +
-                        "shorter strip leaves more of the screen — corners and bottom " +
-                        "navigation especially — behaving normally."
+                    "The gesture is watched in a band across the bottom of the screen. Android " +
+                        "gives no way to look at a touch and still let it reach the app " +
+                        "underneath, so touches in that band go to EZZY — a taller band is " +
+                        "easier to hit, a smaller one leaves more of the app below untouched. " +
+                        "Four fingers need a tall band: every finger has to land inside it."
                 )
             }
 

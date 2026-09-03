@@ -56,6 +56,7 @@ object Seed {
                     TemplateField("Issuing Bank", FieldType.TEXT, ""),
                 ),
                 titleHint = "e.g. Meezan Debit Card",
+                needsPhoto = true,
             ),
         ),
         SeedTemplate(
@@ -71,6 +72,7 @@ object Seed {
                     TemplateField("Issued By", FieldType.TEXT, "Authority or office"),
                 ),
                 titleHint = "e.g. My CNIC",
+                needsPhoto = true,
             ),
         ),
         SeedTemplate(
@@ -87,6 +89,7 @@ object Seed {
                     TemplateField("Summary", FieldType.MULTILINE, "What it says, in your own words"),
                 ),
                 titleHint = "e.g. Property Affidavit",
+                needsPhoto = true,
             ),
         ),
         SeedTemplate(
@@ -102,6 +105,7 @@ object Seed {
                     TemplateField("Payment Method", FieldType.TEXT, "Cash, card, transfer"),
                 ),
                 titleHint = "e.g. AC purchase receipt",
+                needsPhoto = true,
             ),
         ),
         SeedTemplate(
@@ -118,6 +122,7 @@ object Seed {
                     TemplateField("Support Number", FieldType.PHONE, ""),
                 ),
                 titleHint = "e.g. Haier AC 1.5 ton",
+                needsPhoto = true,
             ),
         ),
         SeedTemplate(
@@ -188,6 +193,7 @@ object Seed {
                     TemplateField("Note", FieldType.MULTILINE, ""),
                 ),
                 titleHint = "e.g. Payment confirmation",
+                needsPhoto = true,
             ),
         ),
         SeedTemplate(

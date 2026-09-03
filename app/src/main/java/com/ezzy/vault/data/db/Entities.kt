@@ -90,6 +90,8 @@ data class AttachmentEntity(
     @PrimaryKey val id: String,
     val itemId: String,
     val displayName: String,
+    /** The user's own note about this file — what the picture actually shows. */
+    @ColumnInfo(defaultValue = "") val caption: String,
     val mimeType: String,
     /** File name inside the app's private, encrypted attachment directory. */
     val storedName: String,

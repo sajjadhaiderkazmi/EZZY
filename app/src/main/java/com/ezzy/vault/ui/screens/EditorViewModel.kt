@@ -41,6 +41,8 @@ data class EditorUiState(
     val step: EditorStep = EditorStep.SECTION,
     /** Example text under the Title box, taken from whichever type is selected. */
     val titleHint: String = DEFAULT_TITLE_HINT,
+    /** True when the selected type leads with a picture, so photos appear on the first screen. */
+    val needsPhoto: Boolean = false,
     val loading: Boolean = true,
     val importing: Boolean = false,
     val message: String? = null,
@@ -82,14 +84,13 @@ class EditorViewModel(
             } else {
                 EditorStep.ordered
             }
+            val spec = draft.templateId?.let { repository.templateSpec(it) }
             _state.value = EditorUiState(
                 draft = draft,
                 steps = steps,
                 step = steps.first(),
-                titleHint = draft.templateId
-                    ?.let { repository.templateSpec(it)?.titleHint }
-                    ?.takeIf { it.isNotBlank() }
-                    ?: DEFAULT_TITLE_HINT,
+                titleHint = spec?.titleHint?.takeIf { it.isNotBlank() } ?: DEFAULT_TITLE_HINT,
+                needsPhoto = spec?.needsPhoto ?: false,
                 loading = false,
             )
         }
@@ -133,7 +134,7 @@ class EditorViewModel(
     fun applyTemplate(template: TemplateEntity?) {
         viewModelScope.launch {
             if (template == null) {
-                update { it.copy(titleHint = DEFAULT_TITLE_HINT) }
+                update { it.copy(titleHint = DEFAULT_TITLE_HINT, needsPhoto = false) }
                 updateDraft { it.copy(templateId = null) }
                 return@launch
             }
@@ -152,7 +153,12 @@ class EditorViewModel(
                 field.value.isNotBlank() &&
                     spec.fields.none { it.label.equals(field.label, true) }
             }
-            update { it.copy(titleHint = spec.titleHint.ifBlank { DEFAULT_TITLE_HINT }) }
+            update {
+                it.copy(
+                    titleHint = spec.titleHint.ifBlank { DEFAULT_TITLE_HINT },
+                    needsPhoto = spec.needsPhoto,
+                )
+            }
             updateDraft { it.copy(templateId = template.id, fields = merged + extras) }
         }
     }
@@ -279,6 +285,14 @@ class EditorViewModel(
             setOrAdd("Phone", phone, FieldType.PHONE)
             draft.copy(title = draft.title.ifBlank { name }, fields = fields)
         }
+    }
+
+    fun setAttachmentCaption(id: String, caption: String) = updateDraft { draft ->
+        draft.copy(
+            attachments = draft.attachments.map {
+                if (it.id == id) it.copy(caption = caption) else it
+            }
+        )
     }
 
     fun removeAttachment(id: String) {

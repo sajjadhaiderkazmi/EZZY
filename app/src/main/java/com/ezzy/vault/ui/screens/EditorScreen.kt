@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -78,6 +77,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -89,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.data.db.TemplateEntity
+import com.ezzy.vault.data.model.AttachmentDraft
 import com.ezzy.vault.data.model.FieldDraft
 import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.ui.LocalSnackbar
@@ -315,6 +316,12 @@ private fun DetailsStep(
     val context = LocalContext.current
     var newField by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<FieldDraft?>(null) }
+    var cropping by remember { mutableStateOf<String?>(null) }
+
+    val resolveName = rememberAttachmentNamer()
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
 
     val contactPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -386,6 +393,57 @@ private fun DetailsStep(
                     )
                 }
                 Switch(checked = draft.isPinned, onCheckedChange = viewModel::setPinned)
+            }
+        }
+
+        if (state.needsPhoto) {
+            item {
+                SectionHeader(
+                    text = "Picture",
+                    modifier = Modifier.padding(top = 6.dp),
+                    trailing = {
+                        TextButton(
+                            enabled = !state.importing,
+                            onClick = {
+                                runCatching {
+                                    photoPicker.launch(
+                                        PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.AddPhotoAlternate,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("Add photo", style = MaterialTheme.typography.labelMedium)
+                        }
+                    },
+                )
+            }
+
+            val photos = draft.attachments.filter { it.isImage }
+            if (photos.isEmpty()) {
+                item {
+                    Text(
+                        text = "Add a photo of the document, and write on it what it shows.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            items(photos, key = { "photo-" + it.id }) { photo ->
+                AttachmentEditorRow(
+                    attachment = photo,
+                    onCaptionChange = { viewModel.setAttachmentCaption(photo.id, it) },
+                    canCrop = true,
+                    onCrop = { cropping = photo.id },
+                    onRemove = { viewModel.removeAttachment(photo.id) },
+                )
             }
         }
 
@@ -475,6 +533,13 @@ private fun DetailsStep(
             },
         )
     }
+
+    CropHost(
+        attachmentId = cropping,
+        attachments = draft.attachments,
+        onDismiss = { cropping = null },
+        onCropped = { id, bytes -> viewModel.replaceAttachmentBytes(id, bytes) },
+    )
 }
 
 /**
@@ -734,23 +799,11 @@ private fun ChooserRow(
 
 @Composable
 private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
-    val context = LocalContext.current
     var recording by remember { mutableStateOf(false) }
     var cropping by remember { mutableStateOf<String?>(null) }
-    val resolveName: (Uri) -> Pair<String, String> = { uri ->
-        var name = uri.lastPathSegment?.substringAfterLast('/') ?: "File"
-        runCatching {
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (index >= 0 && cursor.moveToFirst()) name = cursor.getString(index) ?: name
-            }
-        }
-        name to (context.contentResolver.getType(uri) ?: "application/octet-stream")
-    }
 
-    // Single select on purpose: on several OEM gallery pickers a tap in multi-select mode only
-    // opens a preview and Done comes back empty. Picking one photo returns immediately, and the
-    // button can simply be tapped again for the next one.
+    val resolveName = rememberAttachmentNamer()
+
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
@@ -761,11 +814,15 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilledTonalButton(
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AttachButton(
+                    icon = Icons.Rounded.AddPhotoAlternate,
+                    label = "Photo",
+                    enabled = !state.importing,
+                    modifier = Modifier.weight(1f),
                     onClick = {
                         runCatching {
                             photoPicker.launch(
@@ -775,43 +832,21 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
                             )
                         }
                     },
-                    modifier = Modifier.weight(1f),
+                )
+                AttachButton(
+                    icon = Icons.Rounded.AttachFile,
+                    label = "File",
                     enabled = !state.importing,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.AddPhotoAlternate,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Photos")
-                }
-                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
                     onClick = { runCatching { filePicker.launch(DOCUMENT_MIME_TYPES) } },
-                    modifier = Modifier.weight(1f),
+                )
+                AttachButton(
+                    icon = Icons.Rounded.Mic,
+                    label = "Voice",
                     enabled = !state.importing,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.AttachFile,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("File")
-                }
-                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
                     onClick = { recording = true },
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.importing,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Mic,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Voice")
-                }
+                )
             }
         }
 
@@ -835,64 +870,14 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
                             DeleteAttachmentButton { viewModel.removeAttachment(attachment.id) }
                         },
                     )
-                    return@items
-                }
-
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (attachment.isImage) {
-                            EncryptedImage(
-                                storedName = attachment.storedName,
-                                contentDescription = attachment.displayName,
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(10.dp)),
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.size(52.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Description,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = attachment.displayName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = "${attachment.sizeBytes / 1024} KB",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (attachment.isImage) {
-                            IconButton(onClick = { cropping = attachment.id }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Crop,
-                                    contentDescription = "Crop ${attachment.displayName}",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
-                        DeleteAttachmentButton { viewModel.removeAttachment(attachment.id) }
-                    }
+                } else {
+                    AttachmentEditorRow(
+                        attachment = attachment,
+                        onCaptionChange = { viewModel.setAttachmentCaption(attachment.id, it) },
+                        canCrop = attachment.isImage,
+                        onCrop = { cropping = attachment.id },
+                        onRemove = { viewModel.removeAttachment(attachment.id) },
+                    )
                 }
             }
         }
@@ -903,9 +888,7 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
                 onValueChange = viewModel::setNote,
                 label = { Text("Note (optional)") },
                 minLines = 3,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -925,19 +908,152 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
         )
     }
 
-    cropping?.let { id ->
-        val target = state.draft.attachments.firstOrNull { it.id == id }
-        if (target == null) {
-            cropping = null
-        } else {
-            ImageCropDialog(
-                storedName = target.storedName,
-                onCancel = { cropping = null },
-                onCropped = { bytes ->
-                    cropping = null
-                    viewModel.replaceAttachmentBytes(id, bytes)
-                },
+    CropHost(
+        attachmentId = cropping,
+        attachments = state.draft.attachments,
+        onDismiss = { cropping = null },
+        onCropped = { id, bytes -> viewModel.replaceAttachmentBytes(id, bytes) },
+    )
+}
+
+// ---- Attachment pieces shared by both steps ---------------------------------
+
+/**
+ * Equal-width action button. The label is kept to one word and one line: three buttons across a
+ * phone leaves little room, and "Photos" was wrapping its final letter onto a second line.
+ */
+@Composable
+private fun AttachButton(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text = label, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/** A stored file with the remark that says what it is, plus crop and remove. */
+@Composable
+private fun AttachmentEditorRow(
+    attachment: AttachmentDraft,
+    onCaptionChange: (String) -> Unit,
+    canCrop: Boolean,
+    onCrop: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (attachment.isImage) {
+                    EncryptedImage(
+                        storedName = attachment.storedName,
+                        contentDescription = attachment.displayName,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                    )
+                } else {
+                    Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.Description,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = attachment.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "${attachment.sizeBytes / 1024} KB",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (canCrop) {
+                    IconButton(onClick = onCrop) {
+                        Icon(
+                            imageVector = Icons.Rounded.Crop,
+                            contentDescription = "Crop ${attachment.displayName}",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                DeleteAttachmentButton(onRemove)
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = attachment.caption,
+                onValueChange = onCaptionChange,
+                label = { Text("Remarks") },
+                placeholder = { Text("What this shows") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+}
+
+/** Opens the cropper for whichever attachment is currently selected, if any. */
+@Composable
+private fun CropHost(
+    attachmentId: String?,
+    attachments: List<AttachmentDraft>,
+    onDismiss: () -> Unit,
+    onCropped: (String, ByteArray) -> Unit,
+) {
+    val target = attachmentId?.let { id -> attachments.firstOrNull { it.id == id } }
+    if (attachmentId != null && target == null) {
+        onDismiss()
+        return
+    }
+    if (target == null) return
+
+    ImageCropDialog(
+        storedName = target.storedName,
+        onCancel = onDismiss,
+        onCropped = { bytes ->
+            onDismiss()
+            onCropped(target.id, bytes)
+        },
+    )
+}
+
+/** Resolves a picked file's display name and type, off the main thread when it is used. */
+@Composable
+private fun rememberAttachmentNamer(): (Uri) -> Pair<String, String> {
+    val context = LocalContext.current
+    return remember(context) {
+        { uri ->
+            var name = uri.lastPathSegment?.substringAfterLast('/') ?: "File"
+            runCatching {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (index >= 0 && cursor.moveToFirst()) name = cursor.getString(index) ?: name
+                }
+            }
+            name to (context.contentResolver.getType(uri) ?: "application/octet-stream")
         }
     }
 }

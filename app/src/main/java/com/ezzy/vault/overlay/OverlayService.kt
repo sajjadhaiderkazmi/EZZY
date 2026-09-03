@@ -25,8 +25,6 @@ import com.ezzy.vault.MainActivity
 import com.ezzy.vault.R
 import com.ezzy.vault.UnlockActivity
 import com.ezzy.vault.appContainer
-import com.ezzy.vault.util.Gesture
-import com.ezzy.vault.util.GestureEdge
 import com.ezzy.vault.util.EzzySettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,8 +54,7 @@ class OverlayService : Service() {
     private var bubbleView: ComposeView? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
 
-    /** One strip per screen edge that at least one enabled gesture needs. */
-    private val edgeViews = mutableListOf<View>()
+    private var gestureView: View? = null
 
     private var panelHost: OverlayViewHost? = null
     private var panelView: View? = null
@@ -159,13 +156,11 @@ class OverlayService : Service() {
         // Settings.canDrawOverlays() is unreliable on some OEM skins — MIUI reports false even
         // after the user has allowed it — so the real test is whether addView succeeds.
         if (settings.bubbleTrigger) addBubble()
-        settings.gestures.groupBy { it.edge }.forEach { (edge, gestures) ->
-            addEdgeStrip(edge, gestures)
-        }
+        if (settings.gestureEnabled) addGestureCatcher()
 
-        if ((settings.bubbleTrigger || settings.gestures.isNotEmpty()) &&
+        if ((settings.bubbleTrigger || settings.gestureEnabled) &&
             bubbleView == null &&
-            edgeViews.isEmpty()
+            gestureView == null
         ) {
             // A trigger was asked for but nothing could be placed on screen, so the permission
             // really is missing. Say so — silently doing nothing is the worst outcome here.
@@ -181,8 +176,8 @@ class OverlayService : Service() {
         bubbleHost = null
         bubbleParams = null
 
-        edgeViews.forEach { view -> runCatching { windowManager.removeView(view) } }
-        edgeViews.clear()
+        gestureView?.let { runCatching { windowManager.removeView(it) } }
+        gestureView = null
     }
 
     private fun addBubble() {
@@ -215,43 +210,32 @@ class OverlayService : Service() {
     }
 
     /**
-     * Places one strip on [edge] listening for exactly the [gestures] assigned to it.
+     * Places the gesture window across the lower part of the screen.
      *
-     * Both strips are offset clear of the system's own gesture zone: the bottom one sits above
-     * the navigation area so Home still works, and the top one below the status bar so a
-     * two-finger pull there does not open quick settings instead.
+     * It has to be full width and genuinely tall: a four-finger gesture only registers when
+     * every finger lands inside the window, since fingers outside it go to the app below. It is
+     * also offset above the navigation area so the system's own Home swipe still works.
      */
-    private fun addEdgeStrip(edge: GestureEdge, gestures: List<Gesture>) {
-        if (gestures.isEmpty()) return
-
-        val view = EdgeTriggerView(
+    private fun addGestureCatcher() {
+        val view = GestureCatcherView(
             context = this,
-            gestures = gestures,
+            gesture = settings.gesture,
             onTriggered = { showPanel() },
         )
 
         val params = WindowManager.LayoutParams(
-            (screenWidth() * settings.stripLength.fraction).roundToInt(),
-            dp(34),
+            WindowManager.LayoutParams.MATCH_PARENT,
+            (screenHeight() * settings.gestureArea.fraction).roundToInt(),
             overlayWindowType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            when (edge) {
-                GestureEdge.BOTTOM -> {
-                    gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                    y = dp(52)
-                }
-
-                GestureEdge.TOP -> {
-                    gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                    y = statusBarHeight() + dp(8)
-                }
-            }
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = dp(48)
         }
 
-        runCatching { windowManager.addView(view, params) }.onSuccess { edgeViews += view }
+        runCatching { windowManager.addView(view, params) }.onSuccess { gestureView = view }
     }
 
     /** Drags the bubble, and treats a short, still press as a tap that opens the panel. */
@@ -400,12 +384,6 @@ class OverlayService : Service() {
     private fun screenWidth(): Int = resources.displayMetrics.widthPixels
 
     private fun screenHeight(): Int = resources.displayMetrics.heightPixels
-
-    /** Read from the platform so the top strip clears a notch or a tall status bar. */
-    private fun statusBarHeight(): Int {
-        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
-        return if (id > 0) resources.getDimensionPixelSize(id) else dp(28)
-    }
 
     companion object {
         const val ACTION_STOP = "com.ezzy.vault.overlay.STOP"

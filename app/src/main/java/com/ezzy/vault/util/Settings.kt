@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -18,10 +17,11 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 data class EzzySettings(
     val overlayEnabled: Boolean = false,
+    /** The draggable button that stays on screen. */
     val bubbleTrigger: Boolean = true,
-    /** Empty means no strips are placed at all and only the bubble opens the bar. */
-    val gestures: Set<Gesture> = Gesture.default,
-    val stripLength: StripLength = StripLength.MEDIUM,
+    val gestureEnabled: Boolean = false,
+    val gesture: Gesture = Gesture.default,
+    val gestureArea: GestureArea = GestureArea.THIRD,
     /** Off until the user opts in — a fresh install must not open on a lock screen. */
     val biometricLock: Boolean = false,
     val autoLockMinutes: Int = 1,
@@ -40,9 +40,10 @@ class SettingsStore(context: Context) {
         EzzySettings(
             overlayEnabled = prefs[Keys.OVERLAY] ?: false,
             bubbleTrigger = prefs[Keys.BUBBLE] ?: true,
-            gestures = Gesture.from(prefs[Keys.GESTURES]),
-            stripLength = runCatching { StripLength.valueOf(prefs[Keys.STRIP_LENGTH] ?: "") }
-                .getOrDefault(StripLength.MEDIUM),
+            gestureEnabled = prefs[Keys.GESTURE_ON] ?: false,
+            gesture = Gesture.from(prefs[Keys.GESTURE]),
+            gestureArea = runCatching { GestureArea.valueOf(prefs[Keys.GESTURE_AREA] ?: "") }
+                .getOrDefault(GestureArea.THIRD),
             biometricLock = prefs[Keys.BIOMETRIC] ?: false,
             autoLockMinutes = prefs[Keys.AUTO_LOCK] ?: 1,
             clipboardClearSeconds = prefs[Keys.CLIP_CLEAR] ?: 45,
@@ -56,6 +57,7 @@ class SettingsStore(context: Context) {
 
     suspend fun setOverlayEnabled(value: Boolean) = put(Keys.OVERLAY, value)
     suspend fun setBubbleTrigger(value: Boolean) = put(Keys.BUBBLE, value)
+    suspend fun setGestureEnabled(value: Boolean) = put(Keys.GESTURE_ON, value)
     suspend fun setBiometricLock(value: Boolean) = put(Keys.BIOMETRIC, value)
     suspend fun setMaskSecrets(value: Boolean) = put(Keys.MASK, value)
     suspend fun setBlockScreenshots(value: Boolean) = put(Keys.NO_SCREENSHOT, value)
@@ -63,20 +65,12 @@ class SettingsStore(context: Context) {
     suspend fun setAutoLockMinutes(value: Int) = put(Keys.AUTO_LOCK, value)
     suspend fun setClipboardClearSeconds(value: Int) = put(Keys.CLIP_CLEAR, value)
 
-    suspend fun setGestures(value: Set<Gesture>) {
-        store.edit { prefs -> prefs[Keys.GESTURES] = value.mapTo(mutableSetOf()) { it.name } }
+    suspend fun setGesture(value: Gesture) {
+        store.edit { it[Keys.GESTURE] = value.name }
     }
 
-    suspend fun setGestureEnabled(gesture: Gesture, enabled: Boolean) {
-        store.edit { prefs ->
-            val current = Gesture.from(prefs[Keys.GESTURES]).toMutableSet()
-            if (enabled) current += gesture else current -= gesture
-            prefs[Keys.GESTURES] = current.mapTo(mutableSetOf()) { it.name }
-        }
-    }
-
-    suspend fun setStripLength(value: StripLength) {
-        store.edit { it[Keys.STRIP_LENGTH] = value.name }
+    suspend fun setGestureArea(value: GestureArea) {
+        store.edit { it[Keys.GESTURE_AREA] = value.name }
     }
 
     suspend fun setThemeMode(value: ThemeMode) {
@@ -94,8 +88,9 @@ class SettingsStore(context: Context) {
     private object Keys {
         val OVERLAY = booleanPreferencesKey("overlay_enabled")
         val BUBBLE = booleanPreferencesKey("trigger_bubble")
-        val GESTURES = stringSetPreferencesKey("gestures")
-        val STRIP_LENGTH = stringPreferencesKey("strip_length")
+        val GESTURE_ON = booleanPreferencesKey("gesture_enabled")
+        val GESTURE = stringPreferencesKey("gesture")
+        val GESTURE_AREA = stringPreferencesKey("gesture_area")
         val BIOMETRIC = booleanPreferencesKey("biometric_lock")
         val AUTO_LOCK = intPreferencesKey("auto_lock_minutes")
         val CLIP_CLEAR = intPreferencesKey("clipboard_clear_seconds")

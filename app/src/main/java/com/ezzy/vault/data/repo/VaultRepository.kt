@@ -164,6 +164,7 @@ class VaultRepository(
                         id = attachment.id,
                         itemId = draft.id,
                         displayName = attachment.displayName,
+                        caption = attachment.caption.trim(),
                         mimeType = attachment.mimeType,
                         storedName = attachment.storedName,
                         sizeBytes = attachment.sizeBytes,
@@ -222,6 +223,7 @@ class VaultRepository(
                 AttachmentDraft(
                     id = it.id,
                     displayName = it.displayName,
+                    caption = it.caption,
                     mimeType = it.mimeType,
                     storedName = it.storedName,
                     sizeBytes = it.sizeBytes,

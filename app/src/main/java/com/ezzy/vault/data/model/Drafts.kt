@@ -21,6 +21,7 @@ data class FieldDraft(
 data class AttachmentDraft(
     val id: String = UUID.randomUUID().toString(),
     val displayName: String,
+    val caption: String = "",
     val mimeType: String,
     val storedName: String,
     val sizeBytes: Long,

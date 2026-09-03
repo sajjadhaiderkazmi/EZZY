@@ -382,10 +382,10 @@ private fun AttachmentThumb(attachment: AttachmentEntity, onClick: () -> Unit) {
                 }
             }
             Text(
-                text = attachment.displayName,
+                text = attachment.caption.ifBlank { attachment.displayName },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             )
@@ -408,7 +408,7 @@ private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () 
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = attachment.displayName,
+                        text = attachment.caption.ifBlank { attachment.displayName },
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

@@ -40,4 +40,9 @@ data class TemplateSpec(
     val allowsAttachments: Boolean = true,
     /** Example shown under the Title box, so every type suggests something of its own. */
     val titleHint: String = "",
+    /**
+     * True for the types whose whole point is the picture — a document, a receipt, a warranty
+     * card. Those put photos on the first screen instead of hiding them behind a later step.
+     */
+    val needsPhoto: Boolean = false,
 )
