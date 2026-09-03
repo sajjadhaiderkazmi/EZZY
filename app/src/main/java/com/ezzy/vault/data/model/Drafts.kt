@@ -21,6 +21,7 @@ data class AttachmentDraft(
     val sizeBytes: Long,
 ) {
     val isImage: Boolean get() = mimeType.startsWith("image/")
+    val isAudio: Boolean get() = mimeType.startsWith("audio/")
 }
 
 /** Everything the editor collects across its steps. */

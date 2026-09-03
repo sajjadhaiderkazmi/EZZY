@@ -13,6 +13,10 @@
 
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
+    <!-- Only for voice notes, and only requested when the user taps record. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <!-- Deliberately absent: android.permission.INTERNET. EZZY has no way to send your
          data anywhere, and that is enforced by the manifest rather than by promise. -->
 

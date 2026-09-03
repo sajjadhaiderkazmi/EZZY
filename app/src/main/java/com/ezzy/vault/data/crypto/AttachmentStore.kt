@@ -31,6 +31,15 @@ class AttachmentStore(context: Context) {
         StoredFile(storedName, bytes.size.toLong())
     }
 
+    /** Stores bytes EZZY produced itself — a cropped photo, a recorded voice note. */
+    suspend fun save(bytes: ByteArray): StoredFile? = withContext(Dispatchers.IO) {
+        if (bytes.isEmpty() || bytes.size > MAX_BYTES) return@withContext null
+        val storedName = "${UUID.randomUUID()}.bin"
+        runCatching { File(dir, storedName).writeBytes(crypto.encrypt(bytes)) }
+            .getOrElse { return@withContext null }
+        StoredFile(storedName, bytes.size.toLong())
+    }
+
     suspend fun read(storedName: String): ByteArray? = withContext(Dispatchers.IO) {
         val file = File(dir, storedName)
         if (!file.exists()) return@withContext null

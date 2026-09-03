@@ -199,6 +199,72 @@ class EditorViewModel(
         }
     }
 
+    /** Adds bytes EZZY produced itself: a recorded voice note, or a photo taken in-app. */
+    fun addBytesAttachment(bytes: ByteArray, displayName: String, mimeType: String) {
+        viewModelScope.launch {
+            update { it.copy(importing = true) }
+            val stored = container.attachmentStore.save(bytes)
+            _state.value = _state.value.let { current ->
+                current.copy(
+                    importing = false,
+                    message = if (stored == null) "Could not save that recording" else null,
+                    draft = if (stored == null) current.draft else current.draft.copy(
+                        attachments = current.draft.attachments + AttachmentDraft(
+                            displayName = displayName,
+                            mimeType = mimeType,
+                            storedName = stored.storedName,
+                            sizeBytes = stored.sizeBytes,
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
+    /** Overwrites an attachment in place, which is what cropping a photo amounts to. */
+    fun replaceAttachmentBytes(id: String, bytes: ByteArray) {
+        val target = _state.value.draft.attachments.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch {
+            val ok = container.attachmentStore.write(target.storedName, bytes)
+            if (!ok) {
+                update { it.copy(message = "Could not save the cropped photo") }
+                return@launch
+            }
+            updateDraft { draft ->
+                draft.copy(
+                    attachments = draft.attachments.map {
+                        if (it.id == id) {
+                            it.copy(mimeType = "image/jpeg", sizeBytes = bytes.size.toLong())
+                        } else {
+                            it
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    /** Fills the entry from a contact the user picked, without overwriting anything typed. */
+    fun applyContact(name: String, phone: String) {
+        updateDraft { draft ->
+            val fields = draft.fields.toMutableList()
+
+            fun setOrAdd(label: String, value: String, type: FieldType) {
+                if (value.isBlank()) return
+                val index = fields.indexOfFirst { it.label.equals(label, ignoreCase = true) }
+                if (index >= 0) {
+                    fields[index] = fields[index].copy(value = value, type = type)
+                } else {
+                    fields += FieldDraft(label = label, value = value, type = type)
+                }
+            }
+
+            setOrAdd("Name", name, FieldType.TEXT)
+            setOrAdd("Phone", phone, FieldType.PHONE)
+            draft.copy(title = draft.title.ifBlank { name }, fields = fields)
+        }
+    }
+
     fun removeAttachment(id: String) {
         val target = _state.value.draft.attachments.firstOrNull { it.id == id } ?: return
         updateDraft { draft -> draft.copy(attachments = draft.attachments.filterNot { it.id == id }) }

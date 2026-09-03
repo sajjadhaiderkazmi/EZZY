@@ -1,6 +1,9 @@
 package com.ezzy.vault.ui.screens
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.provider.ContactsContract
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -35,6 +38,9 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Crop
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
@@ -84,7 +90,12 @@ import com.ezzy.vault.data.db.TemplateEntity
 import com.ezzy.vault.data.model.FieldDraft
 import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.ui.LocalSnackbar
+import com.ezzy.vault.ui.components.DeleteAttachmentButton
 import com.ezzy.vault.ui.components.EncryptedImage
+import com.ezzy.vault.ui.components.ImageCropDialog
+import com.ezzy.vault.ui.components.VOICE_NOTE_MIME
+import com.ezzy.vault.ui.components.VoiceNoteDialog
+import com.ezzy.vault.ui.components.VoiceNoteRow
 import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.ezzyViewModel
@@ -361,6 +372,14 @@ private fun TypeStep(
 @Composable
 private fun DetailsStep(viewModel: EditorViewModel, state: EditorUiState) {
     val draft = state.draft
+    val context = LocalContext.current
+
+    val contactPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.data ?: return@rememberLauncherForActivityResult
+        readPickedContact(context, uri)?.let { viewModel.applyContact(it.name, it.phone) }
+    }
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -412,7 +431,32 @@ private fun DetailsStep(viewModel: EditorViewModel, state: EditorUiState) {
         }
 
         item {
-            SectionHeader(text = "Fields", modifier = Modifier.padding(top = 8.dp))
+            SectionHeader(
+                text = "Fields",
+                modifier = Modifier.padding(top = 8.dp),
+                trailing = {
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                contactPicker.launch(
+                                    Intent(
+                                        Intent.ACTION_PICK,
+                                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                                    )
+                                )
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Contacts,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("From contacts", style = MaterialTheme.typography.labelMedium)
+                    }
+                },
+            )
         }
 
         if (draft.fields.isEmpty()) {
@@ -506,7 +550,7 @@ private fun FieldEditorCard(
             OutlinedTextField(
                 value = field.value,
                 onValueChange = { onChange(field.copy(value = it)) },
-                label = { Text("Value") },
+                label = { Text("Data") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = field.type != FieldType.MULTILINE,
                 minLines = if (field.type == FieldType.MULTILINE) 3 else 1,
@@ -590,6 +634,8 @@ private fun FieldEditorCard(
 @Composable
 private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
     val context = LocalContext.current
+    var recording by remember { mutableStateOf(false) }
+    var cropping by remember { mutableStateOf<String?>(null) }
     val resolveName: (Uri) -> Pair<String, String> = { uri ->
         var name = uri.lastPathSegment?.substringAfterLast('/') ?: "File"
         runCatching {
@@ -633,9 +679,7 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
                     Text("Photos")
                 }
                 FilledTonalButton(
-                    onClick = {
-                        filePicker.launch(arrayOf("application/pdf", "image/*", "text/plain"))
-                    },
+                    onClick = { runCatching { filePicker.launch(DOCUMENT_MIME_TYPES) } },
                     modifier = Modifier.weight(1f),
                     enabled = !state.importing,
                 ) {
@@ -646,6 +690,19 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
                     )
                     Spacer(Modifier.width(8.dp))
                     Text("File")
+                }
+                FilledTonalButton(
+                    onClick = { recording = true },
+                    modifier = Modifier.weight(1f),
+                    enabled = !state.importing,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Mic,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Voice")
                 }
             }
         }
@@ -662,6 +719,17 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
         if (state.draft.attachments.isNotEmpty()) {
             item { SectionHeader("Attached (${state.draft.attachments.size})") }
             items(state.draft.attachments, key = { it.id }) { attachment ->
+                if (attachment.isAudio) {
+                    VoiceNoteRow(
+                        storedName = attachment.storedName,
+                        displayName = attachment.displayName,
+                        trailing = {
+                            DeleteAttachmentButton { viewModel.removeAttachment(attachment.id) }
+                        },
+                    )
+                    return@items
+                }
+
                 Surface(
                     shape = MaterialTheme.shapes.medium,
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -706,13 +774,16 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = { viewModel.removeAttachment(attachment.id) }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Delete,
-                                contentDescription = "Remove file",
-                                tint = MaterialTheme.colorScheme.error,
-                            )
+                        if (attachment.isImage) {
+                            IconButton(onClick = { cropping = attachment.id }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Crop,
+                                    contentDescription = "Crop ${attachment.displayName}",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         }
+                        DeleteAttachmentButton { viewModel.removeAttachment(attachment.id) }
                     }
                 }
             }
@@ -730,11 +801,81 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
             )
         }
     }
+
+    if (recording) {
+        VoiceNoteDialog(
+            onCancel = { recording = false },
+            onRecorded = { bytes, seconds ->
+                recording = false
+                val index = state.draft.attachments.count { it.isAudio } + 1
+                viewModel.addBytesAttachment(
+                    bytes = bytes,
+                    displayName = "Voice note $index (${seconds}s)",
+                    mimeType = VOICE_NOTE_MIME,
+                )
+            },
+        )
+    }
+
+    cropping?.let { id ->
+        val target = state.draft.attachments.firstOrNull { it.id == id }
+        if (target == null) {
+            cropping = null
+        } else {
+            ImageCropDialog(
+                storedName = target.storedName,
+                onCancel = { cropping = null },
+                onCropped = { bytes ->
+                    cropping = null
+                    viewModel.replaceAttachmentBytes(id, bytes)
+                },
+            )
+        }
+    }
 }
+
+/**
+ * Reads the single phone row the contacts picker handed back. Going through ACTION_PICK means
+ * the picker grants read access to just that row, so EZZY never asks for READ_CONTACTS.
+ */
+private fun readPickedContact(context: Context, uri: Uri): PickedContact? = runCatching {
+    context.contentResolver.query(
+        uri,
+        arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER,
+        ),
+        null,
+        null,
+        null,
+    )?.use { cursor ->
+        if (!cursor.moveToFirst()) return@use null
+        PickedContact(
+            name = cursor.getString(0).orEmpty(),
+            phone = cursor.getString(1).orEmpty(),
+        )
+    }
+}.getOrNull()
+
+private data class PickedContact(val name: String, val phone: String)
 
 // ---- Helpers ----------------------------------------------------------------
 
 private val DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+/** What the "File" button will accept: scans, office documents and plain text. */
+private val DOCUMENT_MIME_TYPES = arrayOf(
+    "application/pdf",
+    "image/*",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/plain",
+    "text/csv",
+)
 
 private fun FieldType.displayName(): String = when (this) {
     FieldType.TEXT -> "Text"

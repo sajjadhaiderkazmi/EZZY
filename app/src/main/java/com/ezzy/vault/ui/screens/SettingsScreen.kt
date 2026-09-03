@@ -40,20 +40,26 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.withResumed
 import com.ezzy.vault.AppContainer
 import com.ezzy.vault.overlay.OverlayService
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.ui.LocalSettings
+import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.util.EdgeSide
@@ -98,16 +104,48 @@ fun SettingsScreen(
     val settings = LocalSettings.current
     val context = LocalContext.current
 
+    val snackbar = LocalSnackbar.current
+    val scope = rememberCoroutineScope()
+
     var canDrawOverlays by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var confirmErase by remember { mutableStateOf(false) }
+    // Set once the user has been sent to the permission screen. Some OEM skins keep reporting
+    // false afterwards even though the permission was granted, so the next tap goes ahead and
+    // lets the service find out for real.
+    var permissionAsked by rememberSaveable { mutableStateOf(false) }
+    // The result callback runs before the activity is resumed, and starting a foreground
+    // service in that window is refused, so the start is deferred to the next resume.
+    var startWhenResumed by remember { mutableStateOf(false) }
+
+    fun turnOn() {
+        viewModel.setOverlayEnabled(true)
+        val failure = OverlayService.start(context)
+        if (failure != null) {
+            scope.launch { snackbar.showSnackbar("Could not start the bar: $failure") }
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(startWhenResumed) {
+        if (!startWhenResumed) return@LaunchedEffect
+        lifecycleOwner.withResumed { }
+        startWhenResumed = false
+        canDrawOverlays = Settings.canDrawOverlays(context)
+        turnOn()
+    }
 
     val overlayPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         canDrawOverlays = Settings.canDrawOverlays(context)
         if (canDrawOverlays) {
-            viewModel.setOverlayEnabled(true)
-            OverlayService.start(context)
+            startWhenResumed = true
+        } else {
+            scope.launch {
+                snackbar.showSnackbar(
+                    "If you already allowed \"Display over other apps\", tap the switch once more."
+                )
+            }
         }
     }
 
@@ -116,20 +154,36 @@ fun SettingsScreen(
     ) { /* The bar still works without it; only the ongoing notice is hidden. */ }
 
     fun enableOverlay() {
-        if (!Settings.canDrawOverlays(context)) {
-            overlayPermissionLauncher.launch(
+        if (!Settings.canDrawOverlays(context) && !permissionAsked) {
+            permissionAsked = true
+            // MIUI and a few other skins do not handle this intent with a package URI, and an
+            // unhandled launch would take the whole app down, so every step falls back.
+            val opened = listOf(
                 Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:${context.packageName}"),
-                )
-            )
+                ),
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION),
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            ).any { intent -> runCatching { overlayPermissionLauncher.launch(intent) }.isSuccess }
+
+            if (!opened) {
+                scope.launch {
+                    snackbar.showSnackbar(
+                        "Could not open the permission screen. Allow \"Display over other apps\" " +
+                            "for EZZY in your phone's settings, then tap the switch again."
+                    )
+                }
+            }
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        viewModel.setOverlayEnabled(true)
-        OverlayService.start(context)
+        turnOn()
     }
 
     Scaffold(
@@ -165,7 +219,7 @@ fun SettingsScreen(
                     } else {
                         "Needs the \"display over other apps\" permission"
                     },
-                    checked = settings.overlayEnabled && canDrawOverlays,
+                    checked = settings.overlayEnabled,
                     onCheckedChange = { wanted ->
                         if (wanted) {
                             enableOverlay()

@@ -11,12 +11,12 @@ import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
-import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.widget.Toast
 import android.widget.FrameLayout
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.app.NotificationCompat
@@ -154,12 +154,20 @@ class OverlayService : Service() {
 
     private fun rebuildTriggers() {
         removeTriggers()
-        if (!Settings.canDrawOverlays(this)) {
-            stopSelf()
-            return
-        }
+        // Settings.canDrawOverlays() is unreliable on some OEM skins — MIUI reports false even
+        // after the user has allowed it — so the real test is whether addView succeeds.
         if (settings.bubbleTrigger) addBubble()
         if (settings.edgeTrigger) addEdgeStrip()
+
+        if ((settings.bubbleTrigger || settings.edgeTrigger) &&
+            bubbleView == null &&
+            edgeView == null
+        ) {
+            // A trigger was asked for but nothing could be placed on screen, so the permission
+            // really is missing. Say so — silently doing nothing is the worst outcome here.
+            Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG).show()
+            stopSelf()
+        }
     }
 
     private fun removeTriggers() {
@@ -290,7 +298,6 @@ class OverlayService : Service() {
 
     private fun showPanel() {
         if (panelView != null) return
-        if (!Settings.canDrawOverlays(this)) return
 
         val host = OverlayViewHost(this).also { it.start() }
         val view = host.composeView {
@@ -386,21 +393,33 @@ class OverlayService : Service() {
         private const val NOTIFICATION_ID = 4211
         private const val TAP_TIMEOUT_MS = 400L
 
-        fun start(context: Context) {
+        /**
+         * @return null on success, or a message explaining why the bar could not be started.
+         *
+         * From Android 12 a foreground service may not be started while the app counts as
+         * backgrounded, and an activity-result callback runs in exactly that window — so this
+         * never throws at the call site.
+         */
+        fun start(context: Context): String? = runCatching {
             val intent = Intent(context, OverlayService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
             }
+            null
+        }.getOrElse { error ->
+            error.message ?: "Android refused to start the floating bar service"
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, OverlayService::class.java).setAction(ACTION_STOP)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            runCatching {
+                val intent = Intent(context, OverlayService::class.java).setAction(ACTION_STOP)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             }
         }
     }

@@ -64,6 +64,7 @@ import com.ezzy.vault.ui.components.EzzyChip
 import com.ezzy.vault.ui.components.FieldValueRow
 import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.SectionHeader
+import com.ezzy.vault.ui.components.VoiceNoteRow
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.ui.rememberCopier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -263,16 +264,31 @@ fun ItemDetailScreen(
                 }
             }
 
-            if (details.attachments.isNotEmpty()) {
+            val voiceNotes = details.sortedAttachments.filter { it.mimeType.startsWith("audio/") }
+            val files = details.sortedAttachments - voiceNotes.toSet()
+
+            if (voiceNotes.isNotEmpty()) {
                 item {
                     SectionHeader(
-                        text = "Files (${details.attachments.size})",
+                        text = "Voice notes (${voiceNotes.size})",
+                        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+                    )
+                }
+                items(voiceNotes, key = { it.id }) { note ->
+                    VoiceNoteRow(storedName = note.storedName, displayName = note.displayName)
+                }
+            }
+
+            if (files.isNotEmpty()) {
+                item {
+                    SectionHeader(
+                        text = "Files (${files.size})",
                         modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
                     )
                 }
                 item {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(details.sortedAttachments, key = { it.id }) { attachment ->
+                        items(files, key = { it.id }) { attachment ->
                             AttachmentThumb(
                                 attachment = attachment,
                                 onClick = { previewAttachment = attachment },

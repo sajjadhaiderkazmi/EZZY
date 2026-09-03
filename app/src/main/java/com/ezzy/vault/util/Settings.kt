@@ -24,7 +24,8 @@ data class EzzySettings(
     val edgeTrigger: Boolean = true,
     val edgeSide: EdgeSide = EdgeSide.BOTTOM,
     val twoFingerOnly: Boolean = true,
-    val biometricLock: Boolean = true,
+    /** Off until the user opts in — a fresh install must not open on a lock screen. */
+    val biometricLock: Boolean = false,
     val autoLockMinutes: Int = 1,
     val clipboardClearSeconds: Int = 45,
     val maskSecrets: Boolean = true,
@@ -45,7 +46,7 @@ class SettingsStore(context: Context) {
             edgeSide = runCatching { EdgeSide.valueOf(prefs[Keys.EDGE_SIDE] ?: "") }
                 .getOrDefault(EdgeSide.BOTTOM),
             twoFingerOnly = prefs[Keys.TWO_FINGER] ?: true,
-            biometricLock = prefs[Keys.BIOMETRIC] ?: true,
+            biometricLock = prefs[Keys.BIOMETRIC] ?: false,
             autoLockMinutes = prefs[Keys.AUTO_LOCK] ?: 1,
             clipboardClearSeconds = prefs[Keys.CLIP_CLEAR] ?: 45,
             maskSecrets = prefs[Keys.MASK] ?: true,

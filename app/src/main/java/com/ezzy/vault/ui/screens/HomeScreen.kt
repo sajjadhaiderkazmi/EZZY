@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CreateNewFolder
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
@@ -41,9 +42,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -52,6 +56,7 @@ import androidx.lifecycle.viewModelScope
 import com.ezzy.vault.AppContainer
 import com.ezzy.vault.data.db.CategoryWithCount
 import com.ezzy.vault.data.db.ItemWithDetails
+import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.ui.components.EmptyState
 import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.SectionHeader
@@ -60,6 +65,7 @@ import com.ezzy.vault.util.EzzySettings
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class HomeViewModel(container: AppContainer) : ViewModel() {
 
@@ -76,6 +82,12 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 
     val itemCount: StateFlow<Int> = repository.observeItemCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    private val settings = container.settings
+
+    fun enableBiometricLock() {
+        viewModelScope.launch { settings.setBiometricLock(true) }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,6 +106,8 @@ fun HomeScreen(
     val pinned by viewModel.pinned.collectAsStateWithLifecycle()
     val recent by viewModel.recent.collectAsStateWithLifecycle()
     val itemCount by viewModel.itemCount.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val canUseBiometrics = remember { AppLock.canAuthenticate(context) }
 
     val quickAccess = (pinned + recent.filterNot { r -> pinned.any { it.item.id == r.item.id } })
         .take(8)
@@ -146,7 +160,31 @@ fun HomeScreen(
         ) {
             if (!settings.overlayEnabled) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    OverlayPromptCard(onClick = onOpenSettings)
+                    SetupCard(
+                        icon = Icons.Rounded.Bolt,
+                        title = "Turn on the floating bar",
+                        subtitle = "Reach your vault from inside any app",
+                        onClick = onOpenSettings,
+                    )
+                }
+            }
+
+            if (!settings.biometricLock) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SetupCard(
+                        icon = Icons.Rounded.Fingerprint,
+                        title = "Turn on fingerprint vault login",
+                        subtitle = if (canUseBiometrics) {
+                            "Ask for your fingerprint before opening the vault"
+                        } else {
+                            "Set a screen lock on this phone first"
+                        },
+                        enabled = canUseBiometrics,
+                        onClick = {
+                            viewModel.enableBiometricLock()
+                            AppLock.unlock()
+                        },
+                    )
                 }
             }
 
@@ -281,52 +319,63 @@ private fun QuickAccessCard(
     }
 }
 
-/** Nudge shown until the floating bar is switched on — it is the point of the app. */
+/** The one-tap setup prompts on the home screen: the floating bar, then the fingerprint lock. */
 @Composable
-private fun OverlayPromptCard(onClick: () -> Unit) {
+private fun SetupCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.primaryContainer,
+        color = if (enabled) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val foreground = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer
+            else MaterialTheme.colorScheme.onSurfaceVariant
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)),
+                    .background(foreground.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Bolt,
+                    imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = foreground,
                     modifier = Modifier.size(22.dp),
                 )
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Turn on the floating bar",
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = foreground,
                 )
                 Text(
-                    text = "Reach your vault from inside any app",
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    color = foreground.copy(alpha = 0.8f),
                 )
             }
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
+            if (enabled) {
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = foreground,
+                )
+            }
         }
     }
 }
