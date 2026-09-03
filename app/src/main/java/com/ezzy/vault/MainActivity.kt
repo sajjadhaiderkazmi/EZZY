@@ -28,8 +28,10 @@ import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.nav.EzzyNavHost
 import com.ezzy.vault.ui.screens.LockScreen
+import com.ezzy.vault.ui.screens.WelcomeScreen
 import com.ezzy.vault.ui.theme.EzzyTheme
 import com.ezzy.vault.util.EzzySettings
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -43,8 +45,14 @@ class MainActivity : FragmentActivity() {
         pendingRoute = intent?.getStringExtra(EXTRA_ROUTE)
 
         setContent {
-            val settings by appContainer.settings.settings
-                .collectAsStateWithLifecycle(initialValue = EzzySettings())
+            // Null until the first DataStore read lands. Without that distinction a fresh read
+            // of "not onboarded yet" is indistinguishable from the defaults, and the welcome
+            // screen would flash on every cold start.
+            // Flow is covariant, so the upcast is all it takes to make `null` a legal initial
+            // value here.
+            val settingsFlow: Flow<EzzySettings?> = appContainer.settings.settings
+            val stored by settingsFlow.collectAsStateWithLifecycle(initialValue = null)
+            val settings = stored ?: EzzySettings()
             val unlocked by AppLock.unlocked.collectAsStateWithLifecycle()
             val snackbarHostState = remember { SnackbarHostState() }
             var authError by remember { mutableStateOf<String?>(null) }
@@ -64,8 +72,20 @@ class MainActivity : FragmentActivity() {
                     LocalSnackbar provides snackbarHostState,
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        if (settings.biometricLock && !unlocked) {
-                            LockScreen(
+                        when {
+                            // Settings not read back yet: hold on a plain themed frame rather
+                            // than showing a screen that the next frame would replace.
+                            stored == null -> Unit
+
+                            !settings.onboarded -> WelcomeScreen(
+                                onContinue = { name ->
+                                    lifecycleScope.launch {
+                                        appContainer.settings.completeOnboarding(name)
+                                    }
+                                },
+                            )
+
+                            settings.biometricLock && !unlocked -> LockScreen(
                                 error = authError,
                                 onUnlock = {
                                     authError = null
@@ -78,17 +98,19 @@ class MainActivity : FragmentActivity() {
                                     )
                                 },
                             )
-                        } else {
-                            val navController = rememberNavController()
 
-                            LaunchedEffect(pendingRoute) {
-                                pendingRoute?.let {
-                                    navController.navigate(it)
-                                    pendingRoute = null
+                            else -> {
+                                val navController = rememberNavController()
+
+                                LaunchedEffect(pendingRoute) {
+                                    pendingRoute?.let {
+                                        navController.navigate(it)
+                                        pendingRoute = null
+                                    }
                                 }
-                            }
 
-                            EzzyNavHost(navController = navController, settings = settings)
+                                EzzyNavHost(navController = navController, settings = settings)
+                            }
                         }
 
                         SnackbarHost(

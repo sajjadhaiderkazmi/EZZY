@@ -7,6 +7,12 @@ object Routes {
     const val SETTINGS = "settings"
     const val TEMPLATES = "templates"
 
+    // Settings is a hub; each area below is its own page.
+    const val SETTINGS_FLOATING_BAR = "settings/floatingBar"
+    const val SETTINGS_SECURITY = "settings/security"
+    const val SETTINGS_APPEARANCE = "settings/appearance"
+    const val SETTINGS_DATA = "settings/data"
+
     const val CATEGORY = "category/{categoryId}"
     fun category(categoryId: String) = "category/$categoryId"
 

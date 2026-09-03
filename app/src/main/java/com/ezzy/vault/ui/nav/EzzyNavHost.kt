@@ -1,17 +1,26 @@
 package com.ezzy.vault.ui.nav
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.ezzy.vault.ui.screens.AppearanceSettingsScreen
 import com.ezzy.vault.ui.screens.CategoryEditorScreen
 import com.ezzy.vault.ui.screens.CategoryScreen
+import com.ezzy.vault.ui.screens.DataSettingsScreen
 import com.ezzy.vault.ui.screens.EditorScreen
+import com.ezzy.vault.ui.screens.FloatingBarSettingsScreen
 import com.ezzy.vault.ui.screens.HomeScreen
 import com.ezzy.vault.ui.screens.ItemDetailScreen
 import com.ezzy.vault.ui.screens.SearchScreen
+import com.ezzy.vault.ui.screens.SecuritySettingsScreen
 import com.ezzy.vault.ui.screens.SettingsScreen
 import com.ezzy.vault.ui.screens.TemplatesScreen
 import com.ezzy.vault.util.EzzySettings
@@ -21,7 +30,24 @@ fun EzzyNavHost(
     navController: NavHostController,
     settings: EzzySettings,
 ) {
-    NavHost(navController = navController, startDestination = Routes.HOME) {
+    // A short slide-and-fade in both directions: enough to show which way the stack moved,
+    // short enough that it never feels like waiting.
+    NavHost(
+        navController = navController,
+        startDestination = Routes.HOME,
+        enterTransition = {
+            slideInHorizontally(animationSpec = tween(280)) { it / 6 } + fadeIn(tween(200))
+        },
+        exitTransition = {
+            slideOutHorizontally(animationSpec = tween(280)) { -it / 8 } + fadeOut(tween(160))
+        },
+        popEnterTransition = {
+            slideInHorizontally(animationSpec = tween(280)) { -it / 8 } + fadeIn(tween(200))
+        },
+        popExitTransition = {
+            slideOutHorizontally(animationSpec = tween(280)) { it / 6 } + fadeOut(tween(160))
+        },
+    ) {
 
         composable(Routes.HOME) {
             HomeScreen(
@@ -105,7 +131,31 @@ fun EzzyNavHost(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                onOpenFloatingBar = { navController.navigate(Routes.SETTINGS_FLOATING_BAR) },
+                onOpenSecurity = { navController.navigate(Routes.SETTINGS_SECURITY) },
+                onOpenAppearance = { navController.navigate(Routes.SETTINGS_APPEARANCE) },
+                onOpenData = { navController.navigate(Routes.SETTINGS_DATA) },
+            )
+        }
+
+        composable(Routes.SETTINGS_FLOATING_BAR) {
+            FloatingBarSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.SETTINGS_SECURITY) {
+            SecuritySettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.SETTINGS_APPEARANCE) {
+            AppearanceSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.SETTINGS_DATA) {
+            DataSettingsScreen(
+                onBack = { navController.popBackStack() },
                 onOpenTemplates = { navController.navigate(Routes.TEMPLATES) },
+                // The vault is empty now, so drop the whole settings stack and land on Home.
+                onErased = { navController.popBackStack(Routes.HOME, inclusive = false) },
             )
         }
 

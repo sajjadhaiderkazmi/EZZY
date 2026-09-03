@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -275,47 +275,76 @@ fun HomeScreen(
  * Home's own bottom bar: Home (already here), a raised Add button for the single most common
  * action, and Settings. Sub-screens keep the back-arrow top bar they already had — this bar is
  * Home-only, not a persistent app-wide shell.
+ *
+ * The Add button rides above the bar's top edge, so it is a sibling of the bar inside a taller
+ * Box rather than a child of it: a child that overflows a Surface gets clipped to the Surface's
+ * bounds, which sliced the top off the circle.
  */
 @Composable
 private fun HomeBottomBar(onAdd: () -> Unit, onSettings: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 3.dp,
+    val barHeight = 66.dp
+    val addSize = 58.dp
+    // How far the button stands proud of the bar, and therefore the extra room the Box needs.
+    val lift = 24.dp
+    // Headroom above the button so its drop shadow has somewhere to land.
+    val headroom = 8.dp
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .height(barHeight + lift + headroom),
     ) {
-        Row(
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            tonalElevation = 3.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
-                .padding(horizontal = 32.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+                .height(barHeight)
+                .align(Alignment.BottomCenter),
         ) {
-            BottomBarAction(icon = Icons.Rounded.Home, label = "Home", selected = true, onClick = {})
-
-            Surface(
-                onClick = onAdd,
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 4.dp,
+            Row(
                 modifier = Modifier
-                    .size(52.dp)
-                    .offset(y = (-14).dp),
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = "Add entry",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
+                BottomBarAction(
+                    icon = Icons.Rounded.Home,
+                    label = "Home",
+                    selected = true,
+                    onClick = {},
+                )
+                // Keeps the two labels clear of the raised button sitting between them.
+                Spacer(Modifier.width(addSize))
+                BottomBarAction(
+                    icon = Icons.Rounded.Settings,
+                    label = "Settings",
+                    selected = false,
+                    onClick = onSettings,
+                )
             }
+        }
 
-            BottomBarAction(
-                icon = Icons.Rounded.Settings,
-                label = "Settings",
-                selected = false,
-                onClick = onSettings,
-            )
+        Surface(
+            onClick = onAdd,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            shadowElevation = 6.dp,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = headroom)
+                .size(addSize),
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = "Add entry",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
         }
     }
 }
@@ -409,12 +438,26 @@ private fun QuickAccessCard(
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = "${item.fields.size} fields",
+                text = quickAccessSummary(item),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
+}
+
+/**
+ * What a quick-access card says under the title. An entry made only of photos or voice notes has
+ * no fields at all, so counting fields alone printed a bare "0 fields" for it.
+ */
+private fun quickAccessSummary(item: ItemWithDetails): String {
+    val fields = item.fields.size
+    val files = item.attachments.size
+    val parts = buildList {
+        if (fields > 0) add(if (fields == 1) "1 field" else "$fields fields")
+        if (files > 0) add(if (files == 1) "1 file" else "$files files")
+    }
+    return if (parts.isEmpty()) "Empty" else parts.joinToString(" · ")
 }
 
 /** The one-tap setup prompts on the home screen: the floating bar, then the fingerprint lock. */

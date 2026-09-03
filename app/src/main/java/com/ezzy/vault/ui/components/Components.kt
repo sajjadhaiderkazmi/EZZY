@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -326,7 +328,12 @@ fun IconPickerGrid(
     }
 }
 
-/** Horizontal swatch row for choosing a category's accent colour. */
+/**
+ * Swatch picker for a category's accent colour. It wraps onto a second line rather than laying
+ * the swatches out in one fixed row — a single row ran the last swatches off the right edge on
+ * narrower phones, leaving colours that could not be tapped at all.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ColorPickerRow(
     selectedKey: String,
@@ -334,34 +341,43 @@ fun ColorPickerRow(
     modifier: Modifier = Modifier,
 ) {
     val dark = LocalIsDarkTheme.current
-    Row(
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Accents.all.forEach { accent ->
             val selected = accent.key == selectedKey
             val color = if (dark) accent.dark else accent.light
+            // The tap target stays a constant 36dp; only the swatch drawn inside it grows when
+            // selected, so nothing shifts sideways as the selection moves.
             Box(
                 modifier = Modifier
-                    .size(if (selected) 34.dp else 28.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
-                    .background(color)
-                    .border(
-                        width = if (selected) 3.dp else 0.dp,
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = CircleShape,
-                    )
                     .clickable { onSelect(accent.key) },
                 contentAlignment = Alignment.Center,
             ) {
-                if (selected) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = accent.label,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
+                Box(
+                    modifier = Modifier
+                        .size(if (selected) 34.dp else 28.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(
+                            width = if (selected) 3.dp else 0.dp,
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = CircleShape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = accent.label,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
