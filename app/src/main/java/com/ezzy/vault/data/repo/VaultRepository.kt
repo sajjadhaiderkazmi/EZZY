@@ -115,6 +115,9 @@ class VaultRepository(
 
     fun observeItemCount(): Flow<Int> = db.itemDao().observeCount()
 
+    /** Every stored item, newest edit first. Used by the value picker's default listing. */
+    fun observeAllItems(): Flow<List<ItemWithDetails>> = db.itemDao().observeAll()
+
     fun search(query: String): Flow<List<ItemWithDetails>> {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return flowOf(emptyList())

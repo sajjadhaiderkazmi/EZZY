@@ -77,7 +77,7 @@ class PickValueViewModel(private val container: AppContainer) : ViewModel() {
                 combine(
                     repository.observePinned(),
                     repository.observeRecent(12),
-                    repository.observeAll(),
+                    repository.observeAllItems(),
                 ) { pinned, recent, all ->
                     val head = pinned + recent
                     val seen = head.mapTo(mutableSetOf()) { it.item.id }
