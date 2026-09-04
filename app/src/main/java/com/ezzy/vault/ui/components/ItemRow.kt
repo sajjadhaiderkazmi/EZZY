@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ezzy.vault.data.db.ItemWithDetails
+import com.ezzy.vault.data.model.FieldType
 
 /** One saved entry as it appears in any list. Keeps home, category and search identical. */
 @Composable
@@ -33,10 +34,18 @@ fun ItemRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // A login's website is a far more useful thing to see under its title than any part of the
+    // password — so a URL field always wins the preview slot before a masked one is considered.
+    val urlField = item.sortedFields.firstOrNull { it.type == FieldType.URL && it.value.isNotBlank() }
     // A masked field (account number, card, IBAN…) makes a far more useful preview than the
     // full value would — "•••• 4321" says which one at a glance without showing it in a list.
-    val maskedField = item.sortedFields.firstOrNull { it.type.isMasked && it.value.isNotBlank() }
+    // A password is the one masked field this never applies to: unlike a card's last four
+    // digits, a password's last four characters are real secret to leak into a list view.
+    val maskedField = item.sortedFields.firstOrNull {
+        it.type.isMasked && it.value.isNotBlank() && !it.label.contains("password", ignoreCase = true)
+    }
     val subtitle = when {
+        urlField != null -> urlField.value
         maskedField != null -> "•••• " + maskedField.value.takeLast(4)
         else -> item.item.subtitle.ifBlank {
             item.sortedFields.firstOrNull { !it.type.isMasked && it.value.isNotBlank() }?.value.orEmpty()
