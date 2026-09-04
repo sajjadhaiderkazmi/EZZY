@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   The bolt drawn straight in the 108 viewport rather than scaled up from a 24dp glyph, so it
-  cannot come out stretched. It spans x 39..69 and y 26..82 — centred on (54,54) and entirely
-  inside the 66dp safe zone, so no launcher mask can clip a point off, and the margin around it
-  is even on all four sides.
+  cannot come out stretched. It spans x 43.2..64.8 and y 33.84..74.16 — centred on (54,54), so
+  no launcher mask can clip a point off and the margin around it is even on all four sides.
+  Sized against what the mask actually leaves visible (roughly the middle 72dp, not the full
+  108), because measuring it against the whole canvas made it read as oversized on a home
+  screen next to everything else.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -12,5 +14,5 @@
     android:viewportHeight="108">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M60,26L39,57L52,57L48,82L69,51L56,51Z" />
+        android:pathData="M58.32,33.84L43.2,56.16L52.56,56.16L49.68,74.16L64.8,51.84L55.44,51.84Z" />
 </vector>
