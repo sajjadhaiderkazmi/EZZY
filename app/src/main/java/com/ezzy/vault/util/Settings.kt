@@ -42,6 +42,8 @@ data class EzzySettings(
      * instead of silently missing from it.
      */
     val hiddenBarSections: Set<String> = emptySet(),
+    /** The star at the top of the bar's rail: pinned and recent, across every section. */
+    val quickAccessInBar: Boolean = true,
 )
 
 class SettingsStore(context: Context) {
@@ -66,6 +68,7 @@ class SettingsStore(context: Context) {
             dynamicColor = prefs[Keys.DYNAMIC] ?: false,
             bubbleSweep = prefs[Keys.BUBBLE_SWEEP] ?: true,
             hiddenBarSections = prefs[Keys.HIDDEN_BAR_SECTIONS] ?: emptySet(),
+            quickAccessInBar = prefs[Keys.QUICK_IN_BAR] ?: true,
         )
     }
 
@@ -91,6 +94,7 @@ class SettingsStore(context: Context) {
     suspend fun setBlockScreenshots(value: Boolean) = put(Keys.NO_SCREENSHOT, value)
     suspend fun setDynamicColor(value: Boolean) = put(Keys.DYNAMIC, value)
     suspend fun setBubbleSweep(value: Boolean) = put(Keys.BUBBLE_SWEEP, value)
+    suspend fun setQuickAccessInBar(value: Boolean) = put(Keys.QUICK_IN_BAR, value)
     /** Adds or removes one section from the bar's rail, leaving the rest of the set alone. */
     suspend fun setBarSectionVisible(categoryId: String, visible: Boolean) {
         store.edit { prefs ->
@@ -143,5 +147,6 @@ class SettingsStore(context: Context) {
         val DYNAMIC = booleanPreferencesKey("dynamic_color")
         val BUBBLE_SWEEP = booleanPreferencesKey("bubble_sweep")
         val HIDDEN_BAR_SECTIONS = stringSetPreferencesKey("hidden_bar_sections")
+        val QUICK_IN_BAR = booleanPreferencesKey("quick_access_in_bar")
     }
 }

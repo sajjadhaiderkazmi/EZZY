@@ -457,6 +457,7 @@ class OverlayService : Service() {
             OverlayPanel(
                 maskSecrets = settings.maskSecrets,
                 hiddenSections = settings.hiddenBarSections,
+                showQuickAccess = settings.quickAccessInBar,
                 requireUnlock = settings.biometricLock,
                 clipboardClearSeconds = settings.clipboardClearSeconds,
                 themeMode = settings.themeMode,

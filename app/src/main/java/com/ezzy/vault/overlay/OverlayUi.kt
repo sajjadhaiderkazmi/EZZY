@@ -265,6 +265,8 @@ fun OverlayPanel(
     maskSecrets: Boolean,
     /** Section ids the user has taken out of the rail. */
     hiddenSections: Set<String>,
+    /** Whether the rail carries its Quick access star at all. */
+    showQuickAccess: Boolean,
     requireUnlock: Boolean,
     clipboardClearSeconds: Int,
     themeMode: ThemeMode,
@@ -309,6 +311,14 @@ fun OverlayPanel(
     fun navigate(target: PanelView) {
         onInteraction()
         view = target
+    }
+
+    // Quick access is the panel's usual root. With the star switched off there is nothing to
+    // root on, so the first section takes its place — including when a back arrow aims there.
+    LaunchedEffect(showQuickAccess, railCategories, view) {
+        if (!showQuickAccess && view is PanelView.Quick) {
+            railCategories.firstOrNull()?.let { view = PanelView.Section(it.id) }
+        }
     }
 
     val locked = requireUnlock && !unlocked
@@ -367,6 +377,7 @@ fun OverlayPanel(
                                 maskSecrets = maskSecrets,
                                 copiedLabel = copiedLabel,
                                 confirmedItems = confirmedItems,
+                                showQuickAccess = showQuickAccess,
                                 onNotify = { copiedLabel = it },
                                 onNavigate = ::navigate,
                                 onRequestUnlock = onRequestUnlock,
@@ -391,6 +402,7 @@ fun OverlayPanel(
 
                     SectionRail(
                         categories = railCategories,
+                        showQuick = showQuickAccess,
                         activeCategoryId = (view as? PanelView.Section)?.categoryId,
                         quickActive = view is PanelView.Quick,
                         onQuick = { navigate(PanelView.Quick) },
@@ -407,6 +419,7 @@ fun OverlayPanel(
 @Composable
 private fun SectionRail(
     categories: List<CategoryEntity>,
+    showQuick: Boolean,
     activeCategoryId: String?,
     quickActive: Boolean,
     onQuick: () -> Unit,
@@ -426,18 +439,20 @@ private fun SectionRail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            RailButton(
-                selected = quickActive,
-                accent = MaterialTheme.colorScheme.primary,
-                onClick = onQuick,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Star,
-                    contentDescription = "Quick access",
-                    tint = if (quickActive) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp),
-                )
+            if (showQuick) {
+                RailButton(
+                    selected = quickActive,
+                    accent = MaterialTheme.colorScheme.primary,
+                    onClick = onQuick,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = "Quick access",
+                        tint = if (quickActive) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
 
             categories.forEach { category ->
@@ -521,6 +536,7 @@ private fun PanelSheet(
     maskSecrets: Boolean,
     copiedLabel: String?,
     confirmedItems: Set<String>,
+    showQuickAccess: Boolean,
     onNotify: (String) -> Unit,
     onNavigate: (PanelView) -> Unit,
     onRequestUnlock: (String?) -> Unit,
@@ -540,7 +556,12 @@ private fun PanelSheet(
 
         PanelHeader(
             title = title,
-            showBack = view !is PanelView.Quick,
+            showBack = when (view) {
+                is PanelView.Quick -> false
+                // A section is the root once the star is gone; there is nowhere back to.
+                is PanelView.Section -> showQuickAccess
+                is PanelView.Entry -> true
+            },
             onBack = {
                 onNavigate(
                     when (view) {

@@ -84,6 +84,8 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     fun setBarSectionVisible(categoryId: String, visible: Boolean) =
         launch { store.setBarSectionVisible(categoryId, visible) }
 
+    fun setQuickAccessInBar(value: Boolean) = launch { store.setQuickAccessInBar(value) }
+
 
     fun eraseEverything(onDone: () -> Unit) = launch {
         container.eraseEverything()

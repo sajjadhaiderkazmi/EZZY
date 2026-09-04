@@ -10,16 +10,23 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -36,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,7 +51,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.withResumed
 import com.ezzy.vault.R
-import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.overlay.EzzyTileService
 import com.ezzy.vault.overlay.OverlayService
 import com.ezzy.vault.ui.LocalSettings
@@ -304,6 +311,38 @@ fun BarSectionsSettingsScreen(onBack: () -> Unit) {
             )
         }
 
+        item {
+            BarToggleRow(
+                name = "Quick access",
+                subtitle = "Pinned and recent, from every section",
+                visible = settings.quickAccessInBar,
+                onChange = { wanted ->
+                    scope.launch {
+                        viewModel.setQuickAccessInBar(wanted).join()
+                        if (settings.overlayEnabled) OverlayService.refresh(context)
+                    }
+                },
+                leading = {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Star,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+                },
+            )
+        }
+
+        item { SettingsGroup("Sections") }
+
         if (categories.isEmpty()) {
             item {
                 Text(
@@ -316,8 +355,8 @@ fun BarSectionsSettingsScreen(onBack: () -> Unit) {
         }
 
         items(categories, key = { it.id }) { category ->
-            BarSectionRow(
-                category = category,
+            BarToggleRow(
+                name = category.name,
                 visible = category.id !in settings.hiddenBarSections,
                 onChange = { wanted ->
                     // Same ordering as everywhere else the service reads a setting back: the
@@ -327,16 +366,28 @@ fun BarSectionsSettingsScreen(onBack: () -> Unit) {
                         if (settings.overlayEnabled) OverlayService.refresh(context)
                     }
                 },
+                leading = {
+                    // The same badge the bar itself shows, so the row is recognisable as that
+                    // icon rather than just a name.
+                    IconAvatar(
+                        iconKey = category.iconKey,
+                        colorKey = category.colorKey,
+                        size = 38.dp,
+                        iconSize = 19.dp,
+                    )
+                },
             )
         }
     }
 }
 
 @Composable
-private fun BarSectionRow(
-    category: CategoryEntity,
+private fun BarToggleRow(
+    name: String,
     visible: Boolean,
     onChange: (Boolean) -> Unit,
+    leading: @Composable () -> Unit,
+    subtitle: String? = null,
 ) {
     Surface(
         shape = MaterialTheme.shapes.large,
@@ -349,22 +400,24 @@ private fun BarSectionRow(
                 .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The same badge the bar itself shows, so the row is recognisable as that icon.
-            IconAvatar(
-                iconKey = category.iconKey,
-                colorKey = category.colorKey,
-                size = 38.dp,
-                iconSize = 19.dp,
-            )
+            leading()
             Spacer(Modifier.width(14.dp))
-            Text(
-                text = category.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Spacer(Modifier.width(10.dp))
             Switch(checked = visible, onCheckedChange = onChange)
         }
