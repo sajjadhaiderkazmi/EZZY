@@ -195,14 +195,30 @@ fun FloatingBarSettingsScreen(onBack: () -> Unit, onOpenBarSections: () -> Unit)
             )
         }
 
-        item {
-            ChoiceRow(
-                title = "Hide the bar",
-                current = settings.autoHide.label,
-                enabled = settings.overlayEnabled,
-                options = AutoHide.entries.map { it.label to it },
-                onSelect = viewModel::setAutoHide,
-            )
+        // Both of these are about a button that comes and goes. In Always active mode it
+        // never does — it is simply there — so neither row has anything to say.
+        if (settings.triggerMode == TriggerMode.ON_TRIGGER) {
+            item {
+                ChoiceRow(
+                    title = "Hide the bar",
+                    current = settings.autoHide.label,
+                    enabled = settings.overlayEnabled,
+                    options = AutoHide.entries.map { it.label to it },
+                    onSelect = viewModel::setAutoHide,
+                )
+            }
+
+            item {
+                NavigationRow(
+                    title = "Add Quick Settings tile",
+                    subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        "Puts EZZY next to Wi-Fi and Bluetooth"
+                    } else {
+                        "Open the shade, tap the pencil, then drag EZZY in"
+                    },
+                    onClick = { requestQuickSettingsTile(context, scope, snackbar) },
+                )
+            }
         }
 
         item {
@@ -214,18 +230,6 @@ fun FloatingBarSettingsScreen(onBack: () -> Unit, onOpenBarSections: () -> Unit)
                     "${settings.hiddenBarSections.size} hidden"
                 },
                 onClick = onOpenBarSections,
-            )
-        }
-
-        item {
-            NavigationRow(
-                title = "Add Quick Settings tile",
-                subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    "Puts EZZY next to Wi-Fi and Bluetooth"
-                } else {
-                    "Open the shade, tap the pencil, then drag EZZY in"
-                },
-                onClick = { requestQuickSettingsTile(context, scope, snackbar) },
             )
         }
 

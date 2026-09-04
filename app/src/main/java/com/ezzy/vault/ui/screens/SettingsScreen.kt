@@ -1,6 +1,7 @@
 package com.ezzy.vault.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,7 @@ import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.components.NavigationRow
 import com.ezzy.vault.ui.components.SettingsPage
 import com.ezzy.vault.ui.ezzyViewModel
+import com.ezzy.vault.ui.icons.EzzyMark
 import com.ezzy.vault.util.AutoHide
 import com.ezzy.vault.util.ThemeMode
 import com.ezzy.vault.util.TriggerMode
@@ -192,26 +195,51 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
             modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(54.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                val initial = name.trim().firstOrNull()
-                if (initial == null) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val initial = name.trim().firstOrNull()
+                    if (initial == null) {
+                        Icon(
+                            imageVector = Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    } else {
+                        Text(
+                            text = initial.uppercase(),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+
+                // The app's own mark on the corner of the avatar, so the card reads as you, in
+                // EZZY. The ring is the card's own colour, which is what lifts the badge off
+                // the circle behind it.
+                Box(
+                    modifier = Modifier
+                        .size(23.dp)
+                        .clip(CircleShape)
+                        .background(EzzyMark.Brand)
+                        .border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = CircleShape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
-                        imageVector = Icons.Rounded.Person,
+                        imageVector = EzzyMark.Bolt,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(26.dp),
-                    )
-                } else {
-                    Text(
-                        text = initial.uppercase(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp),
                     )
                 }
             }
