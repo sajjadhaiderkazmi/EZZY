@@ -2,6 +2,7 @@ package com.ezzy.vault.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -704,6 +705,7 @@ private fun CategoryCard(
  * long-press share no gesture with the drag a section uses to file itself in here, so a folder
  * never has to guess which one the user meant.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GroupCard(
     row: CategoryGroupWithCount,
