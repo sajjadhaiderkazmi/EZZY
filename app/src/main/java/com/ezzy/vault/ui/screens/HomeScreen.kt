@@ -187,7 +187,7 @@ fun HomeScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
-                                text = "Your phone, your data",
+                                text = "Your Digital Wallet",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
