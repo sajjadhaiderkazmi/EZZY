@@ -1,7 +1,9 @@
 package com.ezzy.vault.ui.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // EZZY's own palette: an indigo core with a mint accent, tuned so that the overlay reads
@@ -125,4 +127,28 @@ object Accents {
     fun of(key: String?): AccentColor = byKey[key] ?: all.first()
 
     fun color(key: String?, dark: Boolean): Color = of(key).let { if (dark) it.dark else it.light }
+}
+
+/**
+ * The two brand hues for the entry banner, at the tone each theme wants for a large block of
+ * filled colour with white writing on it.
+ *
+ * In the light scheme the accents themselves are already the dark, saturated end of the ramp,
+ * so they are what fills the banner. In the dark scheme Material flips them to pale tints —
+ * they are meant to be read AS text there, not written on — which turned the banner into a
+ * near-white slab with white text lost on top of it. The container tones are the dark,
+ * filled-surface end of the same two hues, so the banner keeps its identity, stands clear of
+ * the near-black background, and carries white at better than 9:1 either way.
+ */
+@Composable
+fun brandBannerColors(): List<Color> = if (LocalIsDarkTheme.current) {
+    listOf(
+        MaterialTheme.colorScheme.primaryContainer,
+        MaterialTheme.colorScheme.tertiaryContainer,
+    )
+} else {
+    listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.tertiary,
+    )
 }

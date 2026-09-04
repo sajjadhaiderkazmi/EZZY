@@ -79,6 +79,7 @@ import com.ezzy.vault.ui.components.VoiceNoteRow
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.rememberAttachmentActions
+import com.ezzy.vault.ui.theme.brandBannerColors
 import com.ezzy.vault.ui.rememberCopier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -211,14 +212,7 @@ fun ItemDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(MaterialTheme.shapes.large)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.tertiary,
-                                )
-                            )
-                        ),
+                        .background(Brush.linearGradient(brandBannerColors())),
                 ) {
                     Column(
                         modifier = Modifier

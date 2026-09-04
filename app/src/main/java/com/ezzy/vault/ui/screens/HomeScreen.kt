@@ -503,16 +503,6 @@ private fun CategoryCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = when (row.itemCount) {
-                    0 -> "Empty"
-                    1 -> "1 entry"
-                    else -> "${row.itemCount} entries"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -536,35 +526,18 @@ private fun QuickAccessCard(
         ) {
             IconAvatar(iconKey = iconKey, colorKey = colorKey, size = 36.dp, iconSize = 18.dp)
             Spacer(Modifier.height(10.dp))
+            // Always two lines: a row of cards with nothing under the title would otherwise
+            // come out ragged, one card short wherever a name happened to fit on one line.
             Text(
                 text = item.item.title,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
+                minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = quickAccessSummary(item),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
-}
-
-/**
- * What a quick-access card says under the title. An entry made only of photos or voice notes has
- * no fields at all, so counting fields alone printed a bare "0 fields" for it.
- */
-private fun quickAccessSummary(item: ItemWithDetails): String {
-    val fields = item.fields.size
-    val files = item.attachments.size
-    val parts = buildList {
-        if (fields > 0) add(if (fields == 1) "1 field" else "$fields fields")
-        if (files > 0) add(if (files == 1) "1 file" else "$files files")
-    }
-    return if (parts.isEmpty()) "Empty" else parts.joinToString(" · ")
 }
 
 /** The one-tap setup prompts on the home screen: the floating bar, then the fingerprint lock. */
