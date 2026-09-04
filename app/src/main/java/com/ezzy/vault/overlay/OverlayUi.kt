@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +59,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -86,16 +86,23 @@ import com.ezzy.vault.ui.theme.LocalIsDarkTheme
 import com.ezzy.vault.util.ThemeMode
 import kotlinx.coroutines.delay
 
-/** The draggable launcher that sits on top of other apps. */
+/**
+ * The draggable launcher that sits on top of other apps.
+ *
+ * No drop shadow. Each of these lives in its own window sized to exactly this circle, and an
+ * elevation shadow is drawn outside the shape it belongs to — with no window left to spill
+ * into, it came out as a hard grey square under the button. A thin white ring separates the
+ * circle from the wallpaper instead, and stays inside the bounds where it cannot be clipped.
+ */
 @Composable
 fun OverlayBubble() {
     EzzyTheme {
         Box(
             modifier = Modifier
                 .size(56.dp)
-                .shadow(10.dp, CircleShape)
                 .clip(CircleShape)
-                .background(EzzyMark.Brand),
+                .background(EzzyMark.Brand)
+                .border(1.5.dp, Color.White.copy(alpha = 0.30f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             // Same proportion as the launcher icon: the bolt fills a little over half the
@@ -121,12 +128,13 @@ fun DismissTarget(armed: Boolean) {
         Box(
             modifier = Modifier
                 .size(size)
-                .shadow(if (armed) 12.dp else 6.dp, CircleShape)
                 .clip(CircleShape)
                 .background(
                     if (armed) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.surfaceContainerHighest
-                ),
+                )
+                // Same reason as the button: a shadow here had no window to fall into.
+                .border(1.5.dp, Color.White.copy(alpha = 0.22f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
