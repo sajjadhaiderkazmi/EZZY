@@ -73,6 +73,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.withResumed
 import com.ezzy.vault.AppContainer
 import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.data.db.ItemGroupWithCount
