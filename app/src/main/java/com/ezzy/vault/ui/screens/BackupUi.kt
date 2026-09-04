@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -140,11 +140,21 @@ fun SetExportPasswordDialog(
     val mismatch = touched && password != confirm
     val canConfirm = !tooShort && password == confirm
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Set a backup password") },
-        text = {
-            Column {
+    // Two fields in a row is exactly the case Material3's AlertDialog gets wrong: it does not
+    // resize for the keyboard, so the second field ends up hidden behind it the moment it's
+    // focused. A plain Dialog does resize when its content carries imePadding — the whole card
+    // rides up as the keyboard opens, so whichever field has focus stays in view.
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding(),
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Set a backup password", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "This unlocks the file — write it down somewhere. EZZY does not store it, " +
                         "so a lost password means a lost backup.",
@@ -190,18 +200,21 @@ fun SetExportPasswordDialog(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { onConfirm(password) },
+                        enabled = canConfirm,
+                    ) { Text("Continue") }
+                }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(password) },
-                enabled = canConfirm,
-            ) { Text("Continue") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
+        }
+    }
 }
 
 /** Asks for the password an already-picked file was exported with. */
@@ -213,11 +226,17 @@ fun AskImportPasswordDialog(
 ) {
     var password by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Backup password") },
-        text = {
-            Column {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding(),
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Backup password", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "This file was exported with a password. Enter it to restore its entries.",
                     style = MaterialTheme.typography.bodySmall,
@@ -245,18 +264,21 @@ fun AskImportPasswordDialog(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { onConfirm(password) },
+                        enabled = password.isNotEmpty(),
+                    ) { Text("Unlock") }
+                }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(password) },
-                enabled = password.isNotEmpty(),
-            ) { Text("Unlock") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
+        }
+    }
 }
 
 /**

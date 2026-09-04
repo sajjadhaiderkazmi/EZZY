@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Crop
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
@@ -97,6 +98,7 @@ import com.ezzy.vault.data.db.TemplateEntity
 import com.ezzy.vault.data.model.AttachmentDraft
 import com.ezzy.vault.data.model.FieldDraft
 import com.ezzy.vault.data.model.FieldType
+import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.DeleteAttachmentButton
 import com.ezzy.vault.ui.components.EncryptedImage
@@ -437,6 +439,60 @@ private fun DetailsStep(
             }
         }
 
+        // Only the Contact type offers this — pulling a name and number off the phone means
+        // nothing for a bank account or a receipt, and the generic little icon button that used
+        // to sit here on every entry type read as clutter more than as a feature.
+        if (draft.templateId == Seed.CONTACT_TEMPLATE_ID) {
+            item {
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            runCatching {
+                                contactPicker.launch(
+                                    Intent(
+                                        Intent.ACTION_PICK,
+                                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                                    )
+                                )
+                            }
+                        },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Contacts,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Import from your contacts",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Text(
+                                text = "Fills in the name and phone number",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
+            }
+        }
+
         if (state.needsPhoto) {
             item {
                 SectionHeader(
@@ -497,28 +553,6 @@ private fun DetailsStep(
             SectionHeader(
                 text = "Fields",
                 modifier = Modifier.padding(top = 6.dp),
-                trailing = {
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                contactPicker.launch(
-                                    Intent(
-                                        Intent.ACTION_PICK,
-                                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                                    )
-                                )
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Contacts,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("From contacts", style = MaterialTheme.typography.labelMedium)
-                    }
-                },
             )
         }
 

@@ -25,6 +25,9 @@ object Seed {
      */
     val guardedTemplateIds: Set<String> = setOf("tpl_login", "tpl_document")
 
+    /** The one type whose editor offers to fill itself in from the phone's own contacts. */
+    const val CONTACT_TEMPLATE_ID = "tpl_contact"
+
     val categories: List<SeedCategory> = listOf(
         SeedCategory("cat_bank", "Bank & Cards", "bank", "indigo"),
         SeedCategory("cat_documents", "Documents & IDs", "id_card", "blue"),
