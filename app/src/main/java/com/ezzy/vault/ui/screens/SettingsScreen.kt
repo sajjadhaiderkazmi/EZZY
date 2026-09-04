@@ -68,6 +68,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     fun setBlockScreenshots(value: Boolean) = launch { store.setBlockScreenshots(value) }
     fun setThemeMode(value: ThemeMode) = launch { store.setThemeMode(value) }
     fun setDynamicColor(value: Boolean) = launch { store.setDynamicColor(value) }
+    fun setBubbleSweep(value: Boolean) = launch { store.setBubbleSweep(value) }
 
     fun eraseEverything(onDone: () -> Unit) = launch {
         container.eraseEverything()

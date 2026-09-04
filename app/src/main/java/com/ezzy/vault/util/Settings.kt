@@ -33,6 +33,8 @@ data class EzzySettings(
     val blockScreenshots: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = false,
+    /** The arc that circles the floating button while it is up with nothing to count down. */
+    val bubbleSweep: Boolean = true,
 )
 
 class SettingsStore(context: Context) {
@@ -55,6 +57,7 @@ class SettingsStore(context: Context) {
             themeMode = runCatching { ThemeMode.valueOf(prefs[Keys.THEME] ?: "") }
                 .getOrDefault(ThemeMode.SYSTEM),
             dynamicColor = prefs[Keys.DYNAMIC] ?: false,
+            bubbleSweep = prefs[Keys.BUBBLE_SWEEP] ?: true,
         )
     }
 
@@ -79,6 +82,7 @@ class SettingsStore(context: Context) {
     suspend fun setMaskSecrets(value: Boolean) = put(Keys.MASK, value)
     suspend fun setBlockScreenshots(value: Boolean) = put(Keys.NO_SCREENSHOT, value)
     suspend fun setDynamicColor(value: Boolean) = put(Keys.DYNAMIC, value)
+    suspend fun setBubbleSweep(value: Boolean) = put(Keys.BUBBLE_SWEEP, value)
     suspend fun setAutoLockMinutes(value: Int) = put(Keys.AUTO_LOCK, value)
     suspend fun setClipboardClearSeconds(value: Int) = put(Keys.CLIP_CLEAR, value)
 
@@ -120,5 +124,6 @@ class SettingsStore(context: Context) {
         val NO_SCREENSHOT = booleanPreferencesKey("block_screenshots")
         val THEME = stringPreferencesKey("theme_mode")
         val DYNAMIC = booleanPreferencesKey("dynamic_color")
+        val BUBBLE_SWEEP = booleanPreferencesKey("bubble_sweep")
     }
 }

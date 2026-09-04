@@ -109,6 +109,18 @@ class OverlayService : Service() {
                 showPanel()
             }
 
+            ACTION_REFRESH -> scope.launch {
+                refreshSettings()
+                // Only the ring can change from here, so the button is left exactly where the
+                // user dragged it rather than being torn down and rebuilt in its default spot.
+                // A countdown in progress is left alone: that ring is a timer, not decoration.
+                if (bubbleView != null && panelView == null &&
+                    bubbleRing.value !is BubbleRing.Countdown
+                ) {
+                    bubbleRing.value = idleRing()
+                }
+            }
+
             ACTION_SHOW_TRIGGER -> scope.launch {
                 refreshSettings()
                 when (settings.triggerMode) {
@@ -197,7 +209,7 @@ class OverlayService : Service() {
         when (settings.triggerMode) {
             TriggerMode.ALWAYS_ACTIVE -> {
                 // Nothing is counting down in this mode, so the ring simply idles.
-                bubbleRing.value = BubbleRing.Sweep
+                bubbleRing.value = idleRing()
                 // Settings.canDrawOverlays() is unreliable on some OEM skins — MIUI reports
                 // false even after the user has allowed it — so the real test is whether the
                 // bubble could actually be placed.
@@ -273,12 +285,15 @@ class OverlayService : Service() {
         restartBubbleAutoHide()
     }
 
+    /** What the ring shows when nothing is counting down — the user's choice, in other words. */
+    private fun idleRing(): BubbleRing? = if (settings.bubbleSweep) BubbleRing.Sweep else null
+
     private fun restartBubbleAutoHide() {
         bubbleAutoHideJob?.cancel()
         val seconds = settings.autoHide.seconds
         if (seconds <= 0) {
             // "Never": there is no deadline to draw, so the ring goes back to idling.
-            bubbleRing.value = BubbleRing.Sweep
+            bubbleRing.value = idleRing()
             return
         }
         bubbleRing.value = BubbleRing.Countdown(
@@ -535,7 +550,7 @@ class OverlayService : Service() {
         if (fromOnDestroy) return
 
         if (settings.triggerMode != TriggerMode.ON_TRIGGER) {
-            bubbleRing.value = BubbleRing.Sweep
+            bubbleRing.value = idleRing()
             return
         }
 
@@ -570,6 +585,7 @@ class OverlayService : Service() {
         const val ACTION_STOP = "com.ezzy.vault.overlay.STOP"
         const val ACTION_OPEN_PANEL = "com.ezzy.vault.overlay.OPEN_PANEL"
         const val ACTION_SHOW_TRIGGER = "com.ezzy.vault.overlay.SHOW_TRIGGER"
+        const val ACTION_REFRESH = "com.ezzy.vault.overlay.REFRESH"
 
         private const val CHANNEL_ID = "ezzy_overlay"
         private const val NOTIFICATION_ID = 4211
@@ -619,6 +635,21 @@ class OverlayService : Service() {
         fun showTrigger(context: Context) {
             runCatching {
                 val intent = Intent(context, OverlayService::class.java).setAction(ACTION_SHOW_TRIGGER)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }
+        }
+
+        /**
+         * Re-reads the settings without disturbing anything on screen. Used when a preference
+         * changes that only affects how the button is drawn.
+         */
+        fun refresh(context: Context) {
+            runCatching {
+                val intent = Intent(context, OverlayService::class.java).setAction(ACTION_REFRESH)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
                 } else {

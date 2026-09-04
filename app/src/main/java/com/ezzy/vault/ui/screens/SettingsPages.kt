@@ -326,6 +326,8 @@ fun SecuritySettingsScreen(onBack: () -> Unit) {
 fun AppearanceSettingsScreen(onBack: () -> Unit) {
     val viewModel: SettingsViewModel = ezzyViewModel { SettingsViewModel(it) }
     val settings = LocalSettings.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     SettingsPage(title = "Appearance", onBack = onBack) {
         item {
@@ -354,6 +356,37 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     onCheckedChange = viewModel::setDynamicColor,
                 )
             }
+        }
+
+        item { SettingsGroup("Floating button") }
+
+        item {
+            SwitchRow(
+                title = "Spinning ring",
+                subtitle = "The white arc circling the button in Always active mode",
+                checked = settings.bubbleSweep,
+                onCheckedChange = { wanted ->
+                    // The button is already on screen, so the service is told to pick the
+                    // change up rather than making the user turn the bar off and on again: it
+                    // only repaints the ring, and the button keeps the place it was dragged
+                    // to. Same ordering as a mode change — the write has to land before the
+                    // service reads it back, or it can still see the old value.
+                    scope.launch {
+                        viewModel.setBubbleSweep(wanted).join()
+                        if (settings.overlayEnabled) OverlayService.refresh(context)
+                    }
+                },
+            )
+        }
+
+        item {
+            Text(
+                text = "In On trigger mode the ring is the countdown to the button " +
+                    "disappearing, so it is always shown.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
+            )
         }
     }
 }
