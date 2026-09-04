@@ -33,6 +33,7 @@ fun ItemRow(
     colorKey: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    dragging: Boolean = false,
 ) {
     // A login's website is a far more useful thing to see under its title than any part of the
     // password — so a URL field always wins the preview slot before a masked one is considered.
@@ -55,7 +56,9 @@ fun ItemRow(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = if (dragging) 10.dp else 0.dp,
     ) {
         Row(
             modifier = Modifier

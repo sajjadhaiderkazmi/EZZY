@@ -19,8 +19,8 @@ object Routes {
     const val CATEGORY = "category/{categoryId}"
     fun category(categoryId: String) = "category/$categoryId"
 
-    const val GROUP = "group/{groupId}"
-    fun group(groupId: String) = "group/$groupId"
+    const val ITEM_GROUP = "itemGroup/{groupId}"
+    fun itemGroup(groupId: String) = "itemGroup/$groupId"
 
     const val ITEM = "item/{itemId}"
     fun item(itemId: String) = "item/$itemId"

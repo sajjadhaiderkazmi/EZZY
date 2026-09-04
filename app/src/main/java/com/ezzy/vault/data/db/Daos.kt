@@ -27,37 +27,6 @@ interface CategoryDao {
     )
     fun observeAllWithCounts(): Flow<List<CategoryWithCount>>
 
-    /** The home grid's top level: sections that have not been dragged into a group. */
-    @Query(
-        """
-        SELECT c.*, (SELECT COUNT(*) FROM items i WHERE i.categoryId = c.id) AS itemCount
-        FROM categories c
-        WHERE c.groupId IS NULL
-        ORDER BY c.sortOrder ASC, c.name ASC
-        """
-    )
-    fun observeUngroupedWithCounts(): Flow<List<CategoryWithCount>>
-
-    @Query(
-        """
-        SELECT c.*, (SELECT COUNT(*) FROM items i WHERE i.categoryId = c.id) AS itemCount
-        FROM categories c
-        WHERE c.groupId = :groupId
-        ORDER BY c.sortOrder ASC, c.name ASC
-        """
-    )
-    fun observeByGroupWithCounts(groupId: String): Flow<List<CategoryWithCount>>
-
-    @Query("SELECT * FROM categories WHERE groupId = :groupId ORDER BY sortOrder ASC, name ASC")
-    suspend fun getByGroup(groupId: String): List<CategoryEntity>
-
-    @Query("UPDATE categories SET groupId = :groupId WHERE id = :id")
-    suspend fun setGroupId(id: String, groupId: String?)
-
-    /** Every section still in a group that is about to be deleted, so it can be dropped too. */
-    @Query("SELECT id FROM categories WHERE groupId = :groupId")
-    suspend fun idsInGroup(groupId: String): List<String>
-
     @Query("SELECT * FROM categories WHERE id = :id")
     fun observeById(id: String): Flow<CategoryEntity?>
 
@@ -114,6 +83,27 @@ interface ItemDao {
     @Transaction
     @Query("SELECT * FROM items WHERE categoryId = :categoryId ORDER BY isPinned DESC, title COLLATE NOCASE ASC")
     fun observeByCategory(categoryId: String): Flow<List<ItemWithDetails>>
+
+    /** A section's own top level: entries that have not been dragged into one of its groups. */
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM items WHERE categoryId = :categoryId AND groupId IS NULL
+        ORDER BY isPinned DESC, title COLLATE NOCASE ASC
+        """
+    )
+    fun observeUngroupedByCategory(categoryId: String): Flow<List<ItemWithDetails>>
+
+    @Transaction
+    @Query("SELECT * FROM items WHERE groupId = :groupId ORDER BY isPinned DESC, title COLLATE NOCASE ASC")
+    fun observeByGroup(groupId: String): Flow<List<ItemWithDetails>>
+
+    @Query("UPDATE items SET groupId = :groupId WHERE id = :id")
+    suspend fun setGroupId(id: String, groupId: String?)
+
+    /** Every entry still in a group that is about to be deleted, so it can be dropped too. */
+    @Query("SELECT id FROM items WHERE groupId = :groupId")
+    suspend fun idsInGroup(groupId: String): List<String>
 
     @Transaction
     @Query("SELECT * FROM items WHERE id = :id")
@@ -213,35 +203,36 @@ interface AttachmentDao {
 }
 
 @Dao
-interface CategoryGroupDao {
+interface ItemGroupDao {
 
     @Query(
         """
-        SELECT g.*, (SELECT COUNT(*) FROM categories c WHERE c.groupId = g.id) AS categoryCount
-        FROM category_groups g
+        SELECT g.*, (SELECT COUNT(*) FROM items i WHERE i.groupId = g.id) AS itemCount
+        FROM item_groups g
+        WHERE g.categoryId = :categoryId
         ORDER BY g.sortOrder ASC, g.name ASC
         """
     )
-    fun observeAllWithCounts(): Flow<List<CategoryGroupWithCount>>
+    fun observeAllWithCounts(categoryId: String): Flow<List<ItemGroupWithCount>>
 
-    @Query("SELECT * FROM category_groups WHERE id = :id")
-    fun observeById(id: String): Flow<CategoryGroupEntity?>
+    @Query("SELECT * FROM item_groups WHERE id = :id")
+    fun observeById(id: String): Flow<ItemGroupEntity?>
 
-    @Query("SELECT * FROM category_groups WHERE id = :id")
-    suspend fun getById(id: String): CategoryGroupEntity?
+    @Query("SELECT * FROM item_groups WHERE id = :id")
+    suspend fun getById(id: String): ItemGroupEntity?
 
-    @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM category_groups")
-    suspend fun nextSortOrder(): Int
+    @Query("SELECT * FROM item_groups ORDER BY sortOrder ASC, name ASC")
+    suspend fun getAll(): List<ItemGroupEntity>
 
-    @Query("UPDATE category_groups SET sortOrder = :sortOrder WHERE id = :id")
-    suspend fun updateSortOrder(id: String, sortOrder: Int)
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM item_groups WHERE categoryId = :categoryId")
+    suspend fun nextSortOrder(categoryId: String): Int
 
-    @Query("UPDATE category_groups SET name = :name WHERE id = :id")
+    @Query("UPDATE item_groups SET name = :name WHERE id = :id")
     suspend fun rename(id: String, name: String)
 
     @Upsert
-    suspend fun upsert(group: CategoryGroupEntity)
+    suspend fun upsert(group: ItemGroupEntity)
 
-    @Query("DELETE FROM category_groups WHERE id = :id")
+    @Query("DELETE FROM item_groups WHERE id = :id")
     suspend fun deleteById(id: String)
 }

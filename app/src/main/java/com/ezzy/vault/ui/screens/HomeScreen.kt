@@ -2,8 +2,6 @@ package com.ezzy.vault.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,13 +12,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -36,23 +31,16 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CreateNewFolder
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Fingerprint
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.FolderOff
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -74,16 +62,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.ezzy.vault.AppContainer
-import com.ezzy.vault.data.db.CategoryGroupWithCount
 import com.ezzy.vault.data.db.CategoryWithCount
 import com.ezzy.vault.data.db.ItemWithDetails
 import com.ezzy.vault.security.AppLock
@@ -104,16 +89,7 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 
     private val repository = container.repository
 
-    // Every section, grouped or not — this is what a quick-access card looks its icon and
-    // colour up in, and grouping a section must never make its entries stop finding one.
-    val allCategories: StateFlow<List<CategoryWithCount>> = repository.observeCategoriesWithCounts()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    // The home grid's own top level: sections not sitting inside a group.
-    val categories: StateFlow<List<CategoryWithCount>> = repository.observeUngroupedCategories()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val groups: StateFlow<List<CategoryGroupWithCount>> = repository.observeGroups()
+    val categories: StateFlow<List<CategoryWithCount>> = repository.observeCategoriesWithCounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pinned: StateFlow<List<ItemWithDetails>> = repository.observePinned()
@@ -134,28 +110,6 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     fun reorderCategories(orderedIds: List<String>) {
         viewModelScope.launch { repository.reorderCategories(orderedIds) }
     }
-
-    fun createGroup(name: String) {
-        viewModelScope.launch { repository.createGroup(name) }
-    }
-
-    fun renameGroup(id: String, name: String) {
-        viewModelScope.launch { repository.renameGroup(id, name) }
-    }
-
-    /** Dissolves the group; every section it held returns to the home grid's top level. */
-    fun ungroup(id: String) {
-        viewModelScope.launch { repository.ungroup(id) }
-    }
-
-    /** Deletes the group and everything that was still inside it. */
-    fun deleteGroup(id: String) {
-        viewModelScope.launch { repository.deleteGroupAndContents(id) }
-    }
-
-    fun addToGroup(categoryId: String, groupId: String) {
-        viewModelScope.launch { repository.setCategoryGroup(categoryId, groupId) }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -163,7 +117,6 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 fun HomeScreen(
     settings: EzzySettings,
     onOpenCategory: (String) -> Unit,
-    onOpenGroup: (String) -> Unit,
     onOpenItem: (String) -> Unit,
     onOpenQuickAccessEdit: () -> Unit,
     onAddItem: () -> Unit,
@@ -172,9 +125,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
 ) {
     val viewModel: HomeViewModel = ezzyViewModel { HomeViewModel(it) }
-    val allCategories by viewModel.allCategories.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
-    val groups by viewModel.groups.collectAsStateWithLifecycle()
     val pinned by viewModel.pinned.collectAsStateWithLifecycle()
     val recent by viewModel.recent.collectAsStateWithLifecycle()
     val itemCount by viewModel.itemCount.collectAsStateWithLifecycle()
@@ -183,28 +134,19 @@ fun HomeScreen(
 
     val quickAccess = (pinned + recent.filterNot { r -> pinned.any { it.item.id == r.item.id } })
         .take(8)
-    // Grouping a section is purely cosmetic on the home grid — its quick-access card still
-    // needs its icon and colour, so the lookup covers every section, not just the ungrouped
-    // ones the grid itself renders.
-    val categoryLookup = allCategories.associateBy { it.category.id }
+    val categoryLookup = categories.associateBy { it.category.id }
 
-    // Sections can be dragged into whatever order the user wants, or onto a group's folder
-    // card to move into it. While a drag is running the grid follows this local list instead
-    // of the database, so the cards move under the finger straight away; the change is written
-    // once, on drop.
+    // Sections can be dragged into whatever order the user wants. While a drag is running the
+    // grid follows this local list instead of the database, so the cards move under the finger
+    // straight away; the change is written once, on drop.
     val gridState = rememberLazyGridState()
     var order by remember { mutableStateOf(categories) }
     var draggingId by remember { mutableStateOf<String?>(null) }
-    var hoverGroupId by remember { mutableStateOf<String?>(null) }
     var pointer by remember { mutableStateOf(Offset.Zero) }
 
     LaunchedEffect(categories) {
         if (draggingId == null) order = categories
     }
-
-    var creatingGroup by remember { mutableStateOf(false) }
-    var renamingGroup by remember { mutableStateOf<CategoryGroupWithCount?>(null) }
-    var confirmDeleteGroup by remember { mutableStateOf<CategoryGroupWithCount?>(null) }
 
     val greeting = remember {
         when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
@@ -390,63 +332,37 @@ fun HomeScreen(
                 SectionHeader(
                     text = "My Sections",
                     modifier = Modifier.padding(top = 8.dp),
-                    // The icons on their own never said what they did. The label does.
                     trailing = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { creatingGroup = true },
-                                modifier = Modifier.size(32.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.CreateNewFolder,
-                                    contentDescription = "New group",
-                                    modifier = Modifier.size(19.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            TextButton(
-                                onClick = onAddCategory,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            ) {
-                                Text(
-                                    text = "Create Section",
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
+                        TextButton(
+                            onClick = onAddCategory,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = "Create Section",
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.CreateNewFolder,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
                     },
                 )
             }
 
-            if (order.size > 1 || groups.isNotEmpty()) {
+            if (order.size > 1) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
-                        text = "Hold a section to drag it — onto a group to file it there, " +
-                            "or between others to reorder",
+                        text = "Hold and drag a section to reorder it",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            items(groups, key = { GROUP_KEY_PREFIX + it.group.id }) { row ->
-                GroupCard(
-                    row = row,
-                    highlighted = hoverGroupId == row.group.id,
-                    onClick = { onOpenGroup(row.group.id) },
-                    onRename = { renamingGroup = row },
-                    onUngroup = { viewModel.ungroup(row.group.id) },
-                    onDelete = { confirmDeleteGroup = row },
-                )
-            }
-
-            if (categories.isEmpty() && groups.isEmpty()) {
+            if (categories.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
                         icon = Icons.Rounded.FolderOpen,
@@ -468,39 +384,22 @@ fun HomeScreen(
                                     pointer = cardOrigin(gridState, id) + insideCard
                                 },
                                 onDragEnd = {
-                                    val group = hoverGroupId
-                                    if (group != null) {
-                                        // Dropped on a folder: the card leaves the top level
-                                        // straight away rather than waiting on the database
-                                        // round trip to catch up.
-                                        viewModel.addToGroup(id, group)
-                                        order = order.filterNot { it.category.id == id }
-                                    } else if (draggingId != null) {
+                                    if (draggingId != null) {
                                         viewModel.reorderCategories(order.map { it.category.id })
                                     }
                                     draggingId = null
-                                    hoverGroupId = null
                                 },
-                                onDragCancel = {
-                                    draggingId = null
-                                    hoverGroupId = null
-                                },
+                                onDragCancel = { draggingId = null },
                                 onDrag = { _, amount ->
                                     // The card is never translated, only reordered, so the
                                     // finger's position is tracked here rather than read back
                                     // out of a layout that keeps moving underneath it.
                                     pointer += amount
-                                    val key = keyUnder(gridState, pointer) as? String
-                                    hoverGroupId = key
-                                        ?.takeIf { it.startsWith(GROUP_KEY_PREFIX) }
-                                        ?.removePrefix(GROUP_KEY_PREFIX)
-                                    if (hoverGroupId == null) {
-                                        val from = order.indexOfFirst { it.category.id == draggingId }
-                                        val to = order.indexOfFirst { it.category.id == key }
-                                        if (from >= 0 && to >= 0 && from != to) {
-                                            order = order.toMutableList()
-                                                .apply { add(to, removeAt(from)) }
-                                        }
+                                    val from = order.indexOfFirst { it.category.id == draggingId }
+                                    val to = cardIndexUnder(gridState, order, pointer)
+                                    if (from >= 0 && to >= 0 && from != to) {
+                                        order = order.toMutableList()
+                                            .apply { add(to, removeAt(from)) }
                                     }
                                 },
                             )
@@ -509,64 +408,6 @@ fun HomeScreen(
                 }
             }
         }
-    }
-
-    if (creatingGroup) {
-        GroupNameDialog(
-            title = "New group",
-            confirmLabel = "Create",
-            initial = "",
-            onDismiss = { creatingGroup = false },
-            onConfirm = { name ->
-                creatingGroup = false
-                viewModel.createGroup(name)
-            },
-        )
-    }
-
-    renamingGroup?.let { target ->
-        GroupNameDialog(
-            title = "Rename group",
-            confirmLabel = "Save",
-            initial = target.group.name,
-            onDismiss = { renamingGroup = null },
-            onConfirm = { name ->
-                renamingGroup = null
-                viewModel.renameGroup(target.group.id, name)
-            },
-        )
-    }
-
-    confirmDeleteGroup?.let { target ->
-        AlertDialog(
-            onDismissRequest = { confirmDeleteGroup = null },
-            title = { Text("Delete \"${target.group.name}\"?") },
-            text = {
-                Text(
-                    if (target.categoryCount == 0) {
-                        "This empty group will be removed."
-                    } else {
-                        "This group and the ${target.categoryCount} " +
-                            "${if (target.categoryCount == 1) "section" else "sections"} inside it — " +
-                            "along with everything they hold — will be deleted permanently. " +
-                            "This cannot be undone."
-                    }
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmDeleteGroup = null
-                        viewModel.deleteGroup(target.group.id)
-                    }
-                ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDeleteGroup = null }) { Text("Cancel") }
-            },
-        )
     }
 }
 
@@ -700,154 +541,6 @@ private fun CategoryCard(
     }
 }
 
-/**
- * A group's folder card — a tap opens it, a long press offers Delete, Ungroup and Edit. Tap and
- * long-press share no gesture with the drag a section uses to file itself in here, so a folder
- * never has to guess which one the user meant.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun GroupCard(
-    row: CategoryGroupWithCount,
-    highlighted: Boolean,
-    onClick: () -> Unit,
-    onRename: () -> Unit,
-    onUngroup: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        // Switches to the accent tint while a dragged section hovers over it — the same cue a
-        // chat head's dismiss target gives, so "this is about to accept it" reads clearly.
-        color = if (highlighted) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Box {
-            Column(
-                modifier = Modifier
-                    .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
-                    .padding(14.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(
-                            (if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.12f)
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Folder,
-                        contentDescription = null,
-                        tint = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(23.dp),
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = row.group.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = when (row.categoryCount) {
-                        0 -> "Empty"
-                        1 -> "1 section"
-                        else -> "${row.categoryCount} sections"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = (if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.8f),
-                )
-            }
-
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text("Edit") },
-                    leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                    onClick = { menuOpen = false; onRename() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Ungroup") },
-                    leadingIcon = { Icon(Icons.Rounded.FolderOff, contentDescription = null) },
-                    onClick = { menuOpen = false; onUngroup() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    },
-                    onClick = { menuOpen = false; onDelete() },
-                )
-            }
-        }
-    }
-}
-
-/** Names a group, for both creating a new one and renaming an existing one. */
-@Composable
-private fun GroupNameDialog(
-    title: String,
-    confirmLabel: String,
-    initial: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var name by remember { mutableStateOf(initial) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding(),
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(14.dp))
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.take(40) },
-                    label = { Text("Group name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(
-                        onDone = { if (name.isNotBlank()) onConfirm(name) }
-                    ),
-                )
-                Spacer(Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(
-                        onClick = { onConfirm(name) },
-                        enabled = name.isNotBlank(),
-                    ) { Text(confirmLabel) }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun QuickAccessCard(
     item: ItemWithDetails,
@@ -949,18 +642,17 @@ private fun cardOrigin(state: LazyGridState, key: String): Offset {
     return Offset(info.offset.x.toFloat(), info.offset.y.toFloat())
 }
 
-/**
- * The key of whatever card the finger is over right now — a category id, a `"group:"`-prefixed
- * group id, or null when it is over the header, a stat card or nothing at all. Section drag
- * reads this once to decide between "reorder" and "file into this group".
- */
-private fun keyUnder(state: LazyGridState, point: Offset): Any? =
-    state.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+/** Which section card the finger is over right now, as an index into [order]. */
+private fun cardIndexUnder(
+    state: LazyGridState,
+    order: List<CategoryWithCount>,
+    point: Offset,
+): Int {
+    val hit = state.layoutInfo.visibleItemsInfo.firstOrNull { info ->
         point.x >= info.offset.x &&
             point.x <= info.offset.x + info.size.width &&
             point.y >= info.offset.y &&
             point.y <= info.offset.y + info.size.height
-    }?.key
-
-/** Prefixes a group's grid key so it can never collide with a category id (a plain UUID). */
-private const val GROUP_KEY_PREFIX = "group:"
+    } ?: return -1
+    return order.indexOfFirst { it.category.id == hit.key }
+}

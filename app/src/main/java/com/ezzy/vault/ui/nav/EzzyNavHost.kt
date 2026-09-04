@@ -17,8 +17,8 @@ import com.ezzy.vault.ui.screens.CategoryEditorScreen
 import com.ezzy.vault.ui.screens.CategoryScreen
 import com.ezzy.vault.ui.screens.DataSettingsScreen
 import com.ezzy.vault.ui.screens.EditorScreen
+import com.ezzy.vault.ui.screens.EntryGroupScreen
 import com.ezzy.vault.ui.screens.FloatingBarSettingsScreen
-import com.ezzy.vault.ui.screens.GroupScreen
 import com.ezzy.vault.ui.screens.HomeScreen
 import com.ezzy.vault.ui.screens.ItemDetailScreen
 import com.ezzy.vault.ui.screens.QuickAccessEditScreen
@@ -57,7 +57,6 @@ fun EzzyNavHost(
             HomeScreen(
                 settings = settings,
                 onOpenCategory = { navController.navigate(Routes.category(it)) },
-                onOpenGroup = { navController.navigate(Routes.group(it)) },
                 onOpenItem = { navController.navigate(Routes.item(it)) },
                 onOpenQuickAccessEdit = { navController.navigate(Routes.QUICK_ACCESS_EDIT) },
                 onAddItem = { navController.navigate(Routes.editor()) },
@@ -76,6 +75,7 @@ fun EzzyNavHost(
                 categoryId = categoryId,
                 onBack = { navController.popBackStack() },
                 onOpenItem = { navController.navigate(Routes.item(it)) },
+                onOpenGroup = { navController.navigate(Routes.itemGroup(it)) },
                 onAddItem = { navController.navigate(Routes.editor(categoryId = categoryId)) },
                 onEditCategory = { navController.navigate(Routes.categoryEditor(categoryId)) },
             )
@@ -86,13 +86,13 @@ fun EzzyNavHost(
         }
 
         composable(
-            route = Routes.GROUP,
+            route = Routes.ITEM_GROUP,
             arguments = listOf(navArgument("groupId") { type = NavType.StringType }),
         ) { entry ->
-            GroupScreen(
+            EntryGroupScreen(
                 groupId = entry.arguments?.getString("groupId").orEmpty(),
                 onBack = { navController.popBackStack() },
-                onOpenCategory = { navController.navigate(Routes.category(it)) },
+                onOpenItem = { navController.navigate(Routes.item(it)) },
             )
         }
 

@@ -26,7 +26,7 @@ class Converters {
         ItemEntity::class,
         FieldEntity::class,
         AttachmentEntity::class,
-        CategoryGroupEntity::class,
+        ItemGroupEntity::class,
     ],
     version = 3,
     exportSchema = true,
@@ -39,7 +39,7 @@ abstract class EzzyDatabase : RoomDatabase() {
     abstract fun itemDao(): ItemDao
     abstract fun fieldDao(): FieldDao
     abstract fun attachmentDao(): AttachmentDao
-    abstract fun categoryGroupDao(): CategoryGroupDao
+    abstract fun itemGroupDao(): ItemGroupDao
 
     companion object {
         const val NAME = "ezzy.db"
@@ -53,52 +53,74 @@ abstract class EzzyDatabase : RoomDatabase() {
             }
         }
 
-        /** Groups (folders for sections) arrived in v3, along with which group a section is in. */
+        /**
+         * Entry groups — folders for the data inside one section — arrived in v3, along with
+         * which group an entry sits in.
+         */
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """
-                    CREATE TABLE IF NOT EXISTS category_groups (
+                    CREATE TABLE IF NOT EXISTS item_groups (
                         id TEXT NOT NULL PRIMARY KEY,
+                        categoryId TEXT NOT NULL,
                         name TEXT NOT NULL,
-                        sortOrder INTEGER NOT NULL,
-                        createdAt INTEGER NOT NULL
-                    )
-                    """.trimIndent()
-                )
-
-                // categories.groupId carries a real foreign key to category_groups, and SQLite
-                // cannot add a foreign key to an existing table with ALTER TABLE — only a fresh
-                // CREATE TABLE can declare one. So the table is rebuilt: a new one with the
-                // column and its constraint in place from the start, the existing rows copied
-                // across, the old table dropped, and the new one renamed into its place.
-                // Foreign keys in SQLite resolve by table name, so items.categoryId's own
-                // reference to "categories" keeps working once the rename lands.
-                db.execSQL(
-                    """
-                    CREATE TABLE categories_new (
-                        id TEXT NOT NULL PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        iconKey TEXT NOT NULL,
-                        colorKey TEXT NOT NULL,
                         sortOrder INTEGER NOT NULL,
                         createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_item_groups_categoryId ON item_groups(categoryId)"
+                )
+
+                // items.groupId carries a real foreign key to item_groups, and SQLite cannot add
+                // a foreign key to an existing table with ALTER TABLE — only a fresh CREATE
+                // TABLE can declare one. So the table is rebuilt: a new one with the column and
+                // its constraint in place from the start, the existing rows copied across, the
+                // old table dropped, and the new one renamed into its place. DROP TABLE never
+                // runs SQLite's foreign-key checks — those only fire on row-level INSERT/UPDATE/
+                // DELETE, never on schema statements — so this is safe with foreign keys
+                // enforced throughout, and once the rename lands, fields.itemId and
+                // attachments.itemId (which reference "items" by name) resolve to the rebuilt
+                // table exactly as before.
+                db.execSQL(
+                    """
+                    CREATE TABLE items_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        categoryId TEXT NOT NULL,
+                        templateId TEXT,
+                        title TEXT NOT NULL,
+                        subtitle TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        isPinned INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        lastUsedAt INTEGER NOT NULL,
                         groupId TEXT DEFAULT NULL,
-                        FOREIGN KEY(groupId) REFERENCES category_groups(id) ON DELETE SET NULL
+                        FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE,
+                        FOREIGN KEY(groupId) REFERENCES item_groups(id) ON DELETE SET NULL
                     )
                     """.trimIndent()
                 )
                 db.execSQL(
                     """
-                    INSERT INTO categories_new (id, name, iconKey, colorKey, sortOrder, createdAt, groupId)
-                    SELECT id, name, iconKey, colorKey, sortOrder, createdAt, NULL FROM categories
+                    INSERT INTO items_new (
+                        id, categoryId, templateId, title, subtitle, note,
+                        isPinned, createdAt, updatedAt, lastUsedAt, groupId
+                    )
+                    SELECT id, categoryId, templateId, title, subtitle, note,
+                           isPinned, createdAt, updatedAt, lastUsedAt, NULL
+                    FROM items
                     """.trimIndent()
                 )
-                db.execSQL("DROP TABLE categories")
-                db.execSQL("ALTER TABLE categories_new RENAME TO categories")
-                db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS index_categories_groupId ON categories(groupId)"
-                )
+                db.execSQL("DROP TABLE items")
+                db.execSQL("ALTER TABLE items_new RENAME TO items")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_categoryId ON items(categoryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_isPinned ON items(isPinned)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_lastUsedAt ON items(lastUsedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_groupId ON items(groupId)")
             }
         }
 

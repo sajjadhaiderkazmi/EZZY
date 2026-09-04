@@ -11,6 +11,10 @@ data class BackupFile(
     val categories: List<BackupCategory>,
     val templates: List<BackupTemplate>,
     val items: List<BackupItem>,
+    // Defaulted so a backup made before entry groups existed still parses — it just restores
+    // with nothing grouped, same as ignoreUnknownKeys lets a newer field disappear gracefully
+    // going the other way.
+    val itemGroups: List<BackupItemGroup> = emptyList(),
 )
 
 @Serializable
@@ -72,6 +76,16 @@ data class BackupItem(
     val lastUsedAt: Long,
     val fields: List<BackupField>,
     val attachments: List<BackupAttachment>,
+    val groupId: String? = null,
+)
+
+@Serializable
+data class BackupItemGroup(
+    val id: String,
+    val categoryId: String,
+    val name: String,
+    val sortOrder: Int,
+    val createdAt: Long,
 )
 
 internal val BackupJson = Json {

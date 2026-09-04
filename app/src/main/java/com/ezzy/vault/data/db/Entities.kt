@@ -7,40 +7,12 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.ezzy.vault.data.model.FieldType
 
-@Entity(
-    tableName = "categories",
-    foreignKeys = [
-        ForeignKey(
-            entity = CategoryGroupEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["groupId"],
-            // Deleting a group must never take its sections down with it by accident — that is
-            // what the separate, explicitly-confirmed "Delete group" action is for.
-            onDelete = ForeignKey.SET_NULL,
-        ),
-    ],
-    indices = [Index("groupId")],
-)
+@Entity(tableName = "categories")
 data class CategoryEntity(
     @PrimaryKey val id: String,
     val name: String,
     val iconKey: String,
     val colorKey: String,
-    val sortOrder: Int,
-    val createdAt: Long,
-    /** The folder this section has been dragged into, or null if it sits at the top level. */
-    @ColumnInfo(defaultValue = "NULL") val groupId: String? = null,
-)
-
-/**
- * A folder for sections on the home screen — purely organisational. Nothing about how a
- * section works changes by being inside one: it is the same icon in the floating bar, the same
- * entries, the same lock setting, whether grouped or not.
- */
-@Entity(tableName = "category_groups")
-data class CategoryGroupEntity(
-    @PrimaryKey val id: String,
-    val name: String,
     val sortOrder: Int,
     val createdAt: Long,
 )
@@ -65,8 +37,16 @@ data class TemplateEntity(
             childColumns = ["categoryId"],
             onDelete = ForeignKey.CASCADE,
         ),
+        ForeignKey(
+            entity = ItemGroupEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["groupId"],
+            // Deleting a group must never take its entries down with it by accident — that is
+            // what the separate, explicitly-confirmed "Delete group" action is for.
+            onDelete = ForeignKey.SET_NULL,
+        ),
     ],
-    indices = [Index("categoryId"), Index("isPinned"), Index("lastUsedAt")],
+    indices = [Index("categoryId"), Index("isPinned"), Index("lastUsedAt"), Index("groupId")],
 )
 data class ItemEntity(
     @PrimaryKey val id: String,
@@ -79,6 +59,33 @@ data class ItemEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val lastUsedAt: Long,
+    /** The folder this entry has been dragged into within its own section, or null at the top level. */
+    @ColumnInfo(defaultValue = "NULL") val groupId: String? = null,
+)
+
+/**
+ * A folder for entries inside one section — purely organisational. Nothing about how an entry
+ * works changes by being inside one: same fields, same attachments, same section lock, whether
+ * grouped or not. Scoped to [categoryId] since a group only ever makes sense within one section.
+ */
+@Entity(
+    tableName = "item_groups",
+    foreignKeys = [
+        ForeignKey(
+            entity = CategoryEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["categoryId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("categoryId")],
+)
+data class ItemGroupEntity(
+    @PrimaryKey val id: String,
+    val categoryId: String,
+    val name: String,
+    val sortOrder: Int,
+    val createdAt: Long,
 )
 
 @Entity(
