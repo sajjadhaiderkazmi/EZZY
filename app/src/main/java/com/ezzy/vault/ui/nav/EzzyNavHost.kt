@@ -22,6 +22,7 @@ import com.ezzy.vault.ui.screens.HomeScreen
 import com.ezzy.vault.ui.screens.ItemDetailScreen
 import com.ezzy.vault.ui.screens.SearchScreen
 import com.ezzy.vault.ui.screens.SecuritySettingsScreen
+import com.ezzy.vault.ui.screens.SectionLocksSettingsScreen
 import com.ezzy.vault.ui.screens.SettingsScreen
 import com.ezzy.vault.ui.screens.TemplatesScreen
 import com.ezzy.vault.util.EzzySettings
@@ -151,7 +152,14 @@ fun EzzyNavHost(
         }
 
         composable(Routes.SETTINGS_SECURITY) {
-            SecuritySettingsScreen(onBack = { navController.popBackStack() })
+            SecuritySettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSectionLocks = { navController.navigate(Routes.SETTINGS_SECTION_LOCKS) },
+            )
+        }
+
+        composable(Routes.SETTINGS_SECTION_LOCKS) {
+            SectionLocksSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.SETTINGS_APPEARANCE) {

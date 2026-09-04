@@ -125,8 +125,6 @@ class EditorViewModel(
 
     fun setNote(note: String) = updateDraft { it.copy(note = note) }
 
-    fun setPinned(pinned: Boolean) = updateDraft { it.copy(isPinned = pinned) }
-
     /**
      * Applies a template's field list. Anything the user already typed is preserved by matching
      * on the label, so switching type by mistake does not wipe the entry.

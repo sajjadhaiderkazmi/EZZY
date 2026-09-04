@@ -11,6 +11,7 @@ object Routes {
     const val SETTINGS_FLOATING_BAR = "settings/floatingBar"
     const val SETTINGS_BAR_SECTIONS = "settings/floatingBar/sections"
     const val SETTINGS_SECURITY = "settings/security"
+    const val SETTINGS_SECTION_LOCKS = "settings/security/locks"
     const val SETTINGS_APPEARANCE = "settings/appearance"
     const val SETTINGS_DATA = "settings/data"
 

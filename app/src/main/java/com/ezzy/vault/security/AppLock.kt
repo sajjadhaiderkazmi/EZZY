@@ -32,8 +32,21 @@ object AppLock {
         _confirmedItems.value = _confirmedItems.value + itemId
     }
 
+    /**
+     * Locked sections confirmed for the current visit of the floating bar, on the same terms as
+     * [confirmedItems] — a separate set, since a category id and an item id are drawn from
+     * different id spaces and confirming one should never accidentally confirm the other.
+     */
+    private val _confirmedSections = MutableStateFlow<Set<String>>(emptySet())
+    val confirmedSections: StateFlow<Set<String>> = _confirmedSections.asStateFlow()
+
+    fun confirmSection(categoryId: String) {
+        _confirmedSections.value = _confirmedSections.value + categoryId
+    }
+
     fun clearItemConfirmations() {
         _confirmedItems.value = emptySet()
+        _confirmedSections.value = emptySet()
     }
 
     fun unlock() {

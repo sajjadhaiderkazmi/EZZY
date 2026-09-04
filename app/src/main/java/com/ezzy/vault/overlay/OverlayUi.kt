@@ -265,6 +265,8 @@ fun OverlayPanel(
     maskSecrets: Boolean,
     /** Section ids the user has taken out of the rail. */
     hiddenSections: Set<String>,
+    /** Section ids that ask to be unlocked again on their own, every time they're opened. */
+    lockedSections: Set<String>,
     /** Whether the rail carries its Quick access star at all. */
     showQuickAccess: Boolean,
     requireUnlock: Boolean,
@@ -276,6 +278,7 @@ fun OverlayPanel(
     onInteraction: () -> Unit,
     // null asks for the vault itself; an item id asks again for that one guarded entry.
     onRequestUnlock: (String?) -> Unit,
+    onRequestSectionUnlock: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val repository = remember { context.appContainer.repository }
@@ -289,6 +292,7 @@ fun OverlayPanel(
     }
     val unlocked by AppLock.unlocked.collectAsStateWithLifecycle()
     val confirmedItems by AppLock.confirmedItems.collectAsStateWithLifecycle()
+    val confirmedSections by AppLock.confirmedSections.collectAsStateWithLifecycle()
 
     var view by remember { mutableStateOf<PanelView>(PanelView.Quick) }
     var copiedLabel by remember { mutableStateOf<String?>(null) }
@@ -377,10 +381,13 @@ fun OverlayPanel(
                                 maskSecrets = maskSecrets,
                                 copiedLabel = copiedLabel,
                                 confirmedItems = confirmedItems,
+                                lockedSections = lockedSections,
+                                confirmedSections = confirmedSections,
                                 showQuickAccess = showQuickAccess,
                                 onNotify = { copiedLabel = it },
                                 onNavigate = ::navigate,
                                 onRequestUnlock = onRequestUnlock,
+                                onRequestSectionUnlock = onRequestSectionUnlock,
                                 onCopy = { label, value, sensitive ->
                                     onInteraction()
                                     val ok = SecureClipboard.copy(
@@ -536,10 +543,13 @@ private fun PanelSheet(
     maskSecrets: Boolean,
     copiedLabel: String?,
     confirmedItems: Set<String>,
+    lockedSections: Set<String>,
+    confirmedSections: Set<String>,
     showQuickAccess: Boolean,
     onNotify: (String) -> Unit,
     onNavigate: (PanelView) -> Unit,
     onRequestUnlock: (String?) -> Unit,
+    onRequestSectionUnlock: (String) -> Unit,
     onCopy: (String, String, Boolean) -> Unit,
     onOpenApp: (String?) -> Unit,
     onClose: () -> Unit,
@@ -611,23 +621,34 @@ private fun PanelSheet(
             }
 
             is PanelView.Section -> {
-                val items by remember(view.categoryId) { repository.observeItems(view.categoryId) }
-                    .collectAsStateWithLifecycle(initialValue = emptyList())
+                // The same guard the app itself applies from CategoryScreen — the bar draws
+                // over whatever app is in front, and a section marked locked should never be
+                // one tap away from there just because the vault happens to be unlocked.
+                if (view.categoryId in lockedSections && view.categoryId !in confirmedSections) {
+                    GuardedSheet(
+                        title = categories.firstOrNull { it.id == view.categoryId }?.name
+                            ?: "Section",
+                        onConfirm = { onRequestSectionUnlock(view.categoryId) },
+                    )
+                } else {
+                    val items by remember(view.categoryId) { repository.observeItems(view.categoryId) }
+                        .collectAsStateWithLifecycle(initialValue = emptyList())
 
-                PanelEntryList(
-                    entries = items.map {
-                        PanelEntry(
-                            id = it.item.id,
-                            title = it.item.title,
-                            fieldCount = it.fields.size,
-                            categoryId = it.item.categoryId,
-                        )
-                    },
-                    categoriesById = categories.associateBy { it.id },
-                    maxListHeight = maxListHeight,
-                    emptyMessage = "Nothing saved in this section yet.",
-                    onOpen = { onNavigate(PanelView.Entry(it, view.categoryId)) },
-                )
+                    PanelEntryList(
+                        entries = items.map {
+                            PanelEntry(
+                                id = it.item.id,
+                                title = it.item.title,
+                                fieldCount = it.fields.size,
+                                categoryId = it.item.categoryId,
+                            )
+                        },
+                        categoriesById = categories.associateBy { it.id },
+                        maxListHeight = maxListHeight,
+                        emptyMessage = "Nothing saved in this section yet.",
+                        onOpen = { onNavigate(PanelView.Entry(it, view.categoryId)) },
+                    )
+                }
             }
 
             is PanelView.Entry -> {

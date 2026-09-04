@@ -48,7 +48,6 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -67,7 +66,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -415,29 +413,9 @@ private fun DetailsStep(
             )
         }
 
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.PushPin,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Pin to quick access", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = "Shows first in the floating bar",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = draft.isPinned, onCheckedChange = viewModel::setPinned)
-            }
-        }
+        // Pinning stays reachable from the entry's own detail screen (its top bar) once it
+        // exists — asking for it here, before there is even anything to pin to quick access
+        // yet, was one more decision in the way of just saving the entry.
 
         // Only the Contact type offers this — pulling a name and number off the phone means
         // nothing for a bank account or a receipt, and the generic little icon button that used

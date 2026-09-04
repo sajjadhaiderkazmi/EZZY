@@ -457,6 +457,7 @@ class OverlayService : Service() {
             OverlayPanel(
                 maskSecrets = settings.maskSecrets,
                 hiddenSections = settings.hiddenBarSections,
+                lockedSections = settings.lockedSections,
                 showQuickAccess = settings.quickAccessInBar,
                 requireUnlock = settings.biometricLock,
                 clipboardClearSeconds = settings.clipboardClearSeconds,
@@ -481,6 +482,13 @@ class OverlayService : Service() {
                                     putExtra(UnlockActivity.EXTRA_ITEM_ID, itemId)
                                 }
                             }
+                    )
+                },
+                onRequestSectionUnlock = { sectionId ->
+                    startActivity(
+                        Intent(this, UnlockActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            .putExtra(UnlockActivity.EXTRA_SECTION_ID, sectionId)
                     )
                 },
             )

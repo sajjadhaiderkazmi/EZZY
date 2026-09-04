@@ -44,6 +44,12 @@ data class EzzySettings(
     val hiddenBarSections: Set<String> = emptySet(),
     /** The star at the top of the bar's rail: pinned and recent, across every section. */
     val quickAccessInBar: Boolean = true,
+    /**
+     * Sections that ask to be unlocked again every time they're opened — even with the vault
+     * itself already unlocked. Off by default: this is for the one or two sections worth an
+     * extra check, not a second lock screen on the whole app.
+     */
+    val lockedSections: Set<String> = emptySet(),
 )
 
 class SettingsStore(context: Context) {
@@ -69,6 +75,7 @@ class SettingsStore(context: Context) {
             bubbleSweep = prefs[Keys.BUBBLE_SWEEP] ?: true,
             hiddenBarSections = prefs[Keys.HIDDEN_BAR_SECTIONS] ?: emptySet(),
             quickAccessInBar = prefs[Keys.QUICK_IN_BAR] ?: true,
+            lockedSections = prefs[Keys.LOCKED_SECTIONS] ?: emptySet(),
         )
     }
 
@@ -101,6 +108,14 @@ class SettingsStore(context: Context) {
             val hidden = prefs[Keys.HIDDEN_BAR_SECTIONS] ?: emptySet()
             prefs[Keys.HIDDEN_BAR_SECTIONS] =
                 if (visible) hidden - categoryId else hidden + categoryId
+        }
+    }
+
+    /** Adds or removes one section from the set that asks to be unlocked again on its own. */
+    suspend fun setSectionLocked(categoryId: String, locked: Boolean) {
+        store.edit { prefs ->
+            val current = prefs[Keys.LOCKED_SECTIONS] ?: emptySet()
+            prefs[Keys.LOCKED_SECTIONS] = if (locked) current + categoryId else current - categoryId
         }
     }
 
@@ -148,5 +163,6 @@ class SettingsStore(context: Context) {
         val BUBBLE_SWEEP = booleanPreferencesKey("bubble_sweep")
         val HIDDEN_BAR_SECTIONS = stringSetPreferencesKey("hidden_bar_sections")
         val QUICK_IN_BAR = booleanPreferencesKey("quick_access_in_bar")
+        val LOCKED_SECTIONS = stringSetPreferencesKey("locked_sections")
     }
 }

@@ -384,6 +384,60 @@ fun BarSectionsSettingsScreen(onBack: () -> Unit) {
     }
 }
 
+// ---- Section locks -------------------------------------------------------------
+
+/**
+ * Which sections ask to be unlocked again on their own, every time they're opened — on top of
+ * the vault's own lock, not instead of it. Off by default for every section: this is for the
+ * one or two worth a second check, not a second app-wide lock screen.
+ */
+@Composable
+fun SectionLocksSettingsScreen(onBack: () -> Unit) {
+    val viewModel: SettingsViewModel = ezzyViewModel { SettingsViewModel(it) }
+    val settings = LocalSettings.current
+    val scope = rememberCoroutineScope()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+
+    SettingsPage(title = "Section locks", onBack = onBack) {
+        item {
+            Text(
+                text = "A locked section asks to be unlocked every time you open it, even with " +
+                    "the vault already open.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
+
+        if (categories.isEmpty()) {
+            item {
+                Text(
+                    text = "No sections yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
+                )
+            }
+        }
+
+        items(categories, key = { it.id }) { category ->
+            BarToggleRow(
+                name = category.name,
+                visible = category.id in settings.lockedSections,
+                onChange = { wanted -> scope.launch { viewModel.setSectionLocked(category.id, wanted) } },
+                leading = {
+                    IconAvatar(
+                        iconKey = category.iconKey,
+                        colorKey = category.colorKey,
+                        size = 38.dp,
+                        iconSize = 19.dp,
+                    )
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun BarToggleRow(
     name: String,
@@ -430,7 +484,7 @@ private fun BarToggleRow(
 // ---- Security ---------------------------------------------------------------
 
 @Composable
-fun SecuritySettingsScreen(onBack: () -> Unit) {
+fun SecuritySettingsScreen(onBack: () -> Unit, onOpenSectionLocks: () -> Unit) {
     val viewModel: SettingsViewModel = ezzyViewModel { SettingsViewModel(it) }
     val settings = LocalSettings.current
 
@@ -459,6 +513,18 @@ fun SecuritySettingsScreen(onBack: () -> Unit) {
                     "Never" to -1,
                 ),
                 onSelect = viewModel::setAutoLock,
+            )
+        }
+
+        item {
+            NavigationRow(
+                title = "Section locks",
+                subtitle = if (settings.lockedSections.isEmpty()) {
+                    "None"
+                } else {
+                    "${settings.lockedSections.size} locked"
+                },
+                onClick = onOpenSectionLocks,
             )
         }
 

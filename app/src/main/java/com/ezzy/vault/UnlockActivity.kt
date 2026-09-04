@@ -13,18 +13,24 @@ class UnlockActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // With an item id this is the second check on one guarded entry, not the vault door.
+        // With an item or section id this is a second check on that one guarded thing, not
+        // the vault door — at most one of the two extras is ever set.
         val itemId = intent?.getStringExtra(EXTRA_ITEM_ID)
+        val sectionId = intent?.getStringExtra(EXTRA_SECTION_ID)
         AppLock.prompt(
             activity = this,
-            title = if (itemId == null) "Unlock EZZY" else "Confirm it is you",
-            subtitle = if (itemId == null) {
-                "Confirm it is you to reach your saved details"
-            } else {
-                "This entry asks again every time the floating bar opens it"
+            title = if (itemId == null && sectionId == null) "Unlock EZZY" else "Confirm it is you",
+            subtitle = when {
+                itemId != null -> "This entry asks again every time the floating bar opens it"
+                sectionId != null -> "This section asks again every time the floating bar opens it"
+                else -> "Confirm it is you to reach your saved details"
             },
             onSuccess = {
-                if (itemId == null) AppLock.unlock() else AppLock.confirmItem(itemId)
+                when {
+                    itemId != null -> AppLock.confirmItem(itemId)
+                    sectionId != null -> AppLock.confirmSection(sectionId)
+                    else -> AppLock.unlock()
+                }
                 finish()
             },
             onFailure = { finish() },
@@ -39,5 +45,6 @@ class UnlockActivity : FragmentActivity() {
 
     companion object {
         const val EXTRA_ITEM_ID = "com.ezzy.vault.extra.ITEM_ID"
+        const val EXTRA_SECTION_ID = "com.ezzy.vault.extra.SECTION_ID"
     }
 }

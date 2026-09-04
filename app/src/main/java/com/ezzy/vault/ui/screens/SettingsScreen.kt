@@ -86,6 +86,9 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setQuickAccessInBar(value: Boolean) = launch { store.setQuickAccessInBar(value) }
 
+    fun setSectionLocked(categoryId: String, locked: Boolean) =
+        launch { store.setSectionLocked(categoryId, locked) }
+
 
     fun eraseEverything(onDone: () -> Unit) = launch {
         container.eraseEverything()
