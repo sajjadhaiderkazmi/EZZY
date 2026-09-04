@@ -59,6 +59,18 @@ class VaultRepository(
         return entity.id
     }
 
+    /**
+     * Writes the order the user dragged the sections into. One transaction, so the home grid
+     * never observes a half-applied order and shuffles itself while the rows are being written.
+     */
+    suspend fun reorderCategories(orderedIds: List<String>) {
+        if (orderedIds.isEmpty()) return
+        db.withTransaction {
+            val dao = db.categoryDao()
+            orderedIds.forEachIndexed { index, id -> dao.updateSortOrder(id, index) }
+        }
+    }
+
     /** Deleting a category cascades to its items; their sealed files are swept up after. */
     suspend fun deleteCategory(id: String) {
         db.categoryDao().deleteById(id)

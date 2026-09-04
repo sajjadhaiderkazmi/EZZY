@@ -2,6 +2,7 @@ package com.ezzy.vault.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -44,13 +47,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -97,6 +105,10 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     fun enableBiometricLock() {
         viewModelScope.launch { settings.setBiometricLock(true) }
     }
+
+    fun reorderCategories(orderedIds: List<String>) {
+        viewModelScope.launch { repository.reorderCategories(orderedIds) }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,6 +133,18 @@ fun HomeScreen(
     val quickAccess = (pinned + recent.filterNot { r -> pinned.any { it.item.id == r.item.id } })
         .take(8)
     val categoryLookup = categories.associateBy { it.category.id }
+
+    // Sections can be dragged into whatever order the user wants. While a drag is running the
+    // grid follows this local list instead of the database, so the cards move under the finger
+    // straight away; the order is written once, on drop.
+    val gridState = rememberLazyGridState()
+    var order by remember { mutableStateOf(categories) }
+    var draggingId by remember { mutableStateOf<String?>(null) }
+    var pointer by remember { mutableStateOf(Offset.Zero) }
+
+    LaunchedEffect(categories) {
+        if (draggingId == null) order = categories
+    }
 
     val greeting = remember {
         when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
@@ -187,6 +211,7 @@ fun HomeScreen(
     ) { padding ->
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
+            state = gridState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -293,6 +318,16 @@ fun HomeScreen(
                 )
             }
 
+            if (order.size > 1) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = "Hold a section to drag it into place",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             if (categories.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
@@ -302,8 +337,40 @@ fun HomeScreen(
                     )
                 }
             } else {
-                items(categories, key = { it.category.id }) { row ->
-                    CategoryCard(row = row, onClick = { onOpenCategory(row.category.id) })
+                items(order, key = { it.category.id }) { row ->
+                    val id = row.category.id
+                    CategoryCard(
+                        row = row,
+                        dragging = draggingId == id,
+                        onClick = { onOpenCategory(id) },
+                        modifier = Modifier.pointerInput(id) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { insideCard ->
+                                    draggingId = id
+                                    pointer = cardOrigin(gridState, id) + insideCard
+                                },
+                                onDragEnd = {
+                                    if (draggingId != null) {
+                                        viewModel.reorderCategories(order.map { it.category.id })
+                                    }
+                                    draggingId = null
+                                },
+                                onDragCancel = { draggingId = null },
+                                onDrag = { _, amount ->
+                                    // The card is never translated, only reordered, so the
+                                    // finger's position is tracked here rather than read back
+                                    // out of a layout that keeps moving underneath it.
+                                    pointer += amount
+                                    val from = order.indexOfFirst { it.category.id == draggingId }
+                                    val to = cardIndexUnder(gridState, order, pointer)
+                                    if (from >= 0 && to >= 0 && from != to) {
+                                        order = order.toMutableList()
+                                            .apply { add(to, removeAt(from)) }
+                                    }
+                                },
+                            )
+                        },
+                    )
                 }
             }
         }
@@ -404,11 +471,18 @@ private fun BottomBarAction(
 }
 
 @Composable
-private fun CategoryCard(row: CategoryWithCount, onClick: () -> Unit) {
+private fun CategoryCard(
+    row: CategoryWithCount,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    dragging: Boolean = false,
+) {
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth(),
+        color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = if (dragging) 10.dp else 0.dp,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
@@ -552,4 +626,30 @@ private fun SetupCard(
             }
         }
     }
+}
+
+/** Where the grid has laid one section card out, in the grid's own coordinates. */
+private fun cardOrigin(state: LazyGridState, key: String): Offset {
+    val info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+        ?: return Offset.Zero
+    return Offset(info.offset.x.toFloat(), info.offset.y.toFloat())
+}
+
+/**
+ * Which section the finger is over right now, or -1 when it is over the header, a stat card or
+ * nothing at all. Only the section cards carry a category id as their key, so hitting one of
+ * those is what makes a swap.
+ */
+private fun cardIndexUnder(
+    state: LazyGridState,
+    order: List<CategoryWithCount>,
+    point: Offset,
+): Int {
+    val hit = state.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+        point.x >= info.offset.x &&
+            point.x <= info.offset.x + info.size.width &&
+            point.y >= info.offset.y &&
+            point.y <= info.offset.y + info.size.height
+    } ?: return -1
+    return order.indexOfFirst { it.category.id == hit.key }
 }

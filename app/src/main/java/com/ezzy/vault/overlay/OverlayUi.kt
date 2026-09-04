@@ -1,7 +1,9 @@
 package com.ezzy.vault.overlay
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -82,6 +84,7 @@ import com.ezzy.vault.ui.theme.Accents
 import com.ezzy.vault.ui.theme.EzzyTheme
 import com.ezzy.vault.ui.theme.LocalIsDarkTheme
 import com.ezzy.vault.util.ThemeMode
+import kotlinx.coroutines.delay
 
 /** The draggable launcher that sits on top of other apps. */
 @Composable
@@ -179,6 +182,21 @@ fun OverlayPanel(
     var view by remember { mutableStateOf<PanelView>(PanelView.Quick) }
     var copiedLabel by remember { mutableStateOf<String?>(null) }
 
+    // Raised one beat after the window goes up. Building this whole window, laying the sheet
+    // out and taking the first rows back from the database all happen on the first few frames;
+    // animating through that is what made the bar arrive in steps. It waits instead, then
+    // plays one clean movement.
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(60)
+        shown = true
+    }
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (shown) 0.32f else 0f,
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        label = "overlay-scrim",
+    )
+
     fun navigate(target: PanelView) {
         onInteraction()
         view = target
@@ -198,7 +216,7 @@ fun OverlayPanel(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.32f))
+                    .background(Color.Black.copy(alpha = scrimAlpha))
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() },
@@ -206,28 +224,29 @@ fun OverlayPanel(
                     )
             )
 
-            Row(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 8.dp)
-                    .heightIn(max = panelMaxHeight),
-                verticalAlignment = Alignment.CenterVertically,
+            AnimatedVisibility(
+                visible = shown,
+                enter = slideInHorizontally(
+                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                ) { it / 4 } + fadeIn(tween(180)),
+                exit = slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+                ) { it / 4 } + fadeOut(tween(140)),
+                modifier = Modifier.align(Alignment.CenterEnd),
             ) {
-                // Flipped after the first frame so the sheet actually plays its slide-in
-                // rather than appearing already open.
-                var sheetShown by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { sheetShown = true }
-
-                AnimatedVisibility(
-                    visible = sheetShown,
-                    enter = slideInHorizontally(tween(180)) { it / 2 } + fadeIn(tween(180)),
-                    exit = slideOutHorizontally(tween(140)) { it / 2 } + fadeOut(tween(140)),
+                Row(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .heightIn(max = panelMaxHeight),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Surface(
                         modifier = Modifier.width(sheetWidth),
                         shape = RoundedCornerShape(22.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        shadowElevation = 16.dp,
+                        // A soft shadow is redrawn every frame of the slide; 16dp on a
+                        // translucent overlay window was paying for itself in dropped frames.
+                        shadowElevation = 8.dp,
                     ) {
                         if (locked) {
                             LockedSheet(onUnlock = { onRequestUnlock(null) })
@@ -258,18 +277,18 @@ fun OverlayPanel(
                             )
                         }
                     }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    SectionRail(
+                        categories = categories,
+                        activeCategoryId = (view as? PanelView.Section)?.categoryId,
+                        quickActive = view is PanelView.Quick,
+                        onQuick = { navigate(PanelView.Quick) },
+                        onSection = { navigate(PanelView.Section(it)) },
+                        onClose = onDismiss,
+                    )
                 }
-
-                Spacer(Modifier.width(8.dp))
-
-                SectionRail(
-                    categories = categories,
-                    activeCategoryId = (view as? PanelView.Section)?.categoryId,
-                    quickActive = view is PanelView.Quick,
-                    onQuick = { navigate(PanelView.Quick) },
-                    onSection = { navigate(PanelView.Section(it)) },
-                    onClose = onDismiss,
-                )
             }
         }
     }

@@ -36,6 +36,9 @@ interface CategoryDao {
     @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM categories")
     suspend fun nextSortOrder(): Int
 
+    @Query("UPDATE categories SET sortOrder = :sortOrder WHERE id = :id")
+    suspend fun updateSortOrder(id: String, sortOrder: Int)
+
     @Upsert
     suspend fun upsert(category: CategoryEntity)
 

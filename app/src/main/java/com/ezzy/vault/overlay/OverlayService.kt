@@ -509,8 +509,15 @@ class OverlayService : Service() {
         panelView = null
         panelHost = null
 
-        if (!fromOnDestroy && settings.triggerMode == TriggerMode.ON_TRIGGER) {
-            // The panel was the only thing this mode was hosting — step aside again.
+        if (fromOnDestroy || settings.triggerMode != TriggerMode.ON_TRIGGER) return
+
+        if (bubbleView != null) {
+            // Closing the panel is not the same as being finished with the bar. The button the
+            // tile summoned stays where it is and goes back to counting down on its own, so it
+            // can be reopened, or dropped on the cross, until its time is up.
+            restartBubbleAutoHide()
+        } else {
+            // Nothing of this mode's is left on screen, so the service steps aside.
             stopSelf()
         }
     }
