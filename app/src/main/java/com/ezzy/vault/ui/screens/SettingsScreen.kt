@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ezzy.vault.AppContainer
+import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.components.NavigationRow
@@ -51,11 +52,18 @@ import com.ezzy.vault.util.AutoHide
 import com.ezzy.vault.util.ThemeMode
 import com.ezzy.vault.util.TriggerMode
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     private val store = container.settings
+
+    /** The sections themselves, for the page that picks which of them the bar carries. */
+    val categories: StateFlow<List<CategoryEntity>> = container.repository.observeCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setDisplayName(value: String) = launch { store.setDisplayName(value) }
     fun setOverlayEnabled(value: Boolean) = launch { store.setOverlayEnabled(value) }
@@ -69,6 +77,10 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     fun setThemeMode(value: ThemeMode) = launch { store.setThemeMode(value) }
     fun setDynamicColor(value: Boolean) = launch { store.setDynamicColor(value) }
     fun setBubbleSweep(value: Boolean) = launch { store.setBubbleSweep(value) }
+
+    fun setBarSectionVisible(categoryId: String, visible: Boolean) =
+        launch { store.setBarSectionVisible(categoryId, visible) }
+
 
     fun eraseEverything(onDone: () -> Unit) = launch {
         container.eraseEverything()

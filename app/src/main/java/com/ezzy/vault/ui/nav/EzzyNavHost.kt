@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ezzy.vault.ui.screens.AppearanceSettingsScreen
+import com.ezzy.vault.ui.screens.BarSectionsSettingsScreen
 import com.ezzy.vault.ui.screens.CategoryEditorScreen
 import com.ezzy.vault.ui.screens.CategoryScreen
 import com.ezzy.vault.ui.screens.DataSettingsScreen
@@ -139,7 +140,14 @@ fun EzzyNavHost(
         }
 
         composable(Routes.SETTINGS_FLOATING_BAR) {
-            FloatingBarSettingsScreen(onBack = { navController.popBackStack() })
+            FloatingBarSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenBarSections = { navController.navigate(Routes.SETTINGS_BAR_SECTIONS) },
+            )
+        }
+
+        composable(Routes.SETTINGS_BAR_SECTIONS) {
+            BarSectionsSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.SETTINGS_SECURITY) {

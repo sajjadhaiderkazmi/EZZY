@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -35,6 +36,12 @@ data class EzzySettings(
     val dynamicColor: Boolean = false,
     /** The arc that circles the floating button while it is up with nothing to count down. */
     val bubbleSweep: Boolean = true,
+    /**
+     * Sections kept out of the floating bar's rail. Held as the ones that are hidden rather
+     * than the ones that are shown, so a section made later turns up in the bar by default
+     * instead of silently missing from it.
+     */
+    val hiddenBarSections: Set<String> = emptySet(),
 )
 
 class SettingsStore(context: Context) {
@@ -58,6 +65,7 @@ class SettingsStore(context: Context) {
                 .getOrDefault(ThemeMode.SYSTEM),
             dynamicColor = prefs[Keys.DYNAMIC] ?: false,
             bubbleSweep = prefs[Keys.BUBBLE_SWEEP] ?: true,
+            hiddenBarSections = prefs[Keys.HIDDEN_BAR_SECTIONS] ?: emptySet(),
         )
     }
 
@@ -83,6 +91,15 @@ class SettingsStore(context: Context) {
     suspend fun setBlockScreenshots(value: Boolean) = put(Keys.NO_SCREENSHOT, value)
     suspend fun setDynamicColor(value: Boolean) = put(Keys.DYNAMIC, value)
     suspend fun setBubbleSweep(value: Boolean) = put(Keys.BUBBLE_SWEEP, value)
+    /** Adds or removes one section from the bar's rail, leaving the rest of the set alone. */
+    suspend fun setBarSectionVisible(categoryId: String, visible: Boolean) {
+        store.edit { prefs ->
+            val hidden = prefs[Keys.HIDDEN_BAR_SECTIONS] ?: emptySet()
+            prefs[Keys.HIDDEN_BAR_SECTIONS] =
+                if (visible) hidden - categoryId else hidden + categoryId
+        }
+    }
+
     suspend fun setAutoLockMinutes(value: Int) = put(Keys.AUTO_LOCK, value)
     suspend fun setClipboardClearSeconds(value: Int) = put(Keys.CLIP_CLEAR, value)
 
@@ -125,5 +142,6 @@ class SettingsStore(context: Context) {
         val THEME = stringPreferencesKey("theme_mode")
         val DYNAMIC = booleanPreferencesKey("dynamic_color")
         val BUBBLE_SWEEP = booleanPreferencesKey("bubble_sweep")
+        val HIDDEN_BAR_SECTIONS = stringSetPreferencesKey("hidden_bar_sections")
     }
 }

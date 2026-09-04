@@ -263,6 +263,8 @@ private sealed interface PanelView {
 @Composable
 fun OverlayPanel(
     maskSecrets: Boolean,
+    /** Section ids the user has taken out of the rail. */
+    hiddenSections: Set<String>,
     requireUnlock: Boolean,
     clipboardClearSeconds: Int,
     themeMode: ThemeMode,
@@ -277,6 +279,12 @@ fun OverlayPanel(
     val repository = remember { context.appContainer.repository }
     val categories by remember { repository.observeCategories() }
         .collectAsStateWithLifecycle(initialValue = emptyList())
+
+    // Only the rail is filtered. The full list still names an entry's section in the header,
+    // so opening a hidden section's entry from Quick access still says where it came from.
+    val railCategories = remember(categories, hiddenSections) {
+        categories.filterNot { it.id in hiddenSections }
+    }
     val unlocked by AppLock.unlocked.collectAsStateWithLifecycle()
     val confirmedItems by AppLock.confirmedItems.collectAsStateWithLifecycle()
 
@@ -382,7 +390,7 @@ fun OverlayPanel(
                     Spacer(Modifier.width(8.dp))
 
                     SectionRail(
-                        categories = categories,
+                        categories = railCategories,
                         activeCategoryId = (view as? PanelView.Section)?.categoryId,
                         quickActive = view is PanelView.Quick,
                         onQuick = { navigate(PanelView.Quick) },

@@ -456,6 +456,7 @@ class OverlayService : Service() {
         val view = host.composeView {
             OverlayPanel(
                 maskSecrets = settings.maskSecrets,
+                hiddenSections = settings.hiddenBarSections,
                 requireUnlock = settings.biometricLock,
                 clipboardClearSeconds = settings.clipboardClearSeconds,
                 themeMode = settings.themeMode,

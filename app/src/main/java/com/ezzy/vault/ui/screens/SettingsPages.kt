@@ -10,13 +10,20 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,17 +34,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.withResumed
 import com.ezzy.vault.R
+import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.overlay.EzzyTileService
 import com.ezzy.vault.overlay.OverlayService
 import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.ChoiceRow
+import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.NavigationRow
 import com.ezzy.vault.ui.components.SettingsGroup
 import com.ezzy.vault.ui.components.SettingsPage
@@ -52,7 +64,7 @@ import kotlinx.coroutines.launch
 // ---- Floating bar -----------------------------------------------------------
 
 @Composable
-fun FloatingBarSettingsScreen(onBack: () -> Unit) {
+fun FloatingBarSettingsScreen(onBack: () -> Unit, onOpenBarSections: () -> Unit) {
     val viewModel: SettingsViewModel = ezzyViewModel { SettingsViewModel(it) }
     val settings = LocalSettings.current
     val context = LocalContext.current
@@ -195,6 +207,18 @@ fun FloatingBarSettingsScreen(onBack: () -> Unit) {
 
         item {
             NavigationRow(
+                title = "Sections in the bar",
+                subtitle = if (settings.hiddenBarSections.isEmpty()) {
+                    "All of them"
+                } else {
+                    "${settings.hiddenBarSections.size} hidden"
+                },
+                onClick = onOpenBarSections,
+            )
+        }
+
+        item {
+            NavigationRow(
                 title = "Add Quick Settings tile",
                 subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     "Puts EZZY next to Wi-Fi and Bluetooth"
@@ -244,6 +268,102 @@ fun FloatingBarSettingsScreen(onBack: () -> Unit) {
             },
             confirmButton = {},
         )
+    }
+}
+
+// ---- Sections in the bar -----------------------------------------------------
+
+/**
+ * Which sections the floating bar's rail carries. Everything is in it by default; this is for
+ * taking things out, so the icons beside the button are the handful actually reached for from
+ * inside another app rather than every section in the vault.
+ *
+ * Turning a section off here changes nothing about the section itself — it is untouched in the
+ * app, and its entries still turn up in the bar's Quick access if they are pinned or recent.
+ */
+@Composable
+fun BarSectionsSettingsScreen(onBack: () -> Unit) {
+    val viewModel: SettingsViewModel = ezzyViewModel { SettingsViewModel(it) }
+    val settings = LocalSettings.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+
+    SettingsPage(title = "Sections in the bar", onBack = onBack) {
+        item {
+            Text(
+                text = "Turn a section off to keep it out of the floating bar. It stays in the " +
+                    "app either way.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
+
+        if (categories.isEmpty()) {
+            item {
+                Text(
+                    text = "No sections yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
+                )
+            }
+        }
+
+        items(categories, key = { it.id }) { category ->
+            BarSectionRow(
+                category = category,
+                visible = category.id !in settings.hiddenBarSections,
+                onChange = { wanted ->
+                    // Same ordering as everywhere else the service reads a setting back: the
+                    // write has to land first, or the bar can still be built from the old list.
+                    scope.launch {
+                        viewModel.setBarSectionVisible(category.id, wanted).join()
+                        if (settings.overlayEnabled) OverlayService.refresh(context)
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun BarSectionRow(
+    category: CategoryEntity,
+    visible: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable { onChange(!visible) }
+                .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The same badge the bar itself shows, so the row is recognisable as that icon.
+            IconAvatar(
+                iconKey = category.iconKey,
+                colorKey = category.colorKey,
+                size = 38.dp,
+                iconSize = 19.dp,
+            )
+            Spacer(Modifier.width(14.dp))
+            Text(
+                text = category.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(10.dp))
+            Switch(checked = visible, onCheckedChange = onChange)
+        }
     }
 }
 
