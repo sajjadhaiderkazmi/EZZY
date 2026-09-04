@@ -305,13 +305,21 @@ fun HomeScreen(
                 SectionHeader(
                     text = "My Sections",
                     modifier = Modifier.padding(top = 8.dp),
+                    // The icon on its own never said what it did. The label next to it does.
                     trailing = {
-                        IconButton(onClick = onAddCategory, modifier = Modifier.size(32.dp)) {
+                        TextButton(
+                            onClick = onAddCategory,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = "Create Section",
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            Spacer(Modifier.width(6.dp))
                             Icon(
                                 imageVector = Icons.Rounded.CreateNewFolder,
-                                contentDescription = "New section",
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     },
