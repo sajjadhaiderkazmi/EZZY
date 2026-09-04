@@ -1,6 +1,12 @@
 package com.ezzy.vault.data.repo
 
 import androidx.room.withTransaction
+import com.ezzy.vault.data.backup.BackupAttachment
+import com.ezzy.vault.data.backup.BackupCategory
+import com.ezzy.vault.data.backup.BackupField
+import com.ezzy.vault.data.backup.BackupFile
+import com.ezzy.vault.data.backup.BackupItem
+import com.ezzy.vault.data.backup.BackupTemplate
 import com.ezzy.vault.data.crypto.AttachmentStore
 import com.ezzy.vault.data.db.AttachmentEntity
 import com.ezzy.vault.data.db.CategoryEntity
@@ -12,6 +18,7 @@ import com.ezzy.vault.data.db.ItemWithDetails
 import com.ezzy.vault.data.db.TemplateEntity
 import com.ezzy.vault.data.model.AttachmentDraft
 import com.ezzy.vault.data.model.FieldDraft
+import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.data.model.ItemDraft
 import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.data.model.TemplateSpec
@@ -20,6 +27,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.util.Base64
 import java.util.UUID
 
 /** Single entry point to the vault. All screens and the overlay talk to this. */
@@ -283,6 +291,152 @@ class VaultRepository(
     }
 
     suspend fun attachmentBytes(storedName: String): ByteArray? = attachments.read(storedName)
+
+    // ---- Backup -------------------------------------------------------------
+
+    /** How many rows [importSnapshot] actually applied versus had to skip. */
+    data class ImportResult(val imported: Int, val skipped: Int)
+
+    /**
+     * Everything in the vault, with every attachment decrypted back to plain bytes so it can be
+     * resealed into the portable export format. [onProgress] runs once per item, from 0f to 1f
+     * — attachments are the slow part, and there is one of these calls per item regardless of
+     * how many files it carries.
+     */
+    suspend fun exportSnapshot(onProgress: suspend (Float) -> Unit): BackupFile = withContext(Dispatchers.IO) {
+        val categories = db.categoryDao().getAll()
+        val templates = db.templateDao().getAll()
+        val allItems = db.itemDao().getAll()
+        val total = allItems.size.coerceAtLeast(1)
+
+        val backupItems = allItems.mapIndexed { index, entry ->
+            val backupAttachments = entry.sortedAttachments.mapNotNull { attachment ->
+                val bytes = attachments.read(attachment.storedName) ?: return@mapNotNull null
+                BackupAttachment(
+                    id = attachment.id,
+                    displayName = attachment.displayName,
+                    caption = attachment.caption,
+                    mimeType = attachment.mimeType,
+                    sizeBytes = attachment.sizeBytes,
+                    sortOrder = attachment.sortOrder,
+                    createdAt = attachment.createdAt,
+                    data = Base64.getEncoder().encodeToString(bytes),
+                )
+            }
+            onProgress((index + 1).toFloat() / total)
+            BackupItem(
+                id = entry.item.id,
+                categoryId = entry.item.categoryId,
+                templateId = entry.item.templateId,
+                title = entry.item.title,
+                subtitle = entry.item.subtitle,
+                note = entry.item.note,
+                isPinned = entry.item.isPinned,
+                createdAt = entry.item.createdAt,
+                updatedAt = entry.item.updatedAt,
+                lastUsedAt = entry.item.lastUsedAt,
+                fields = entry.sortedFields.map {
+                    BackupField(it.id, it.label, it.value, it.type.name, it.sortOrder)
+                },
+                attachments = backupAttachments,
+            )
+        }
+
+        BackupFile(
+            exportedAt = System.currentTimeMillis(),
+            categories = categories.map {
+                BackupCategory(it.id, it.name, it.iconKey, it.colorKey, it.sortOrder, it.createdAt)
+            },
+            templates = templates.map {
+                BackupTemplate(it.id, it.name, it.iconKey, it.specJson, it.isBuiltIn, it.sortOrder)
+            },
+            items = backupItems,
+        )
+    }
+
+    /**
+     * Applies an imported snapshot on top of whatever is already in the vault. Every row
+     * upserts by its original id, so re-importing the same backup twice lands on the same
+     * state rather than duplicating it, while importing into a different vault simply adds
+     * alongside what is already there. Attachments get a fresh stored name on this device —
+     * the name recorded in the backup only ever existed on the device that made it.
+     *
+     * One item failing (a category the backup did not include, say) is skipped rather than
+     * failing the whole import, so a partly damaged file still recovers everything it can.
+     */
+    suspend fun importSnapshot(
+        backup: BackupFile,
+        onProgress: suspend (Float) -> Unit,
+    ): ImportResult = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            backup.categories.forEach { c ->
+                db.categoryDao().upsert(
+                    CategoryEntity(c.id, c.name, c.iconKey, c.colorKey, c.sortOrder, c.createdAt)
+                )
+            }
+            backup.templates.forEach { t ->
+                db.templateDao().upsert(
+                    TemplateEntity(t.id, t.name, t.iconKey, t.specJson, t.isBuiltIn, t.sortOrder)
+                )
+            }
+        }
+
+        val total = backup.items.size.coerceAtLeast(1)
+        var imported = 0
+        var skipped = 0
+
+        backup.items.forEachIndexed { index, item ->
+            val ok = runCatching {
+                val storedAttachments = item.attachments.mapNotNull { backed ->
+                    val bytes = runCatching { Base64.getDecoder().decode(backed.data) }.getOrNull()
+                        ?: return@mapNotNull null
+                    val stored = attachments.save(bytes) ?: return@mapNotNull null
+                    AttachmentEntity(
+                        id = backed.id,
+                        itemId = item.id,
+                        displayName = backed.displayName,
+                        caption = backed.caption,
+                        mimeType = backed.mimeType,
+                        storedName = stored.storedName,
+                        sizeBytes = stored.sizeBytes,
+                        sortOrder = backed.sortOrder,
+                        createdAt = backed.createdAt,
+                    )
+                }
+
+                db.withTransaction {
+                    db.itemDao().upsert(
+                        ItemEntity(
+                            id = item.id,
+                            categoryId = item.categoryId,
+                            templateId = item.templateId,
+                            title = item.title,
+                            subtitle = item.subtitle,
+                            note = item.note,
+                            isPinned = item.isPinned,
+                            createdAt = item.createdAt,
+                            updatedAt = item.updatedAt,
+                            lastUsedAt = item.lastUsedAt,
+                        )
+                    )
+                    db.fieldDao().deleteForItem(item.id)
+                    db.fieldDao().insertAll(
+                        item.fields.map {
+                            FieldEntity(it.id, item.id, it.label, it.value, FieldType.from(it.type), it.sortOrder)
+                        }
+                    )
+                    db.attachmentDao().deleteForItem(item.id)
+                    db.attachmentDao().insertAll(storedAttachments)
+                }
+            }.isSuccess
+
+            if (ok) imported++ else skipped++
+            onProgress((index + 1).toFloat() / total)
+        }
+
+        sweepOrphanFiles()
+        ImportResult(imported, skipped)
+    }
 
     private suspend fun sweepOrphanFiles() {
         val referenced = db.attachmentDao().getAll().map { it.storedName }.toSet()

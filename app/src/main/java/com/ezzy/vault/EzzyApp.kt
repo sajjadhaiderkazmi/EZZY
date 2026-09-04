@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
+import com.ezzy.vault.data.backup.BackupManager
 import com.ezzy.vault.data.crypto.AttachmentStore
 import com.ezzy.vault.data.crypto.DatabaseKey
 import com.ezzy.vault.data.db.EzzyDatabase
@@ -32,6 +33,7 @@ class AppContainer(context: Context) {
 
     val database: EzzyDatabase by lazy { EzzyDatabase.open(appContext, databaseKey.passphrase()) }
     val repository: VaultRepository by lazy { VaultRepository(database, attachmentStore) }
+    val backupManager: BackupManager by lazy { BackupManager(repository) }
 
     /** Drops the key first: without it the remaining database bytes are just noise. */
     suspend fun eraseEverything() {

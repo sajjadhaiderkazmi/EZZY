@@ -67,6 +67,9 @@ import com.ezzy.vault.util.ThemeMode
 import com.ezzy.vault.util.TriggerMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ---- Floating bar -----------------------------------------------------------
 
@@ -577,8 +580,27 @@ fun DataSettingsScreen(
     onErased: () -> Unit,
 ) {
     val viewModel: SettingsViewModel = ezzyViewModel { SettingsViewModel(it) }
+    val backupViewModel: BackupViewModel = ezzyViewModel { BackupViewModel(it) }
     val context = LocalContext.current
     var confirmErase by remember { mutableStateOf(false) }
+    var setExportPassword by remember { mutableStateOf(false) }
+    // Held only long enough to reach the file picker's callback — never written anywhere.
+    var pendingExportPassword by remember { mutableStateOf("") }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        if (uri != null && pendingExportPassword.isNotEmpty()) {
+            backupViewModel.export(context, uri, pendingExportPassword)
+        }
+        pendingExportPassword = ""
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) backupViewModel.beginImport(context, uri)
+    }
 
     SettingsPage(title = "Data", onBack = onBack) {
         item {
@@ -589,6 +611,36 @@ fun DataSettingsScreen(
             )
         }
 
+        item { SettingsGroup("Backup") }
+
+        item {
+            NavigationRow(
+                title = "Export backup",
+                subtitle = "Save an encrypted copy of everything to a file",
+                onClick = { setExportPassword = true },
+            )
+        }
+
+        item {
+            NavigationRow(
+                title = "Import backup",
+                subtitle = "Add entries from a previously exported .ezzy file",
+                onClick = { importLauncher.launch(arrayOf("*/*")) },
+            )
+        }
+
+        item {
+            Text(
+                text = "The backup file is encrypted with the password you set for it. EZZY " +
+                    "never stores that password — losing it means losing the backup.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
+            )
+        }
+
+        item { SettingsGroup("Danger zone") }
+
         item {
             NavigationRow(
                 title = "Erase everything",
@@ -597,6 +649,76 @@ fun DataSettingsScreen(
                 onClick = { confirmErase = true },
             )
         }
+    }
+
+    if (setExportPassword) {
+        SetExportPasswordDialog(
+            onDismiss = { setExportPassword = false },
+            onConfirm = { password ->
+                setExportPassword = false
+                pendingExportPassword = password
+                exportLauncher.launch(exportFileName())
+            },
+        )
+    }
+
+    val backupState = backupViewModel.state
+    when (backupState) {
+        is BackupUiState.AskImportPassword -> {
+            AskImportPasswordDialog(
+                error = backupState.error,
+                onDismiss = { backupViewModel.dismiss() },
+                onConfirm = { password -> backupViewModel.confirmImportPassword(password) },
+            )
+        }
+
+        is BackupUiState.Working -> {
+            BackupProgressDialog(progress = backupState.progress, exporting = backupState.exporting)
+        }
+
+        BackupUiState.ExportDone -> {
+            AlertDialog(
+                onDismissRequest = { backupViewModel.dismiss() },
+                title = { Text("Backup saved") },
+                text = { Text("Keep the password somewhere safe — it is the only way back in.") },
+                confirmButton = {
+                    TextButton(onClick = { backupViewModel.dismiss() }) { Text("Done") }
+                },
+            )
+        }
+
+        is BackupUiState.ImportDone -> {
+            val result = backupState.result
+            AlertDialog(
+                onDismissRequest = { backupViewModel.dismiss() },
+                title = { Text("Import complete") },
+                text = {
+                    Text(
+                        if (result.skipped == 0) {
+                            "${result.imported} ${if (result.imported == 1) "entry" else "entries"} added."
+                        } else {
+                            "${result.imported} added, ${result.skipped} could not be read."
+                        }
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { backupViewModel.dismiss() }) { Text("Done") }
+                },
+            )
+        }
+
+        is BackupUiState.Error -> {
+            AlertDialog(
+                onDismissRequest = { backupViewModel.dismiss() },
+                title = { Text("Couldn't do that") },
+                text = { Text(backupState.message) },
+                confirmButton = {
+                    TextButton(onClick = { backupViewModel.dismiss() }) { Text("OK") }
+                },
+            )
+        }
+
+        BackupUiState.Idle -> Unit
     }
 
     if (confirmErase) {
@@ -669,6 +791,12 @@ private fun requestQuickSettingsTile(
             )
         }
     }
+}
+
+/** A distinct name per export, so saving a new one never silently overwrites an older one. */
+private fun exportFileName(): String {
+    val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.getDefault()).format(Date())
+    return "ezzy-backup-$stamp.ezzy"
 }
 
 private fun autoLockLabel(minutes: Int): String = when (minutes) {

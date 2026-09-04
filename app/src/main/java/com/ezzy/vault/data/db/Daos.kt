@@ -15,6 +15,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY sortOrder ASC, name ASC")
     fun observeAll(): Flow<List<CategoryEntity>>
 
+    @Query("SELECT * FROM categories ORDER BY sortOrder ASC, name ASC")
+    suspend fun getAll(): List<CategoryEntity>
+
     @Query(
         """
         SELECT c.*, (SELECT COUNT(*) FROM items i WHERE i.categoryId = c.id) AS itemCount
@@ -54,6 +57,9 @@ interface TemplateDao {
 
     @Query("SELECT * FROM templates ORDER BY sortOrder ASC, name ASC")
     fun observeAll(): Flow<List<TemplateEntity>>
+
+    @Query("SELECT * FROM templates ORDER BY sortOrder ASC, name ASC")
+    suspend fun getAll(): List<TemplateEntity>
 
     @Query("SELECT * FROM templates WHERE id = :id")
     suspend fun getById(id: String): TemplateEntity?
