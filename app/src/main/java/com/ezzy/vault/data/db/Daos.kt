@@ -27,6 +27,37 @@ interface CategoryDao {
     )
     fun observeAllWithCounts(): Flow<List<CategoryWithCount>>
 
+    /** The home grid's top level: sections that have not been dragged into a group. */
+    @Query(
+        """
+        SELECT c.*, (SELECT COUNT(*) FROM items i WHERE i.categoryId = c.id) AS itemCount
+        FROM categories c
+        WHERE c.groupId IS NULL
+        ORDER BY c.sortOrder ASC, c.name ASC
+        """
+    )
+    fun observeUngroupedWithCounts(): Flow<List<CategoryWithCount>>
+
+    @Query(
+        """
+        SELECT c.*, (SELECT COUNT(*) FROM items i WHERE i.categoryId = c.id) AS itemCount
+        FROM categories c
+        WHERE c.groupId = :groupId
+        ORDER BY c.sortOrder ASC, c.name ASC
+        """
+    )
+    fun observeByGroupWithCounts(groupId: String): Flow<List<CategoryWithCount>>
+
+    @Query("SELECT * FROM categories WHERE groupId = :groupId ORDER BY sortOrder ASC, name ASC")
+    suspend fun getByGroup(groupId: String): List<CategoryEntity>
+
+    @Query("UPDATE categories SET groupId = :groupId WHERE id = :id")
+    suspend fun setGroupId(id: String, groupId: String?)
+
+    /** Every section still in a group that is about to be deleted, so it can be dropped too. */
+    @Query("SELECT id FROM categories WHERE groupId = :groupId")
+    suspend fun idsInGroup(groupId: String): List<String>
+
     @Query("SELECT * FROM categories WHERE id = :id")
     fun observeById(id: String): Flow<CategoryEntity?>
 
@@ -178,5 +209,39 @@ interface AttachmentDao {
     suspend fun deleteForItem(itemId: String)
 
     @Query("DELETE FROM attachments WHERE id = :id")
+    suspend fun deleteById(id: String)
+}
+
+@Dao
+interface CategoryGroupDao {
+
+    @Query(
+        """
+        SELECT g.*, (SELECT COUNT(*) FROM categories c WHERE c.groupId = g.id) AS categoryCount
+        FROM category_groups g
+        ORDER BY g.sortOrder ASC, g.name ASC
+        """
+    )
+    fun observeAllWithCounts(): Flow<List<CategoryGroupWithCount>>
+
+    @Query("SELECT * FROM category_groups WHERE id = :id")
+    fun observeById(id: String): Flow<CategoryGroupEntity?>
+
+    @Query("SELECT * FROM category_groups WHERE id = :id")
+    suspend fun getById(id: String): CategoryGroupEntity?
+
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM category_groups")
+    suspend fun nextSortOrder(): Int
+
+    @Query("UPDATE category_groups SET sortOrder = :sortOrder WHERE id = :id")
+    suspend fun updateSortOrder(id: String, sortOrder: Int)
+
+    @Query("UPDATE category_groups SET name = :name WHERE id = :id")
+    suspend fun rename(id: String, name: String)
+
+    @Upsert
+    suspend fun upsert(group: CategoryGroupEntity)
+
+    @Query("DELETE FROM category_groups WHERE id = :id")
     suspend fun deleteById(id: String)
 }

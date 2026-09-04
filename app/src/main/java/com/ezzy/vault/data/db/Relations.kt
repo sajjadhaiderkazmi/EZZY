@@ -20,3 +20,9 @@ data class CategoryWithCount(
     @Embedded val category: CategoryEntity,
     val itemCount: Int,
 )
+
+/** Row used for a group's folder card: how many sections it holds. */
+data class CategoryGroupWithCount(
+    @Embedded val group: CategoryGroupEntity,
+    val categoryCount: Int,
+)

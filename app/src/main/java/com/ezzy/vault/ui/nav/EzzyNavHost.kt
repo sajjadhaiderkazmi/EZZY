@@ -18,6 +18,7 @@ import com.ezzy.vault.ui.screens.CategoryScreen
 import com.ezzy.vault.ui.screens.DataSettingsScreen
 import com.ezzy.vault.ui.screens.EditorScreen
 import com.ezzy.vault.ui.screens.FloatingBarSettingsScreen
+import com.ezzy.vault.ui.screens.GroupScreen
 import com.ezzy.vault.ui.screens.HomeScreen
 import com.ezzy.vault.ui.screens.ItemDetailScreen
 import com.ezzy.vault.ui.screens.SearchScreen
@@ -55,6 +56,7 @@ fun EzzyNavHost(
             HomeScreen(
                 settings = settings,
                 onOpenCategory = { navController.navigate(Routes.category(it)) },
+                onOpenGroup = { navController.navigate(Routes.group(it)) },
                 onOpenItem = { navController.navigate(Routes.item(it)) },
                 onAddItem = { navController.navigate(Routes.editor()) },
                 onAddCategory = { navController.navigate(Routes.categoryEditor()) },
@@ -74,6 +76,17 @@ fun EzzyNavHost(
                 onOpenItem = { navController.navigate(Routes.item(it)) },
                 onAddItem = { navController.navigate(Routes.editor(categoryId = categoryId)) },
                 onEditCategory = { navController.navigate(Routes.categoryEditor(categoryId)) },
+            )
+        }
+
+        composable(
+            route = Routes.GROUP,
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType }),
+        ) { entry ->
+            GroupScreen(
+                groupId = entry.arguments?.getString("groupId").orEmpty(),
+                onBack = { navController.popBackStack() },
+                onOpenCategory = { navController.navigate(Routes.category(it)) },
             )
         }
 

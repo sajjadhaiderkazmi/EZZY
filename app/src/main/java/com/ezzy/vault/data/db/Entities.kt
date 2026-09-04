@@ -7,12 +7,40 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.ezzy.vault.data.model.FieldType
 
-@Entity(tableName = "categories")
+@Entity(
+    tableName = "categories",
+    foreignKeys = [
+        ForeignKey(
+            entity = CategoryGroupEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["groupId"],
+            // Deleting a group must never take its sections down with it by accident — that is
+            // what the separate, explicitly-confirmed "Delete group" action is for.
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
+    indices = [Index("groupId")],
+)
 data class CategoryEntity(
     @PrimaryKey val id: String,
     val name: String,
     val iconKey: String,
     val colorKey: String,
+    val sortOrder: Int,
+    val createdAt: Long,
+    /** The folder this section has been dragged into, or null if it sits at the top level. */
+    @ColumnInfo(defaultValue = "NULL") val groupId: String? = null,
+)
+
+/**
+ * A folder for sections on the home screen — purely organisational. Nothing about how a
+ * section works changes by being inside one: it is the same icon in the floating bar, the same
+ * entries, the same lock setting, whether grouped or not.
+ */
+@Entity(tableName = "category_groups")
+data class CategoryGroupEntity(
+    @PrimaryKey val id: String,
+    val name: String,
     val sortOrder: Int,
     val createdAt: Long,
 )

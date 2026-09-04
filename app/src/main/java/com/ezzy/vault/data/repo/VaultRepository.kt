@@ -10,6 +10,8 @@ import com.ezzy.vault.data.backup.BackupTemplate
 import com.ezzy.vault.data.crypto.AttachmentStore
 import com.ezzy.vault.data.db.AttachmentEntity
 import com.ezzy.vault.data.db.CategoryEntity
+import com.ezzy.vault.data.db.CategoryGroupEntity
+import com.ezzy.vault.data.db.CategoryGroupWithCount
 import com.ezzy.vault.data.db.CategoryWithCount
 import com.ezzy.vault.data.db.EzzyDatabase
 import com.ezzy.vault.data.db.FieldEntity
@@ -62,6 +64,10 @@ class VaultRepository(
             colorKey = colorKey,
             sortOrder = existing?.sortOrder ?: dao.nextSortOrder(),
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            // Editing a section's name, icon or colour must never quietly kick it out of its
+            // group — this form knows nothing about grouping, so it carries the existing value
+            // straight through rather than defaulting it back to ungrouped.
+            groupId = existing?.groupId,
         )
         dao.upsert(entity)
         return entity.id
@@ -82,6 +88,70 @@ class VaultRepository(
     /** Deleting a category cascades to its items; their sealed files are swept up after. */
     suspend fun deleteCategory(id: String) {
         db.categoryDao().deleteById(id)
+        sweepOrphanFiles()
+    }
+
+    // ---- Section groups -----------------------------------------------------
+
+    /** The home grid's top level: sections not inside any group. */
+    fun observeUngroupedCategories(): Flow<List<CategoryWithCount>> =
+        db.categoryDao().observeUngroupedWithCounts()
+
+    fun observeGroups(): Flow<List<CategoryGroupWithCount>> = db.categoryGroupDao().observeAllWithCounts()
+
+    fun observeGroup(id: String): Flow<CategoryGroupEntity?> = db.categoryGroupDao().observeById(id)
+
+    fun observeGroupCategories(groupId: String): Flow<List<CategoryWithCount>> =
+        db.categoryDao().observeByGroupWithCounts(groupId)
+
+    suspend fun createGroup(name: String): String {
+        val dao = db.categoryGroupDao()
+        val entity = CategoryGroupEntity(
+            id = UUID.randomUUID().toString(),
+            name = name.trim().ifEmpty { "New group" },
+            sortOrder = dao.nextSortOrder(),
+            createdAt = System.currentTimeMillis(),
+        )
+        dao.upsert(entity)
+        return entity.id
+    }
+
+    suspend fun renameGroup(id: String, name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        db.categoryGroupDao().rename(id, trimmed)
+    }
+
+    /** Writes the order groups sit in on the home grid, the same way section order is written. */
+    suspend fun reorderGroups(orderedIds: List<String>) {
+        if (orderedIds.isEmpty()) return
+        db.withTransaction {
+            val dao = db.categoryGroupDao()
+            orderedIds.forEachIndexed { index, id -> dao.updateSortOrder(id, index) }
+        }
+    }
+
+    /** Drags a section into a group — or, with a null id, back out to the home grid's top level. */
+    suspend fun setCategoryGroup(categoryId: String, groupId: String?) {
+        db.categoryDao().setGroupId(categoryId, groupId)
+    }
+
+    /**
+     * Dissolves a group without touching what was inside it: every section it held goes back
+     * to the top level, exactly where "Delete" (below) draws the line the other way.
+     */
+    suspend fun ungroup(groupId: String) {
+        db.withTransaction {
+            db.categoryDao().idsInGroup(groupId).forEach { db.categoryDao().setGroupId(it, null) }
+            db.categoryGroupDao().deleteById(groupId)
+        }
+        sweepOrphanFiles()
+    }
+
+    /** Deletes the group and every section still inside it, cascading to their entries and files. */
+    suspend fun deleteGroupAndContents(groupId: String) {
+        db.categoryDao().idsInGroup(groupId).forEach { db.categoryDao().deleteById(it) }
+        db.categoryGroupDao().deleteById(groupId)
         sweepOrphanFiles()
     }
 
