@@ -164,6 +164,7 @@ fun HomeScreen(
     onOpenCategory: (String) -> Unit,
     onOpenGroup: (String) -> Unit,
     onOpenItem: (String) -> Unit,
+    onOpenQuickAccessEdit: () -> Unit,
     onAddItem: () -> Unit,
     onAddCategory: () -> Unit,
     onOpenSearch: () -> Unit,
@@ -327,34 +328,59 @@ fun HomeScreen(
                 }
             }
 
-            if (quickAccess.isNotEmpty()) {
+            // The header (and its edit icon) stays up even with nothing pinned yet — that is
+            // the one way in to pin a first entry, so it can't only appear once one already is.
+            if (itemCount > 0) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SectionHeader(
                         text = "Quick access",
                         modifier = Modifier.padding(top = 4.dp),
                         trailing = {
-                            TextButton(
-                                onClick = onOpenSearch,
-                                contentPadding = PaddingValues(horizontal = 8.dp),
-                            ) {
-                                Text("See all", style = MaterialTheme.typography.labelMedium)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = onOpenQuickAccessEdit,
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Edit,
+                                        contentDescription = "Edit Quick access",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                TextButton(
+                                    onClick = onOpenSearch,
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                ) {
+                                    Text("See all", style = MaterialTheme.typography.labelMedium)
+                                }
                             }
                         },
                     )
                 }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 2.dp),
-                    ) {
-                        items(quickAccess, key = { it.item.id }) { entry ->
-                            QuickAccessCard(
-                                item = entry,
-                                iconKey = categoryLookup[entry.item.categoryId]?.category?.iconKey,
-                                colorKey = categoryLookup[entry.item.categoryId]?.category?.colorKey,
-                                onClick = { onOpenItem(entry.item.id) },
-                            )
+                if (quickAccess.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(vertical = 2.dp),
+                        ) {
+                            items(quickAccess, key = { it.item.id }) { entry ->
+                                QuickAccessCard(
+                                    item = entry,
+                                    iconKey = categoryLookup[entry.item.categoryId]?.category?.iconKey,
+                                    colorKey = categoryLookup[entry.item.categoryId]?.category?.colorKey,
+                                    onClick = { onOpenItem(entry.item.id) },
+                                )
+                            }
                         }
+                    }
+                } else {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = "Nothing pinned yet — tap the edit icon above to add one.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
