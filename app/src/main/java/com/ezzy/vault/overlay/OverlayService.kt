@@ -75,6 +75,17 @@ class OverlayService : Service() {
      * which times out the panel. */
     private var bubbleAutoHideJob: Job? = null
 
+    /**
+     * What the ring around the floating button is drawing. In "Always active" mode there is no
+     * deadline, so it idles as a sweep; in "On trigger" mode it empties in step with
+     * [bubbleAutoHideJob], which is the same countdown, so the time left is visible instead of
+     * the button just vanishing.
+     */
+    private val bubbleRing = mutableStateOf<BubbleRing?>(null)
+
+    /** Bumped on every restart so the ring starts its arc over rather than carrying on. */
+    private var countdownToken = 0
+
     private var panelHost: OverlayViewHost? = null
     private var panelView: View? = null
 
@@ -185,6 +196,8 @@ class OverlayService : Service() {
         removeTriggers()
         when (settings.triggerMode) {
             TriggerMode.ALWAYS_ACTIVE -> {
+                // Nothing is counting down in this mode, so the ring simply idles.
+                bubbleRing.value = BubbleRing.Sweep
                 // Settings.canDrawOverlays() is unreliable on some OEM skins — MIUI reports
                 // false even after the user has allowed it — so the real test is whether the
                 // bubble could actually be placed.
@@ -216,7 +229,7 @@ class OverlayService : Service() {
 
     private fun addBubble() {
         val host = OverlayViewHost(this).also { it.start() }
-        val view = host.composeView { OverlayBubble() }
+        val view = host.composeView { OverlayBubble(ring = bubbleRing.value) }
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -263,7 +276,15 @@ class OverlayService : Service() {
     private fun restartBubbleAutoHide() {
         bubbleAutoHideJob?.cancel()
         val seconds = settings.autoHide.seconds
-        if (seconds <= 0) return
+        if (seconds <= 0) {
+            // "Never": there is no deadline to draw, so the ring goes back to idling.
+            bubbleRing.value = BubbleRing.Sweep
+            return
+        }
+        bubbleRing.value = BubbleRing.Countdown(
+            token = ++countdownToken,
+            millis = seconds * 1000L,
+        )
         bubbleAutoHideJob = scope.launch {
             delay(seconds * 1000L)
             // Nothing else is being hosted in this mode, so the whole service can step aside.
@@ -410,9 +431,11 @@ class OverlayService : Service() {
 
     private fun showPanel() {
         if (panelView != null) return
-        // The button's own countdown no longer applies once the panel is what's on screen.
+        // The button's own countdown no longer applies once the panel is what's on screen,
+        // and its ring has nothing to say from behind the panel either.
         bubbleAutoHideJob?.cancel()
         bubbleAutoHideJob = null
+        bubbleRing.value = null
 
         val host = OverlayViewHost(this).also { it.start() }
         val view = host.composeView {
@@ -509,7 +532,12 @@ class OverlayService : Service() {
         panelView = null
         panelHost = null
 
-        if (fromOnDestroy || settings.triggerMode != TriggerMode.ON_TRIGGER) return
+        if (fromOnDestroy) return
+
+        if (settings.triggerMode != TriggerMode.ON_TRIGGER) {
+            bubbleRing.value = BubbleRing.Sweep
+            return
+        }
 
         if (bubbleView != null) {
             // Closing the panel is not the same as being finished with the bar. The button the

@@ -2,8 +2,12 @@ package com.ezzy.vault.overlay
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +15,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -59,8 +64,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,34 +96,117 @@ import com.ezzy.vault.ui.theme.LocalIsDarkTheme
 import com.ezzy.vault.util.ThemeMode
 import kotlinx.coroutines.delay
 
+/** What the white ring around the floating button is doing. */
+sealed interface BubbleRing {
+
+    /** A white arc travelling round the ring, for the button that stays up permanently. */
+    data object Sweep : BubbleRing
+
+    /**
+     * The ring emptying as the button's own time runs out, so how long is left is something
+     * you can see rather than a surprise. [token] changes whenever the countdown restarts —
+     * on a fresh tile tap, or when the panel closes and the button starts counting again.
+     */
+    data class Countdown(val token: Int, val millis: Long) : BubbleRing
+}
+
 /**
  * The draggable launcher that sits on top of other apps.
  *
  * No drop shadow. Each of these lives in its own window sized to exactly this circle, and an
  * elevation shadow is drawn outside the shape it belongs to — with no window left to spill
- * into, it came out as a hard grey square under the button. A thin white ring separates the
- * circle from the wallpaper instead, and stays inside the bounds where it cannot be clipped.
+ * into, it came out as a hard grey square under the button. The ring separates the circle from
+ * the wallpaper instead, and stays inside the bounds where nothing can clip it.
  */
 @Composable
-fun OverlayBubble() {
+fun OverlayBubble(ring: BubbleRing? = null) {
     EzzyTheme {
         Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(EzzyMark.Brand)
-                .border(1.5.dp, Color.White.copy(alpha = 0.30f), CircleShape),
+            modifier = Modifier.size(56.dp),
             contentAlignment = Alignment.Center,
         ) {
-            // Same proportion as the launcher icon: the bolt fills a little over half the
-            // circle's height, so it never crowds the edge.
-            Icon(
-                imageVector = EzzyMark.Bolt,
-                contentDescription = "Open EZZY",
-                tint = Color.White,
-                modifier = Modifier.size(38.dp),
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(EzzyMark.Brand)
+                    // The track the bright arc runs on, and what is left once it has gone.
+                    .border(1.5.dp, Color.White.copy(alpha = 0.22f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                // Same proportion as the launcher icon: the bolt fills a little over half the
+                // circle's height, so it never crowds the edge.
+                Icon(
+                    imageVector = EzzyMark.Bolt,
+                    contentDescription = "Open EZZY",
+                    tint = Color.White,
+                    modifier = Modifier.size(38.dp),
+                )
+            }
+
+            BubbleRingArc(ring = ring, modifier = Modifier.size(56.dp))
+        }
+    }
+}
+
+@Composable
+private fun BubbleRingArc(ring: BubbleRing?, modifier: Modifier) {
+    when (ring) {
+        null -> Unit
+
+        is BubbleRing.Sweep -> {
+            val transition = rememberInfiniteTransition(label = "bubble-sweep")
+            val start by transition.animateFloat(
+                initialValue = -90f,
+                targetValue = 270f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1600, easing = LinearEasing),
+                ),
+                label = "bubble-sweep-angle",
+            )
+            RingArc(modifier = modifier, startAngle = start, sweepAngle = 96f)
+        }
+
+        is BubbleRing.Countdown -> {
+            // Driven off the clock rather than a frame-by-frame animation: it has to agree
+            // with the service's own timer, and a ten-minute arc redrawn sixty times a second
+            // would be burning the battery to show a change no eye can see. One tick per
+            // degree of arc, floored so a short countdown still looks smooth.
+            var progress by remember(ring.token) { mutableStateOf(1f) }
+            LaunchedEffect(ring.token) {
+                val startedAt = System.currentTimeMillis()
+                val tick = (ring.millis / 360L).coerceIn(33L, 500L)
+                while (true) {
+                    val elapsed = System.currentTimeMillis() - startedAt
+                    progress = (1f - elapsed.toFloat() / ring.millis.toFloat()).coerceIn(0f, 1f)
+                    if (progress <= 0f) break
+                    delay(tick)
+                }
+            }
+            RingArc(
+                modifier = modifier,
+                startAngle = -90f,
+                sweepAngle = 360f * progress,
             )
         }
+    }
+}
+
+/** One white arc drawn on the button's edge, inset so the stroke stays inside the circle. */
+@Composable
+private fun RingArc(modifier: Modifier, startAngle: Float, sweepAngle: Float) {
+    val strokePx = with(LocalDensity.current) { 2.5.dp.toPx() }
+    Canvas(modifier = modifier) {
+        val inset = strokePx / 2f
+        drawArc(
+            color = Color.White,
+            startAngle = startAngle,
+            sweepAngle = sweepAngle,
+            useCenter = false,
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - strokePx, size.height - strokePx),
+            style = Stroke(width = strokePx, cap = StrokeCap.Round),
+        )
     }
 }
 
