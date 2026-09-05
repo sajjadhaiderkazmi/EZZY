@@ -28,7 +28,7 @@ class Converters {
         AttachmentEntity::class,
         ItemGroupEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -125,6 +125,110 @@ abstract class EzzyDatabase : RoomDatabase() {
         }
 
         /**
+         * A handful of devices reached "version 3" through an earlier build of this migration —
+         * one that built section groups on categories (a category_groups table, a groupId
+         * column on categories) before that feature was reworked to live inside each section
+         * instead, at which point this file's own MIGRATION_2_3 body was rewritten to build
+         * item_groups directly. Changing an already-shipped migration's body is never safe: any
+         * device that had already run the old one keeps the old shape on disk forever, no matter
+         * what the code says version 3 means now. Bumping the version and cleaning up here,
+         * rather than editing MIGRATION_2_3 again, is what actually fixes it — for everyone.
+         *
+         * A device coming from true v2 runs the (correct, current) MIGRATION_2_3 above and
+         * arrives here with the right shape already, so this checks what is actually on disk
+         * and only acts on the old one; nothing to do is a valid outcome for a migration.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val hasOldSectionGroups = db.query(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'category_groups'"
+                ).use { cursor -> cursor.moveToFirst() && cursor.getInt(0) > 0 }
+                if (!hasOldSectionGroups) return
+
+                // Undo the old section-groups shape: categories goes back to carrying no
+                // groupId or foreign key at all, and category_groups is dropped outright —
+                // nothing about it needs preserving, a section was never deleted by having
+                // been filed into one.
+                db.execSQL(
+                    """
+                    CREATE TABLE categories_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        iconKey TEXT NOT NULL,
+                        colorKey TEXT NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO categories_new (id, name, iconKey, colorKey, sortOrder, createdAt)
+                    SELECT id, name, iconKey, colorKey, sortOrder, createdAt FROM categories
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE categories")
+                db.execSQL("ALTER TABLE categories_new RENAME TO categories")
+                db.execSQL("DROP TABLE category_groups")
+
+                // This device's own v2→v3 run predates entry groups, so its items table never
+                // got a groupId column — exactly what the current MIGRATION_2_3 already does
+                // for every other device, applied here instead.
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS item_groups (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        categoryId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_item_groups_categoryId ON item_groups(categoryId)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE items_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        categoryId TEXT NOT NULL,
+                        templateId TEXT,
+                        title TEXT NOT NULL,
+                        subtitle TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        isPinned INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        lastUsedAt INTEGER NOT NULL,
+                        groupId TEXT DEFAULT NULL,
+                        FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE,
+                        FOREIGN KEY(groupId) REFERENCES item_groups(id) ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO items_new (
+                        id, categoryId, templateId, title, subtitle, note,
+                        isPinned, createdAt, updatedAt, lastUsedAt, groupId
+                    )
+                    SELECT id, categoryId, templateId, title, subtitle, note,
+                           isPinned, createdAt, updatedAt, lastUsedAt, NULL
+                    FROM items
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE items")
+                db.execSQL("ALTER TABLE items_new RENAME TO items")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_categoryId ON items(categoryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_isPinned ON items(isPinned)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_lastUsedAt ON items(lastUsedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_items_groupId ON items(groupId)")
+            }
+        }
+
+        /**
          * Opens the encrypted database. [passphrase] is consumed (and zeroed) by SQLCipher,
          * so callers must hand over a copy they no longer need.
          */
@@ -136,7 +240,7 @@ abstract class EzzyDatabase : RoomDatabase() {
                 NAME,
             )
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
         }
     }
