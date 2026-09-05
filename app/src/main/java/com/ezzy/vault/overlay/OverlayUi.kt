@@ -82,6 +82,7 @@ import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.security.SecureClipboard
 import com.ezzy.vault.data.db.AttachmentEntity
+import com.ezzy.vault.data.db.watermarkStyle
 import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.ui.components.EncryptedImage
 import com.ezzy.vault.ui.components.FieldValueRow
@@ -1098,12 +1099,16 @@ private fun PanelImage(
                 .height(150.dp)
                 .clip(RoundedCornerShape(12.dp)),
             watermark = attachment.watermark,
+            watermarkStyle = attachment.watermarkStyle,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilledTonalButton(
                 onClick = {
                     actions.copy(
-                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                        attachment.storedName,
+                        label,
+                        attachment.mimeType,
+                        attachment.watermarkStyle.takeIf { attachment.watermark },
                     ) { ok ->
                         if (ok) onCopied()
                     }
@@ -1122,7 +1127,10 @@ private fun PanelImage(
             FilledTonalButton(
                 onClick = {
                     actions.share(
-                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                        attachment.storedName,
+                        label,
+                        attachment.mimeType,
+                        attachment.watermarkStyle.takeIf { attachment.watermark },
                     ) { ok ->
                         // The bar sits over everything, including the share sheet.
                         if (ok) onShared()

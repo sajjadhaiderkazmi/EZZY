@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ezzy_settings")
@@ -138,6 +139,15 @@ class SettingsStore(context: Context) {
         store.edit { it[Keys.THEME] = value.name }
     }
 
+    /**
+     * Which revision of the built-in types this install has already been brought up to. Read
+     * once at launch rather than observed — nothing on screen depends on it, it only decides
+     * whether the built-in types need rewriting.
+     */
+    suspend fun seedRevision(): Int = store.data.first()[Keys.SEED_REVISION] ?: 0
+
+    suspend fun setSeedRevision(value: Int) = put(Keys.SEED_REVISION, value)
+
     private suspend fun put(key: Preferences.Key<Boolean>, value: Boolean) {
         store.edit { it[key] = value }
     }
@@ -164,5 +174,6 @@ class SettingsStore(context: Context) {
         val HIDDEN_BAR_SECTIONS = stringSetPreferencesKey("hidden_bar_sections")
         val QUICK_IN_BAR = booleanPreferencesKey("quick_access_in_bar")
         val LOCKED_SECTIONS = stringSetPreferencesKey("locked_sections")
+        val SEED_REVISION = intPreferencesKey("seed_revision")
     }
 }

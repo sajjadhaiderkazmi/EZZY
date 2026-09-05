@@ -55,6 +55,33 @@ data class EditorUiState(
         }
 
     val canSave: Boolean get() = draft.categoryId.isNotBlank() && draft.title.isNotBlank()
+
+    /**
+     * Switching type mid-entry can add or remove the Files step under the user's feet, so the
+     * step they are standing on is re-checked here: if it has just gone away, they land on the
+     * last one that is left rather than on a step the wizard no longer has.
+     */
+    fun withNeedsPhoto(value: Boolean): EditorUiState {
+        val next = stepsFor(
+            hasCategory = steps.none { it == EditorStep.SECTION },
+            needsPhoto = value,
+        )
+        return copy(
+            needsPhoto = value,
+            steps = next,
+            step = if (step in next) step else next.last(),
+        )
+    }
+}
+
+/**
+ * A type that leads with its picture keeps everything on the one screen — its files and its
+ * note included — so there is no second step to walk to for them.
+ */
+internal fun stepsFor(hasCategory: Boolean, needsPhoto: Boolean): List<EditorStep> = buildList {
+    if (!hasCategory) add(EditorStep.SECTION)
+    add(EditorStep.DETAILS)
+    if (!needsPhoto) add(EditorStep.FILES)
 }
 
 class EditorViewModel(
@@ -79,18 +106,18 @@ class EditorViewModel(
             val draft = repository.draftFor(itemId, presetCategoryId.orEmpty())
             // Once the section is known there is nothing left to ask before the form itself:
             // the type is chosen inside it, next to everything it changes.
-            val steps = if (draft.categoryId.isNotBlank()) {
-                listOf(EditorStep.DETAILS, EditorStep.FILES)
-            } else {
-                EditorStep.ordered
-            }
             val spec = draft.templateId?.let { repository.templateSpec(it) }
+            val needsPhoto = spec?.needsPhoto ?: false
+            val steps = stepsFor(
+                hasCategory = draft.categoryId.isNotBlank(),
+                needsPhoto = needsPhoto,
+            )
             _state.value = EditorUiState(
                 draft = draft,
                 steps = steps,
                 step = steps.first(),
                 titleHint = spec?.titleHint?.takeIf { it.isNotBlank() } ?: DEFAULT_TITLE_HINT,
-                needsPhoto = spec?.needsPhoto ?: false,
+                needsPhoto = needsPhoto,
                 loading = false,
             )
         }
@@ -132,7 +159,7 @@ class EditorViewModel(
     fun applyTemplate(template: TemplateEntity?) {
         viewModelScope.launch {
             if (template == null) {
-                update { it.copy(titleHint = DEFAULT_TITLE_HINT, needsPhoto = false) }
+                update { it.withNeedsPhoto(false).copy(titleHint = DEFAULT_TITLE_HINT) }
                 updateDraft { it.copy(templateId = null) }
                 return@launch
             }
@@ -152,10 +179,8 @@ class EditorViewModel(
                     spec.fields.none { it.label.equals(field.label, true) }
             }
             update {
-                it.copy(
-                    titleHint = spec.titleHint.ifBlank { DEFAULT_TITLE_HINT },
-                    needsPhoto = spec.needsPhoto,
-                )
+                it.withNeedsPhoto(spec.needsPhoto)
+                    .copy(titleHint = spec.titleHint.ifBlank { DEFAULT_TITLE_HINT })
             }
             updateDraft { it.copy(templateId = template.id, fields = merged + extras) }
         }

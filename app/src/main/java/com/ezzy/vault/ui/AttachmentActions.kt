@@ -8,7 +8,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.ezzy.vault.appContainer
 import com.ezzy.vault.data.crypto.AttachmentStore
 import com.ezzy.vault.data.db.AttachmentEntity
+import com.ezzy.vault.data.db.watermarkStyle
 import com.ezzy.vault.security.SecureShare
+import com.ezzy.vault.util.WatermarkStyle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -27,7 +29,7 @@ class AttachmentActions internal constructor(
         storedName: String,
         displayName: String,
         mimeType: String,
-        watermark: Boolean = false,
+        watermark: WatermarkStyle? = null,
         onResult: (Boolean) -> Unit = {},
     ) = perform(storedName, displayName, mimeType, watermark, onResult) { uri ->
         SecureShare.copy(context, uri, displayName)
@@ -37,7 +39,7 @@ class AttachmentActions internal constructor(
         storedName: String,
         displayName: String,
         mimeType: String,
-        watermark: Boolean = false,
+        watermark: WatermarkStyle? = null,
         onResult: (Boolean) -> Unit = {},
     ) = perform(storedName, displayName, mimeType, watermark, onResult) { uri ->
         SecureShare.share(context, uri, mimeType)
@@ -48,7 +50,7 @@ class AttachmentActions internal constructor(
         displayName: String,
         mimeType: String,
         onResult: (Boolean) -> Unit = {},
-    ) = perform(storedName, displayName, mimeType, watermark = false, onResult = onResult) { uri ->
+    ) = perform(storedName, displayName, mimeType, watermark = null, onResult = onResult) { uri ->
         SecureShare.open(context, uri, mimeType)
     }
 
@@ -67,7 +69,7 @@ class AttachmentActions internal constructor(
                     storedName = file.storedName,
                     displayName = file.caption.ifBlank { file.displayName },
                     mimeType = file.mimeType,
-                    watermark = file.watermark,
+                    watermark = file.watermarkStyle.takeIf { file.watermark },
                 )
             }
             onResult(uris.isNotEmpty() && SecureShare.copyMultiple(context, uris, "EZZY files"))
@@ -78,7 +80,7 @@ class AttachmentActions internal constructor(
         storedName: String,
         displayName: String,
         mimeType: String,
-        watermark: Boolean,
+        watermark: WatermarkStyle?,
         onResult: (Boolean) -> Unit,
         action: (android.net.Uri) -> Boolean,
     ) {

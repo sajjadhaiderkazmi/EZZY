@@ -214,6 +214,26 @@ interface AttachmentDao {
 
     @Query("UPDATE attachments SET watermark = :enabled WHERE id = :id")
     suspend fun setWatermark(id: String, enabled: Boolean)
+
+    @Query(
+        """
+        UPDATE attachments SET
+            watermarkOpacity = :opacity,
+            watermarkScale = :scale,
+            watermarkX = :offsetX,
+            watermarkY = :offsetY,
+            watermarkColor = :colorKey
+        WHERE id = :id
+        """
+    )
+    suspend fun setWatermarkStyle(
+        id: String,
+        opacity: Int,
+        scale: Int,
+        offsetX: Int,
+        offsetY: Int,
+        colorKey: String,
+    )
 }
 
 @Dao

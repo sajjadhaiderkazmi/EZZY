@@ -25,6 +25,7 @@ import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.data.model.ItemDraft
 import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.data.model.TemplateSpec
+import com.ezzy.vault.util.WatermarkStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -208,6 +209,11 @@ class VaultRepository(
                         sortOrder = index,
                         createdAt = now,
                         watermark = attachment.watermark,
+                        watermarkOpacity = attachment.watermarkStyle.opacity,
+                        watermarkScale = attachment.watermarkStyle.scale,
+                        watermarkX = attachment.watermarkStyle.offsetX,
+                        watermarkY = attachment.watermarkStyle.offsetY,
+                        watermarkColor = attachment.watermarkStyle.colorKey,
                     )
                 }
             )
@@ -231,6 +237,16 @@ class VaultRepository(
 
     suspend fun setAttachmentWatermark(id: String, enabled: Boolean) =
         db.attachmentDao().setWatermark(id, enabled)
+
+    suspend fun setAttachmentWatermarkStyle(id: String, style: WatermarkStyle) =
+        db.attachmentDao().setWatermarkStyle(
+            id = id,
+            opacity = style.opacity,
+            scale = style.scale,
+            offsetX = style.offsetX,
+            offsetY = style.offsetY,
+            colorKey = style.colorKey,
+        )
 
     suspend fun setPinned(id: String, pinned: Boolean) =
         db.itemDao().setPinned(id, pinned, System.currentTimeMillis())
@@ -277,6 +293,7 @@ class VaultRepository(
                     storedName = it.storedName,
                     sizeBytes = it.sizeBytes,
                     watermark = it.watermark,
+                    watermarkStyle = it.watermarkStyle,
                 )
             },
         )
@@ -390,6 +407,32 @@ class VaultRepository(
         }
     }
 
+    /**
+     * Brings the built-in types back in line with the version of the app that is running.
+     *
+     * [seedIfEmpty] writes them exactly once, on the very first launch, and never looks at them
+     * again — so every improvement made to a built-in type since then (a new field, a type that
+     * now leads with its picture) simply never reached a phone that had already been installed.
+     * This is the other half of that: whenever [Seed.REVISION] moves, the built-in rows are
+     * rewritten once, and only then. Types the user made themselves are never touched.
+     */
+    suspend fun refreshBuiltInTemplates() = withContext(Dispatchers.IO) {
+        Seed.templates.forEachIndexed { index, template ->
+            val existing = db.templateDao().getById(template.id)
+            if (existing != null && !existing.isBuiltIn) return@forEachIndexed
+            db.templateDao().upsert(
+                TemplateEntity(
+                    id = template.id,
+                    name = template.name,
+                    iconKey = template.iconKey,
+                    specJson = json.encodeToString(TemplateSpec.serializer(), template.spec),
+                    isBuiltIn = true,
+                    sortOrder = existing?.sortOrder ?: index,
+                )
+            )
+        }
+    }
+
     suspend fun attachmentBytes(storedName: String): ByteArray? = attachments.read(storedName)
 
     // ---- Backup -------------------------------------------------------------
@@ -423,6 +466,11 @@ class VaultRepository(
                     createdAt = attachment.createdAt,
                     data = Base64.getEncoder().encodeToString(bytes),
                     watermark = attachment.watermark,
+                    watermarkOpacity = attachment.watermarkOpacity,
+                    watermarkScale = attachment.watermarkScale,
+                    watermarkX = attachment.watermarkX,
+                    watermarkY = attachment.watermarkY,
+                    watermarkColor = attachment.watermarkColor,
                 )
             }
             val iconPhotoData = entry.item.iconPhoto
@@ -527,6 +575,11 @@ class VaultRepository(
                         sortOrder = backed.sortOrder,
                         createdAt = backed.createdAt,
                         watermark = backed.watermark,
+                        watermarkOpacity = backed.watermarkOpacity,
+                        watermarkScale = backed.watermarkScale,
+                        watermarkX = backed.watermarkX,
+                        watermarkY = backed.watermarkY,
+                        watermarkColor = backed.watermarkColor,
                     )
                 }
 

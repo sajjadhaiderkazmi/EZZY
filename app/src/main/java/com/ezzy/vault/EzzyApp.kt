@@ -8,6 +8,7 @@ import com.ezzy.vault.data.backup.BackupManager
 import com.ezzy.vault.data.crypto.AttachmentStore
 import com.ezzy.vault.data.crypto.DatabaseKey
 import com.ezzy.vault.data.db.EzzyDatabase
+import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.data.repo.VaultRepository
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.security.SecureShare
@@ -52,7 +53,17 @@ class EzzyApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // A keystore or database failure here must not take the launcher icon down with it.
-        container.scope.launch { runCatching { container.repository.seedIfEmpty() } }
+        container.scope.launch {
+            runCatching {
+                container.repository.seedIfEmpty()
+                // Then catch the built-in types up to this build, for the installs that were
+                // seeded long before it. Only ever runs when the seed itself has moved on.
+                if (container.settings.seedRevision() < Seed.REVISION) {
+                    container.repository.refreshBuiltInTemplates()
+                    container.settings.setSeedRevision(Seed.REVISION)
+                }
+            }
+        }
         // A copy or share staged in the previous run is plain bytes sitting in the cache. The
         // receiving app has long since read it, so the first thing this run does is wipe it.
         SecureShare.clear(this)

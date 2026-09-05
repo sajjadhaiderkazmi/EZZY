@@ -1,5 +1,6 @@
 package com.ezzy.vault.data.model
 
+import com.ezzy.vault.util.WatermarkStyle
 import java.util.UUID
 
 /** A field as it is being edited, before it becomes a row. */
@@ -27,6 +28,9 @@ data class AttachmentDraft(
     val sizeBytes: Long,
     /** Stamps "FOR VERIFICATION PURPOSE ONLY" across this picture on Copy or Share. */
     val watermark: Boolean = false,
+    /** Carried through the editor untouched, so re-saving an entry cannot quietly reset a
+     *  stamp the user has already tuned on the entry's own screen. */
+    val watermarkStyle: WatermarkStyle = WatermarkStyle.Default,
 ) {
     val isImage: Boolean get() = mimeType.startsWith("image/")
     val isAudio: Boolean get() = mimeType.startsWith("audio/")

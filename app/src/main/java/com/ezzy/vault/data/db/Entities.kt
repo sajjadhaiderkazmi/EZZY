@@ -6,6 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.ezzy.vault.data.model.FieldType
+import com.ezzy.vault.util.WatermarkStyle
 
 @Entity(tableName = "categories")
 data class CategoryEntity(
@@ -143,4 +144,23 @@ data class AttachmentEntity(
     /** Stamps "FOR VERIFICATION PURPOSE ONLY" across a picture the moment it leaves the vault
      *  via Copy or Share — the file sealed here stays untouched either way. */
     @ColumnInfo(defaultValue = "0") val watermark: Boolean = false,
+    // How that stamp is drawn, once the user has tuned it. Kept as plain columns rather than a
+    // blob so a future screen can sort or search on them without parsing anything.
+    @ColumnInfo(defaultValue = "40") val watermarkOpacity: Int = WatermarkStyle.DEFAULT_OPACITY,
+    @ColumnInfo(defaultValue = "100") val watermarkScale: Int = WatermarkStyle.DEFAULT_SCALE,
+    @ColumnInfo(defaultValue = "0") val watermarkX: Int = 0,
+    @ColumnInfo(defaultValue = "0") val watermarkY: Int = 0,
+    // Quoted: Room drops this into the CREATE TABLE as written, and it has to match the
+    // migration's own DEFAULT 'blue' exactly or opening the database fails the schema check.
+    @ColumnInfo(defaultValue = "'blue'") val watermarkColor: String = WatermarkStyle.DEFAULT_COLOR,
 )
+
+/** The stamp settings this file carries, in the shape the drawing code asks for. */
+val AttachmentEntity.watermarkStyle: WatermarkStyle
+    get() = WatermarkStyle(
+        opacity = watermarkOpacity,
+        scale = watermarkScale,
+        offsetX = watermarkX,
+        offsetY = watermarkY,
+        colorKey = watermarkColor,
+    )

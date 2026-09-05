@@ -28,7 +28,7 @@ class Converters {
         AttachmentEntity::class,
         ItemGroupEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -260,6 +260,17 @@ abstract class EzzyDatabase : RoomDatabase() {
             }
         }
 
+        /** v8 lets that watermark be tuned: opacity, size, position and colour, per file. */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE attachments ADD COLUMN watermarkOpacity INTEGER NOT NULL DEFAULT 40")
+                db.execSQL("ALTER TABLE attachments ADD COLUMN watermarkScale INTEGER NOT NULL DEFAULT 100")
+                db.execSQL("ALTER TABLE attachments ADD COLUMN watermarkX INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE attachments ADD COLUMN watermarkY INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE attachments ADD COLUMN watermarkColor TEXT NOT NULL DEFAULT 'blue'")
+            }
+        }
+
         /**
          * Opens the encrypted database. [passphrase] is consumed (and zeroed) by SQLCipher,
          * so callers must hand over a copy they no longer need.
@@ -272,7 +283,15 @@ abstract class EzzyDatabase : RoomDatabase() {
                 NAME,
             )
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                )
                 .build()
         }
     }

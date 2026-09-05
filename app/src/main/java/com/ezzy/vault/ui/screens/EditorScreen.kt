@@ -651,6 +651,19 @@ private fun DetailsStep(
                 Text("Add a field")
             }
         }
+
+        // These types have no second step to hold it, so the note comes along here.
+        if (state.needsPhoto) {
+            item {
+                OutlinedTextField(
+                    value = draft.note,
+                    onValueChange = viewModel::setNote,
+                    label = { Text("Note (optional)") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 
     if (newField) {
@@ -1286,6 +1299,7 @@ private fun AttachmentEditorRow(
                             .size(56.dp)
                             .clip(RoundedCornerShape(10.dp)),
                         watermark = attachment.watermark,
+                        watermarkStyle = attachment.watermarkStyle,
                     )
                 } else {
                     Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {

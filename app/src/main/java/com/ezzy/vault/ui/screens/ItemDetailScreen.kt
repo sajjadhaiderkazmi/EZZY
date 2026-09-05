@@ -2,6 +2,8 @@ package com.ezzy.vault.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
@@ -27,6 +31,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.EventAvailable
@@ -44,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -75,9 +82,12 @@ import com.ezzy.vault.data.db.AttachmentEntity
 import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.data.db.FieldEntity
 import com.ezzy.vault.data.db.ItemWithDetails
+import com.ezzy.vault.data.db.watermarkStyle
 import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.LocalSnackbar
+import com.ezzy.vault.util.Watermark
+import com.ezzy.vault.util.WatermarkStyle
 import com.ezzy.vault.ui.components.EncryptedImage
 import com.ezzy.vault.ui.components.FieldValueRow
 import com.ezzy.vault.ui.components.SectionHeader
@@ -100,6 +110,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ItemDetailViewModel(
@@ -144,6 +155,10 @@ class ItemDetailViewModel(
 
     fun setAttachmentWatermark(id: String, enabled: Boolean) {
         viewModelScope.launch { container.repository.setAttachmentWatermark(id, enabled) }
+    }
+
+    fun setAttachmentWatermarkStyle(id: String, style: WatermarkStyle) {
+        viewModelScope.launch { container.repository.setAttachmentWatermarkStyle(id, style) }
     }
 }
 
@@ -442,6 +457,16 @@ fun ItemDetailScreen(
                 // not the live one, so it would otherwise sit one tap behind.
                 previewAttachment = attachment.copy(watermark = enabled)
             },
+            onSaveWatermarkStyle = { style ->
+                viewModel.setAttachmentWatermarkStyle(attachment.id, style)
+                previewAttachment = attachment.copy(
+                    watermarkOpacity = style.opacity,
+                    watermarkScale = style.scale,
+                    watermarkX = style.offsetX,
+                    watermarkY = style.offsetY,
+                    watermarkColor = style.colorKey,
+                )
+            },
         )
     }
 
@@ -573,6 +598,7 @@ private fun AttachmentThumb(
                             .fillMaxWidth()
                             .aspectRatio(1f),
                         watermark = attachment.watermark,
+                        watermarkStyle = attachment.watermarkStyle,
                     )
                 } else {
                     // A PDF or a video gets its own mark and colour — a scanned document or a
@@ -648,15 +674,21 @@ private fun AttachmentPreviewDialog(
     attachment: AttachmentEntity,
     onDismiss: () -> Unit,
     onToggleWatermark: (Boolean) -> Unit,
+    onSaveWatermarkStyle: (WatermarkStyle) -> Unit,
 ) {
     val isPdf = attachment.mimeType == "application/pdf"
     val isVideo = attachment.mimeType.startsWith("video/")
+
+    // The sliders move this and the picture above redraws from it on every change; the file
+    // only hears about it once Save is pressed, so an experiment can always be walked back.
+    var style by remember(attachment.id) { mutableStateOf(attachment.watermarkStyle) }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -683,6 +715,7 @@ private fun AttachmentPreviewDialog(
                             .fillMaxWidth()
                             .height(420.dp),
                         watermark = attachment.watermark,
+                        watermarkStyle = style,
                     )
                 } else {
                     Column(
@@ -712,7 +745,13 @@ private fun AttachmentPreviewDialog(
                     }
                 }
 
-                AttachmentActionRow(attachment = attachment, onToggleWatermark = onToggleWatermark)
+                AttachmentActionRow(
+                    attachment = attachment,
+                    style = style,
+                    onToggleWatermark = onToggleWatermark,
+                    onStyleChange = { style = it },
+                    onSaveStyle = { onSaveWatermarkStyle(style) },
+                )
                 Spacer(Modifier.height(6.dp))
             }
         }
@@ -725,7 +764,13 @@ private fun AttachmentPreviewDialog(
  * one-off read grant for that file alone; the vault stays sealed.
  */
 @Composable
-private fun AttachmentActionRow(attachment: AttachmentEntity, onToggleWatermark: (Boolean) -> Unit) {
+private fun AttachmentActionRow(
+    attachment: AttachmentEntity,
+    style: WatermarkStyle,
+    onToggleWatermark: (Boolean) -> Unit,
+    onStyleChange: (WatermarkStyle) -> Unit,
+    onSaveStyle: () -> Unit,
+) {
     val actions = rememberAttachmentActions()
     val isImage = attachment.mimeType.startsWith("image/")
     val label = attachment.caption.ifBlank { attachment.displayName }
@@ -760,6 +805,18 @@ private fun AttachmentActionRow(attachment: AttachmentEntity, onToggleWatermark:
                 }
                 Switch(checked = attachment.watermark, onCheckedChange = onToggleWatermark)
             }
+
+            if (attachment.watermark) {
+                WatermarkCustomizer(
+                    style = style,
+                    onStyleChange = onStyleChange,
+                    onSave = {
+                        onSaveStyle()
+                        status = "Watermark saved"
+                    },
+                )
+                Spacer(Modifier.height(8.dp))
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -771,7 +828,10 @@ private fun AttachmentActionRow(attachment: AttachmentEntity, onToggleWatermark:
                 modifier = Modifier.weight(1f),
                 onClick = {
                     actions.copy(
-                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                        attachment.storedName,
+                        label,
+                        attachment.mimeType,
+                        style.takeIf { attachment.watermark },
                     ) { ok ->
                         status = if (ok) "Copied — paste it in any app" else "Could not copy it"
                     }
@@ -783,7 +843,10 @@ private fun AttachmentActionRow(attachment: AttachmentEntity, onToggleWatermark:
                 modifier = Modifier.weight(1f),
                 onClick = {
                     actions.share(
-                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                        attachment.storedName,
+                        label,
+                        attachment.mimeType,
+                        style.takeIf { attachment.watermark },
                     ) { ok ->
                         if (!ok) status = "No app on this phone can receive it"
                     }
@@ -812,6 +875,143 @@ private fun AttachmentActionRow(attachment: AttachmentEntity, onToggleWatermark:
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/**
+ * The watermark's own controls, folded away behind "Customize" until they are wanted. Every
+ * change redraws the picture directly above, so the stamp is placed by looking at it rather
+ * than by guessing at numbers — and only Save writes any of it to the file.
+ */
+@Composable
+private fun WatermarkCustomizer(
+    style: WatermarkStyle,
+    onStyleChange: (WatermarkStyle) -> Unit,
+    onSave: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .clickable { expanded = !expanded }
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Customize",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) "Hide watermark settings"
+                else "Show watermark settings",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        if (expanded) {
+            WatermarkSlider(
+                label = "Opacity",
+                value = style.opacity,
+                range = WatermarkStyle.MIN_OPACITY..WatermarkStyle.MAX_OPACITY,
+                display = "${style.opacity}%",
+                onChange = { onStyleChange(style.copy(opacity = it)) },
+            )
+            WatermarkSlider(
+                label = "Size",
+                value = style.scale,
+                range = WatermarkStyle.MIN_SCALE..WatermarkStyle.MAX_SCALE,
+                display = "${style.scale}%",
+                onChange = { onStyleChange(style.copy(scale = it)) },
+            )
+            WatermarkSlider(
+                label = "Position X",
+                value = style.offsetX,
+                range = -WatermarkStyle.MAX_OFFSET..WatermarkStyle.MAX_OFFSET,
+                display = "${style.offsetX}",
+                onChange = { onStyleChange(style.copy(offsetX = it)) },
+            )
+            WatermarkSlider(
+                label = "Position Y",
+                value = style.offsetY,
+                range = -WatermarkStyle.MAX_OFFSET..WatermarkStyle.MAX_OFFSET,
+                display = "${style.offsetY}",
+                onChange = { onStyleChange(style.copy(offsetY = it)) },
+            )
+
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Colour",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Watermark.colors.forEach { (key, argb) ->
+                    val chosen = key == style.colorKey
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(argb))
+                            .border(
+                                width = if (chosen) 3.dp else 1.dp,
+                                color = if (chosen) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant,
+                                shape = CircleShape,
+                            )
+                            .clickable { onStyleChange(style.copy(colorKey = key)) },
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { onStyleChange(WatermarkStyle.Default) }) { Text("Reset") }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = onSave) { Text("Save") }
+            }
+        }
+    }
+}
+
+/** One labelled slider, stepped in whole numbers — the values here are all percentages. */
+@Composable
+private fun WatermarkSlider(
+    label: String,
+    value: Int,
+    range: IntRange,
+    display: String,
+    onChange: (Int) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = display,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+        )
     }
 }
 

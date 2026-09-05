@@ -19,6 +19,15 @@ data class SeedCategory(
 object Seed {
 
     /**
+     * Bumped whenever anything below changes. The built-in types are written to the database on
+     * the first launch and would otherwise stay frozen at whatever shipped that day, so a phone
+     * installed months ago keeps types the app itself has long since moved on from. Moving this
+     * number rewrites the built-in rows once, on the next launch; types the user made are left
+     * exactly as they are.
+     */
+    const val REVISION = 2
+
+    /**
      * Entry types the floating bar re-checks with a fingerprint before showing, even when the
      * vault is already open. A password or an ID number on screen over someone else's app is
      * the case worth one extra tap; a phone number is not.

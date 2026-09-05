@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ezzy.vault.appContainer
 import com.ezzy.vault.util.Watermark
+import com.ezzy.vault.util.WatermarkStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -80,6 +81,7 @@ fun EncryptedImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     watermark: Boolean = false,
+    watermarkStyle: WatermarkStyle = WatermarkStyle.Default,
 ) {
     val bitmap by rememberDecryptedBitmap(storedName)
     val current = bitmap
@@ -98,10 +100,30 @@ fun EncryptedImage(
                             Modifier.drawWithContent {
                                 drawContent()
                                 drawIntoCanvas { canvas ->
+                                    // A picture shown to fit is letterboxed inside this box, so
+                                    // the stamp is placed over the picture itself rather than
+                                    // across the empty bars either side of it.
+                                    val scale = if (
+                                        contentScale == ContentScale.Fit &&
+                                        current.width > 0 &&
+                                        current.height > 0
+                                    ) {
+                                        minOf(
+                                            size.width / current.width,
+                                            size.height / current.height,
+                                        )
+                                    } else {
+                                        0f
+                                    }
+                                    val width = if (scale > 0f) current.width * scale else size.width
+                                    val height = if (scale > 0f) current.height * scale else size.height
                                     Watermark.draw(
-                                        canvas.nativeCanvas,
-                                        size.width.toInt(),
-                                        size.height.toInt(),
+                                        canvas = canvas.nativeCanvas,
+                                        left = (size.width - width) / 2f,
+                                        top = (size.height - height) / 2f,
+                                        width = width,
+                                        height = height,
+                                        style = watermarkStyle,
                                     )
                                 }
                             }

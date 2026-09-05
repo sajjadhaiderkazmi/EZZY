@@ -11,6 +11,7 @@ import androidx.core.content.FileProvider
 import androidx.core.content.getSystemService
 import com.ezzy.vault.data.crypto.AttachmentStore
 import com.ezzy.vault.util.Watermark
+import com.ezzy.vault.util.WatermarkStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -33,8 +34,8 @@ object SecureShare {
 
     /**
      * Decrypts one stored file into the staging folder and returns a grantable URI for it.
-     * [watermark] stamps the staged copy only — the sealed original on disk is never touched,
-     * so switching it back off is always just that.
+     * A non-null [watermark] stamps the staged copy only — the sealed original on disk is
+     * never touched, so switching it back off is always just that.
      */
     suspend fun stage(
         context: Context,
@@ -42,11 +43,11 @@ object SecureShare {
         storedName: String,
         displayName: String,
         mimeType: String,
-        watermark: Boolean = false,
+        watermark: WatermarkStyle? = null,
     ): Uri? = withContext(Dispatchers.IO) {
         val raw = store.read(storedName) ?: return@withContext null
-        val bytes = if (watermark && mimeType.startsWith("image/")) {
-            runCatching { Watermark.apply(raw, mimeType) }.getOrDefault(raw)
+        val bytes = if (watermark != null && mimeType.startsWith("image/")) {
+            runCatching { Watermark.apply(raw, mimeType, watermark) }.getOrDefault(raw)
         } else {
             raw
         }
