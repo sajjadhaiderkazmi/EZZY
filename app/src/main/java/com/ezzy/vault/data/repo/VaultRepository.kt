@@ -19,6 +19,7 @@ import com.ezzy.vault.data.db.ItemGroupEntity
 import com.ezzy.vault.data.db.ItemGroupWithCount
 import com.ezzy.vault.data.db.ItemWithDetails
 import com.ezzy.vault.data.db.TemplateEntity
+import com.ezzy.vault.data.db.watermarkStyle
 import com.ezzy.vault.data.model.AttachmentDraft
 import com.ezzy.vault.data.model.FieldDraft
 import com.ezzy.vault.data.model.FieldType
