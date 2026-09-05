@@ -572,6 +572,7 @@ private fun AttachmentThumb(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f),
+                        watermark = attachment.watermark,
                     )
                 } else {
                     // A PDF or a video gets its own mark and colour — a scanned document or a
@@ -681,6 +682,7 @@ private fun AttachmentPreviewDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(420.dp),
+                        watermark = attachment.watermark,
                     )
                 } else {
                     Column(

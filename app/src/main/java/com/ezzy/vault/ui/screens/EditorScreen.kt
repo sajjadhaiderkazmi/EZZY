@@ -370,10 +370,21 @@ private fun DetailsStep(
     ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
 
     // A CNIC, a passport or a degree arrives as a scan just as often as a photo, so the
-    // document step takes a PDF on the same screen rather than hiding it behind a later step.
-    val pdfPicker = rememberLauncherForActivityResult(
+    // document step takes every attachment type on the same screen — the same buttons as the
+    // Files step — rather than hiding video, audio and generic files behind a later step.
+    val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    val videoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    val audioPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    var recording by remember { mutableStateOf(false) }
 
     val contactPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -502,11 +513,13 @@ private fun DetailsStep(
         if (state.needsPhoto) {
             item {
                 SectionHeader(
-                    text = "Photo or PDF",
+                    text = "Files",
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
 
+            // The same buttons as the Files step, right under the title — a document's proof
+            // is as often a video, a voice note or a plain file as it is a photo or a PDF.
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AttachButton(
@@ -525,34 +538,79 @@ private fun DetailsStep(
                         },
                     )
                     AttachButton(
-                        icon = Icons.Rounded.PictureAsPdf,
-                        label = "PDF",
+                        icon = Icons.Rounded.AttachFile,
+                        label = "File",
                         enabled = !state.importing,
                         modifier = Modifier.weight(1f),
-                        onClick = { runCatching { pdfPicker.launch(PDF_MIME_TYPES) } },
+                        onClick = { runCatching { filePicker.launch(DOCUMENT_MIME_TYPES) } },
+                    )
+                    AttachButton(
+                        icon = Icons.Rounded.Mic,
+                        label = "Voice",
+                        enabled = !state.importing,
+                        modifier = Modifier.weight(1f),
+                        onClick = { recording = true },
                     )
                 }
             }
 
-            val scans = draft.attachments.filter { it.isImage || it.isPdf }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AttachButton(
+                        icon = Icons.Rounded.Videocam,
+                        label = "Video",
+                        enabled = !state.importing,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            runCatching {
+                                videoPicker.launch(
+                                    PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.VideoOnly
+                                    )
+                                )
+                            }
+                        },
+                    )
+                    AttachButton(
+                        icon = Icons.Rounded.AudioFile,
+                        label = "Audio",
+                        enabled = !state.importing,
+                        modifier = Modifier.weight(1f),
+                        onClick = { runCatching { audioPicker.launch(arrayOf("audio/*")) } },
+                    )
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+
+            val scans = draft.attachments
             if (scans.isEmpty()) {
                 item {
                     Text(
-                        text = "Add a photo or a PDF of the document, and write on it what it shows.",
+                        text = "Add a photo, PDF, video, voice note or file, and write on it what it shows.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             items(scans, key = { "scan-" + it.id }) { scan ->
-                AttachmentEditorRow(
-                    attachment = scan,
-                    onCaptionChange = { viewModel.setAttachmentCaption(scan.id, it) },
-                    canCrop = scan.isImage,
-                    onCrop = { cropping = scan.id },
-                    onRemove = { viewModel.removeAttachment(scan.id) },
-                    onToggleWatermark = { viewModel.setAttachmentWatermark(scan.id, it) },
-                )
+                if (scan.isAudio) {
+                    VoiceNoteRow(
+                        storedName = scan.storedName,
+                        displayName = scan.displayName,
+                        trailing = {
+                            DeleteAttachmentButton { viewModel.removeAttachment(scan.id) }
+                        },
+                    )
+                } else {
+                    AttachmentEditorRow(
+                        attachment = scan,
+                        onCaptionChange = { viewModel.setAttachmentCaption(scan.id, it) },
+                        canCrop = scan.isImage,
+                        onCrop = { cropping = scan.id },
+                        onRemove = { viewModel.removeAttachment(scan.id) },
+                        onToggleWatermark = { viewModel.setAttachmentWatermark(scan.id, it) },
+                    )
+                }
             }
         }
 
@@ -617,6 +675,21 @@ private fun DetailsStep(
             onConfirm = { label, type ->
                 renaming = null
                 viewModel.renameField(field.id, label, type)
+            },
+        )
+    }
+
+    if (recording) {
+        VoiceNoteDialog(
+            onCancel = { recording = false },
+            onRecorded = { bytes, seconds ->
+                recording = false
+                val index = draft.attachments.count { it.isAudio } + 1
+                viewModel.addBytesAttachment(
+                    bytes = bytes,
+                    displayName = "Voice note $index (${seconds}s)",
+                    mimeType = VOICE_NOTE_MIME,
+                )
             },
         )
     }
@@ -1212,6 +1285,7 @@ private fun AttachmentEditorRow(
                         modifier = Modifier
                             .size(56.dp)
                             .clip(RoundedCornerShape(10.dp)),
+                        watermark = attachment.watermark,
                     )
                 } else {
                     Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
@@ -1358,9 +1432,6 @@ private data class PickedContact(val name: String, val phone: String)
 // ---- Helpers ----------------------------------------------------------------
 
 private val DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-
-/** What the document step's "PDF" button will accept. */
-private val PDF_MIME_TYPES = arrayOf("application/pdf")
 
 /** What the "File" button will accept: scans, office documents and plain text. */
 private val DOCUMENT_MIME_TYPES = arrayOf(

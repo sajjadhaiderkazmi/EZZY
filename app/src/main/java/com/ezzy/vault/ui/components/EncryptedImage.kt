@@ -18,11 +18,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ezzy.vault.appContainer
+import com.ezzy.vault.util.Watermark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -62,13 +66,20 @@ private fun decodeSampled(bytes: ByteArray): Bitmap? {
     return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
 }
 
-/** Renders a sealed attachment, with a spinner while it decrypts and a fallback if it cannot. */
+/**
+ * Renders a sealed attachment, with a spinner while it decrypts and a fallback if it cannot.
+ * [watermark] draws the same "FOR VERIFICATION PURPOSE ONLY" pattern [Watermark] stamps onto a
+ * Copy or Share, straight onto this composable — so the picture already shows it wherever it's
+ * looked at, not only in the file that leaves the vault. Nothing is written to the decoded
+ * bitmap itself, so this costs nothing beyond one extra draw pass.
+ */
 @Composable
 fun EncryptedImage(
     storedName: String?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
+    watermark: Boolean = false,
 ) {
     val bitmap by rememberDecryptedBitmap(storedName)
     val current = bitmap
@@ -80,7 +91,24 @@ fun EncryptedImage(
             current != null -> Image(
                 bitmap = current.asImageBitmap(),
                 contentDescription = contentDescription,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (watermark) {
+                            Modifier.drawWithContent {
+                                drawContent()
+                                drawIntoCanvas { canvas ->
+                                    Watermark.draw(
+                                        canvas.nativeCanvas,
+                                        size.width.toInt(),
+                                        size.height.toInt(),
+                                    )
+                                }
+                            }
+                        } else {
+                            Modifier
+                        }
+                    ),
                 contentScale = contentScale,
             )
 

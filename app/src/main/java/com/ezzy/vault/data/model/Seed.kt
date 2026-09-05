@@ -69,17 +69,19 @@ object Seed {
                 needsPhoto = true,
             ),
         ),
+        // Document / ID, Affidavit, Receipt, Warranty and Screenshot all share the same shape
+        // now: the scan itself (photo, PDF, video, audio or file, attached right at the top of
+        // this step) carries the actual detail, so the only fields worth typing by hand are the
+        // two dates that drive the "days left" badge on the entry — everything else used to be
+        // a second copy of what the attached document already says.
         SeedTemplate(
             id = "tpl_document",
             name = "Document / ID",
             iconKey = "id_card",
             spec = TemplateSpec(
                 fields = listOf(
-                    TemplateField("Document Name", FieldType.TEXT, "e.g. CNIC, Passport", required = true),
-                    TemplateField("ID Number", FieldType.SECRET, "The number printed on it"),
-                    TemplateField("Issued On", FieldType.DATE, ""),
-                    TemplateField("Expires On", FieldType.DATE, "The entry says how long is left"),
-                    TemplateField("Issued By", FieldType.TEXT, "Authority or office"),
+                    TemplateField("Issue Date", FieldType.DATE, ""),
+                    TemplateField("Expiry Date", FieldType.DATE, "The entry says how long is left"),
                 ),
                 titleHint = "e.g. My CNIC",
                 needsPhoto = true,
@@ -91,12 +93,8 @@ object Seed {
             iconKey = "gavel",
             spec = TemplateSpec(
                 fields = listOf(
-                    TemplateField("Title", FieldType.TEXT, "What this affidavit is for", required = true),
-                    TemplateField("Reference Number", FieldType.TEXT, ""),
-                    TemplateField("Executed On", FieldType.DATE, ""),
-                    TemplateField("Lawyer / Notary", FieldType.TEXT, ""),
-                    TemplateField("Contact Number", FieldType.PHONE, ""),
-                    TemplateField("Summary", FieldType.MULTILINE, "What it says, in your own words"),
+                    TemplateField("Issue Date", FieldType.DATE, ""),
+                    TemplateField("Expiry Date", FieldType.DATE, "The entry says how long is left"),
                 ),
                 titleHint = "e.g. Property Affidavit",
                 needsPhoto = true,
@@ -108,11 +106,8 @@ object Seed {
             iconKey = "receipt",
             spec = TemplateSpec(
                 fields = listOf(
-                    TemplateField("Item / Service", FieldType.TEXT, "What you paid for", required = true),
-                    TemplateField("Amount", FieldType.NUMBER, ""),
-                    TemplateField("Purchased On", FieldType.DATE, ""),
-                    TemplateField("Shop / Vendor", FieldType.TEXT, ""),
-                    TemplateField("Payment Method", FieldType.TEXT, "Cash, card, transfer"),
+                    TemplateField("Issue Date", FieldType.DATE, "When it was purchased"),
+                    TemplateField("Expiry Date", FieldType.DATE, "Return or claim deadline, if any"),
                 ),
                 titleHint = "e.g. AC purchase receipt",
                 needsPhoto = true,
@@ -124,12 +119,8 @@ object Seed {
             iconKey = "warranty",
             spec = TemplateSpec(
                 fields = listOf(
-                    TemplateField("Product", FieldType.TEXT, "e.g. Haier AC 1.5 ton", required = true),
-                    TemplateField("Brand / Model", FieldType.TEXT, ""),
-                    TemplateField("Purchased On", FieldType.DATE, ""),
-                    TemplateField("Warranty Ends", FieldType.DATE, "Reminders use this date"),
-                    TemplateField("Serial Number", FieldType.TEXT, ""),
-                    TemplateField("Support Number", FieldType.PHONE, ""),
+                    TemplateField("Issue Date", FieldType.DATE, "When it was purchased"),
+                    TemplateField("Expiry Date", FieldType.DATE, "Reminders use this date"),
                 ),
                 titleHint = "e.g. Haier AC 1.5 ton",
                 needsPhoto = true,
@@ -199,8 +190,8 @@ object Seed {
             iconKey = "image",
             spec = TemplateSpec(
                 fields = listOf(
-                    TemplateField("Title", FieldType.TEXT, "What this shows", required = true),
-                    TemplateField("Note", FieldType.MULTILINE, ""),
+                    TemplateField("Issue Date", FieldType.DATE, ""),
+                    TemplateField("Expiry Date", FieldType.DATE, "The entry says how long is left"),
                 ),
                 titleHint = "e.g. Payment confirmation",
                 needsPhoto = true,

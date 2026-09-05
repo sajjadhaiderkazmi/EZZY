@@ -1097,6 +1097,7 @@ private fun PanelImage(
                 .fillMaxWidth()
                 .height(150.dp)
                 .clip(RoundedCornerShape(12.dp)),
+            watermark = attachment.watermark,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilledTonalButton(
