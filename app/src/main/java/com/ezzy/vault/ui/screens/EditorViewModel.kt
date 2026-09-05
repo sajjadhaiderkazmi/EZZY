@@ -340,6 +340,14 @@ class EditorViewModel(
         )
     }
 
+    fun setAttachmentWatermark(id: String, enabled: Boolean) = updateDraft { draft ->
+        draft.copy(
+            attachments = draft.attachments.map {
+                if (it.id == id) it.copy(watermark = enabled) else it
+            }
+        )
+    }
+
     fun removeAttachment(id: String) {
         val target = _state.value.draft.attachments.firstOrNull { it.id == id } ?: return
         updateDraft { draft -> draft.copy(attachments = draft.attachments.filterNot { it.id == id }) }

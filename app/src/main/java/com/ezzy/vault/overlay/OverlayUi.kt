@@ -1101,7 +1101,9 @@ private fun PanelImage(
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilledTonalButton(
                 onClick = {
-                    actions.copy(attachment.storedName, label, attachment.mimeType) { ok ->
+                    actions.copy(
+                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                    ) { ok ->
                         if (ok) onCopied()
                     }
                 },
@@ -1118,7 +1120,9 @@ private fun PanelImage(
             }
             FilledTonalButton(
                 onClick = {
-                    actions.share(attachment.storedName, label, attachment.mimeType) { ok ->
+                    actions.share(
+                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                    ) { ok ->
                         // The bar sits over everything, including the share sheet.
                         if (ok) onShared()
                     }

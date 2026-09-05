@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Crop
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -67,6 +69,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -548,6 +551,7 @@ private fun DetailsStep(
                     canCrop = scan.isImage,
                     onCrop = { cropping = scan.id },
                     onRemove = { viewModel.removeAttachment(scan.id) },
+                    onToggleWatermark = { viewModel.setAttachmentWatermark(scan.id, it) },
                 )
             }
         }
@@ -1012,6 +1016,17 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
         ActivityResultContracts.OpenDocument()
     ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
 
+    // A recorded voice note is one thing; a clip or a track already sitting on the phone is
+    // another — the "File" button's own list deliberately leaves both out, so each gets its
+    // own picker instead of getting lost in a document chooser that wasn't built for them.
+    val videoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    val audioPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1051,6 +1066,34 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
         }
 
         item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AttachButton(
+                    icon = Icons.Rounded.Videocam,
+                    label = "Video",
+                    enabled = !state.importing,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        runCatching {
+                            videoPicker.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.VideoOnly
+                                )
+                            )
+                        }
+                    },
+                )
+                AttachButton(
+                    icon = Icons.Rounded.AudioFile,
+                    label = "Audio",
+                    enabled = !state.importing,
+                    modifier = Modifier.weight(1f),
+                    onClick = { runCatching { audioPicker.launch(arrayOf("audio/*")) } },
+                )
+                Spacer(Modifier.weight(1f))
+            }
+        }
+
+        item {
             Text(
                 text = "Files are encrypted with a key held in this phone's secure hardware and " +
                     "stored inside the app — never in your gallery.",
@@ -1077,6 +1120,9 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
                         canCrop = attachment.isImage,
                         onCrop = { cropping = attachment.id },
                         onRemove = { viewModel.removeAttachment(attachment.id) },
+                        onToggleWatermark = {
+                            viewModel.setAttachmentWatermark(attachment.id, it)
+                        },
                     )
                 }
             }
@@ -1150,6 +1196,7 @@ private fun AttachmentEditorRow(
     canCrop: Boolean,
     onCrop: () -> Unit,
     onRemove: () -> Unit,
+    onToggleWatermark: (Boolean) -> Unit,
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
@@ -1169,8 +1216,11 @@ private fun AttachmentEditorRow(
                 } else {
                     Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = if (attachment.isPdf) Icons.Rounded.PictureAsPdf
-                            else Icons.Rounded.Description,
+                            imageVector = when {
+                                attachment.isPdf -> Icons.Rounded.PictureAsPdf
+                                attachment.isVideo -> Icons.Rounded.Videocam
+                                else -> Icons.Rounded.Description
+                            },
                             contentDescription = null,
                             tint = if (attachment.isPdf) MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1213,6 +1263,26 @@ private fun AttachmentEditorRow(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Only a picture can carry a visible stamp — hidden here so the switch never sits
+            // beside a PDF, video or audio row where it would silently do nothing.
+            if (attachment.isImage) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Watermark", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "\"FOR VERIFICATION PURPOSE ONLY\" on Copy and Share",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = attachment.watermark, onCheckedChange = onToggleWatermark)
+                }
+            }
         }
     }
 }

@@ -207,6 +207,7 @@ class VaultRepository(
                         sizeBytes = attachment.sizeBytes,
                         sortOrder = index,
                         createdAt = now,
+                        watermark = attachment.watermark,
                     )
                 }
             )
@@ -220,6 +221,16 @@ class VaultRepository(
         db.itemDao().deleteById(id)
         sweepOrphanFiles()
     }
+
+    /** Removes one or more files from an already-saved entry — the bulk "Delete" a multi-select
+     *  offers, without walking the whole entry through the editor just to drop a few photos. */
+    suspend fun deleteAttachments(ids: Set<String>) {
+        ids.forEach { db.attachmentDao().deleteById(it) }
+        sweepOrphanFiles()
+    }
+
+    suspend fun setAttachmentWatermark(id: String, enabled: Boolean) =
+        db.attachmentDao().setWatermark(id, enabled)
 
     suspend fun setPinned(id: String, pinned: Boolean) =
         db.itemDao().setPinned(id, pinned, System.currentTimeMillis())
@@ -265,6 +276,7 @@ class VaultRepository(
                     mimeType = it.mimeType,
                     storedName = it.storedName,
                     sizeBytes = it.sizeBytes,
+                    watermark = it.watermark,
                 )
             },
         )
@@ -410,6 +422,7 @@ class VaultRepository(
                     sortOrder = attachment.sortOrder,
                     createdAt = attachment.createdAt,
                     data = Base64.getEncoder().encodeToString(bytes),
+                    watermark = attachment.watermark,
                 )
             }
             val iconPhotoData = entry.item.iconPhoto
@@ -513,6 +526,7 @@ class VaultRepository(
                         sizeBytes = stored.sizeBytes,
                         sortOrder = backed.sortOrder,
                         createdAt = backed.createdAt,
+                        watermark = backed.watermark,
                     )
                 }
 

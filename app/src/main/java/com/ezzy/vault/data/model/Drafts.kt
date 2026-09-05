@@ -25,9 +25,12 @@ data class AttachmentDraft(
     val mimeType: String,
     val storedName: String,
     val sizeBytes: Long,
+    /** Stamps "FOR VERIFICATION PURPOSE ONLY" across this picture on Copy or Share. */
+    val watermark: Boolean = false,
 ) {
     val isImage: Boolean get() = mimeType.startsWith("image/")
     val isAudio: Boolean get() = mimeType.startsWith("audio/")
+    val isVideo: Boolean get() = mimeType.startsWith("video/")
     val isPdf: Boolean get() = mimeType == "application/pdf"
 }
 

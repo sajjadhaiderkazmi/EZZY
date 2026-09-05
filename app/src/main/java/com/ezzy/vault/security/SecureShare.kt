@@ -10,6 +10,7 @@ import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.core.content.getSystemService
 import com.ezzy.vault.data.crypto.AttachmentStore
+import com.ezzy.vault.util.Watermark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -30,15 +31,25 @@ object SecureShare {
 
     private const val DIR = "shared"
 
-    /** Decrypts one stored file into the staging folder and returns a grantable URI for it. */
+    /**
+     * Decrypts one stored file into the staging folder and returns a grantable URI for it.
+     * [watermark] stamps the staged copy only — the sealed original on disk is never touched,
+     * so switching it back off is always just that.
+     */
     suspend fun stage(
         context: Context,
         store: AttachmentStore,
         storedName: String,
         displayName: String,
         mimeType: String,
+        watermark: Boolean = false,
     ): Uri? = withContext(Dispatchers.IO) {
-        val bytes = store.read(storedName) ?: return@withContext null
+        val raw = store.read(storedName) ?: return@withContext null
+        val bytes = if (watermark && mimeType.startsWith("image/")) {
+            runCatching { Watermark.apply(raw, mimeType) }.getOrDefault(raw)
+        } else {
+            raw
+        }
         val dir = File(context.cacheDir, DIR)
         if (!dir.exists() && !dir.mkdirs()) return@withContext null
 
@@ -60,6 +71,20 @@ object SecureShare {
             ?: return false
         return runCatching {
             manager.setPrimaryClip(ClipData.newUri(context.contentResolver, label, uri))
+            true
+        }.getOrDefault(false)
+    }
+
+    /** The multi-select "Copy" — every staged file lands on the clipboard as one clip with
+     *  several items, rather than only the last one winning. */
+    fun copyMultiple(context: Context, uris: List<Uri>, label: String): Boolean {
+        if (uris.isEmpty()) return false
+        val manager = context.applicationContext.getSystemService<ClipboardManager>()
+            ?: return false
+        return runCatching {
+            val clip = ClipData.newUri(context.contentResolver, label, uris.first())
+            uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+            manager.setPrimaryClip(clip)
             true
         }.getOrDefault(false)
     }

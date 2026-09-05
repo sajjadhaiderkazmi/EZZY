@@ -1,7 +1,8 @@
 package com.ezzy.vault.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +45,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -51,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +77,7 @@ import com.ezzy.vault.data.db.FieldEntity
 import com.ezzy.vault.data.db.ItemWithDetails
 import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.ui.LocalSettings
+import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.components.EncryptedImage
 import com.ezzy.vault.ui.components.FieldValueRow
 import com.ezzy.vault.ui.components.SectionHeader
@@ -129,6 +135,16 @@ class ItemDetailViewModel(
             onDone()
         }
     }
+
+    /** The bulk "Delete" a multi-select of this entry's own files offers. */
+    fun deleteAttachments(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch { container.repository.deleteAttachments(ids) }
+    }
+
+    fun setAttachmentWatermark(id: String, enabled: Boolean) {
+        viewModelScope.launch { container.repository.setAttachmentWatermark(id, enabled) }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,11 +162,21 @@ fun ItemDetailScreen(
     val templateName by viewModel.templateName.collectAsStateWithLifecycle()
     val settings = LocalSettings.current
     val copy = rememberCopier()
+    val fileActions = rememberAttachmentActions()
+    val snackbar = LocalSnackbar.current
+    val scope = rememberCoroutineScope()
 
     var confirmDelete by remember { mutableStateOf(false) }
     var previewAttachment by remember { mutableStateOf<AttachmentEntity?>(null) }
 
+    // Long-pressing a file turns the row into a multi-select — a plain tap toggles from then
+    // on, until the selection is cleared, the same gesture pattern the app already uses for a
+    // section's own cards. Cleared whenever the entry itself changes so a stale id can't linger.
+    var selectedFileIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var confirmDeleteFiles by remember { mutableStateOf(false) }
+
     val details = item
+    LaunchedEffect(details?.item?.id) { selectedFileIds = emptySet() }
 
     Scaffold(
         topBar = {
@@ -332,17 +358,49 @@ fun ItemDetailScreen(
 
             if (files.isNotEmpty()) {
                 item {
-                    SectionHeader(
-                        text = "Files (${files.size})",
-                        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
-                    )
+                    if (selectedFileIds.isNotEmpty()) {
+                        FileSelectionBar(
+                            count = selectedFileIds.size,
+                            onCopy = {
+                                val selected = files.filter { it.id in selectedFileIds }
+                                fileActions.copyMultiple(selected) { ok ->
+                                    scope.launch {
+                                        snackbar.showSnackbar(
+                                            if (ok) "Copied — paste in any app" else "Could not copy them"
+                                        )
+                                    }
+                                }
+                                selectedFileIds = emptySet()
+                            },
+                            onDelete = { confirmDeleteFiles = true },
+                            onCancel = { selectedFileIds = emptySet() },
+                        )
+                    } else {
+                        SectionHeader(
+                            text = "Files (${files.size})",
+                            modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+                        )
+                    }
                 }
                 item {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(files, key = { it.id }) { attachment ->
                             AttachmentThumb(
                                 attachment = attachment,
-                                onClick = { previewAttachment = attachment },
+                                selected = attachment.id in selectedFileIds,
+                                selectionMode = selectedFileIds.isNotEmpty(),
+                                onClick = {
+                                    if (selectedFileIds.isNotEmpty()) {
+                                        selectedFileIds = if (attachment.id in selectedFileIds) {
+                                            selectedFileIds - attachment.id
+                                        } else {
+                                            selectedFileIds + attachment.id
+                                        }
+                                    } else {
+                                        previewAttachment = attachment
+                                    }
+                                },
+                                onLongClick = { selectedFileIds = selectedFileIds + attachment.id },
                             )
                         }
                     }
@@ -375,7 +433,16 @@ fun ItemDetailScreen(
     }
 
     previewAttachment?.let { attachment ->
-        AttachmentPreviewDialog(attachment = attachment, onDismiss = { previewAttachment = null })
+        AttachmentPreviewDialog(
+            attachment = attachment,
+            onDismiss = { previewAttachment = null },
+            onToggleWatermark = { enabled ->
+                viewModel.setAttachmentWatermark(attachment.id, enabled)
+                // Keeps the open dialog's own switch in sync — it holds a snapshot of the row,
+                // not the live one, so it would otherwise sit one tap behind.
+                previewAttachment = attachment.copy(watermark = enabled)
+            },
+        )
     }
 
     if (confirmDelete) {
@@ -398,6 +465,66 @@ fun ItemDetailScreen(
             },
         )
     }
+
+    if (confirmDeleteFiles) {
+        val count = selectedFileIds.size
+        AlertDialog(
+            onDismissRequest = { confirmDeleteFiles = false },
+            title = { Text(if (count == 1) "Delete this file?" else "Delete $count files?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDeleteFiles = false
+                        viewModel.deleteAttachments(selectedFileIds)
+                        selectedFileIds = emptySet()
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteFiles = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+/** The bar that replaces the "Files" header once one or more of an entry's own files is
+ *  long-pressed into a multi-select — the same Copy and Delete a single file already offers,
+ *  just for as many as are picked. */
+@Composable
+private fun FileSelectionBar(
+    count: Int,
+    onCopy: () -> Unit,
+    onDelete: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$count selected",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onCopy) {
+            Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy selected files")
+        }
+        IconButton(onClick = onDelete) {
+            Icon(
+                imageVector = Icons.Rounded.Delete,
+                contentDescription = "Delete selected files",
+                tint = MaterialTheme.colorScheme.error,
+            )
+        }
+        IconButton(onClick = onCancel) {
+            Icon(Icons.Rounded.Close, contentDescription = "Cancel selection")
+        }
+    }
 }
 
 /** Small translucent pill for the category/type labels sitting on the gradient banner. */
@@ -416,68 +543,113 @@ private fun HeroChip(text: String) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AttachmentThumb(attachment: AttachmentEntity, onClick: () -> Unit) {
+private fun AttachmentThumb(
+    attachment: AttachmentEntity,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val isImage = attachment.mimeType.startsWith("image/")
     val isPdf = attachment.mimeType == "application/pdf"
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.width(124.dp),
-    ) {
-        Column(modifier = Modifier.clickable(onClick = onClick)) {
-            if (isImage) {
-                EncryptedImage(
-                    storedName = attachment.storedName,
-                    contentDescription = attachment.displayName,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                )
-            } else {
-                // A PDF gets its own mark and the red everyone already reads as "PDF" — a
-                // scanned document is the common case here, and a generic page icon made every
-                // file look the same.
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        imageVector = if (isPdf) Icons.Rounded.PictureAsPdf
-                        else Icons.Rounded.Description,
-                        contentDescription = null,
-                        modifier = Modifier.size(34.dp),
-                        tint = if (isPdf) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+    val isVideo = attachment.mimeType.startsWith("video/")
+    Box(modifier = Modifier.width(124.dp)) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = if (selected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            ) {
+                if (isImage) {
+                    EncryptedImage(
+                        storedName = attachment.storedName,
+                        contentDescription = attachment.displayName,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
                     )
-                    if (isPdf) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "PDF",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
+                } else {
+                    // A PDF or a video gets its own mark and colour — a scanned document or a
+                    // clip is the common case here, and a generic page icon made every file
+                    // look the same.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = when {
+                                isPdf -> Icons.Rounded.PictureAsPdf
+                                isVideo -> Icons.Rounded.Videocam
+                                else -> Icons.Rounded.Description
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(34.dp),
+                            tint = if (isPdf) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (isPdf) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "PDF",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
+                Text(
+                    text = attachment.caption.ifBlank { attachment.displayName },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                )
             }
-            Text(
-                text = attachment.caption.ifBlank { attachment.displayName },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            )
+        }
+
+        if (selectionMode) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary
+                        else Color.Black.copy(alpha = 0.35f)
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () -> Unit) {
+private fun AttachmentPreviewDialog(
+    attachment: AttachmentEntity,
+    onDismiss: () -> Unit,
+    onToggleWatermark: (Boolean) -> Unit,
+) {
     val isPdf = attachment.mimeType == "application/pdf"
+    val isVideo = attachment.mimeType.startsWith("video/")
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = MaterialTheme.shapes.large,
@@ -519,8 +691,11 @@ private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () 
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Icon(
-                            imageVector = if (isPdf) Icons.Rounded.PictureAsPdf
-                            else Icons.Rounded.Description,
+                            imageVector = when {
+                                isPdf -> Icons.Rounded.PictureAsPdf
+                                isVideo -> Icons.Rounded.Videocam
+                                else -> Icons.Rounded.Description
+                            },
                             contentDescription = null,
                             modifier = Modifier.size(46.dp),
                             tint = if (isPdf) MaterialTheme.colorScheme.error
@@ -535,7 +710,7 @@ private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () 
                     }
                 }
 
-                AttachmentActionRow(attachment = attachment)
+                AttachmentActionRow(attachment = attachment, onToggleWatermark = onToggleWatermark)
                 Spacer(Modifier.height(6.dp))
             }
         }
@@ -548,7 +723,7 @@ private fun AttachmentPreviewDialog(attachment: AttachmentEntity, onDismiss: () 
  * one-off read grant for that file alone; the vault stays sealed.
  */
 @Composable
-private fun AttachmentActionRow(attachment: AttachmentEntity) {
+private fun AttachmentActionRow(attachment: AttachmentEntity, onToggleWatermark: (Boolean) -> Unit) {
     val actions = rememberAttachmentActions()
     val isImage = attachment.mimeType.startsWith("image/")
     val label = attachment.caption.ifBlank { attachment.displayName }
@@ -564,6 +739,26 @@ private fun AttachmentActionRow(attachment: AttachmentEntity) {
     }
 
     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        // Only a picture can carry the pattern — a switch here that did nothing for a PDF or a
+        // video would just be confusing.
+        if (isImage) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Watermark", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = "\"FOR VERIFICATION PURPOSE ONLY\" on Copy and Share",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = attachment.watermark, onCheckedChange = onToggleWatermark)
+            }
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -573,7 +768,9 @@ private fun AttachmentActionRow(attachment: AttachmentEntity) {
                 label = "Copy",
                 modifier = Modifier.weight(1f),
                 onClick = {
-                    actions.copy(attachment.storedName, label, attachment.mimeType) { ok ->
+                    actions.copy(
+                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                    ) { ok ->
                         status = if (ok) "Copied — paste it in any app" else "Could not copy it"
                     }
                 },
@@ -583,7 +780,9 @@ private fun AttachmentActionRow(attachment: AttachmentEntity) {
                 label = "Share",
                 modifier = Modifier.weight(1f),
                 onClick = {
-                    actions.share(attachment.storedName, label, attachment.mimeType) { ok ->
+                    actions.share(
+                        attachment.storedName, label, attachment.mimeType, attachment.watermark,
+                    ) { ok ->
                         if (!ok) status = "No app on this phone can receive it"
                     }
                 },

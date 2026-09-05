@@ -211,6 +211,9 @@ interface AttachmentDao {
 
     @Query("DELETE FROM attachments WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("UPDATE attachments SET watermark = :enabled WHERE id = :id")
+    suspend fun setWatermark(id: String, enabled: Boolean)
 }
 
 @Dao

@@ -61,6 +61,7 @@ data class BackupAttachment(
     val createdAt: Long,
     /** Base64 of the file's decrypted bytes — the whole reason the export needs a password. */
     val data: String,
+    val watermark: Boolean = false,
 )
 
 @Serializable

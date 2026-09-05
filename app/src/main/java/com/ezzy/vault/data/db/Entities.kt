@@ -140,4 +140,7 @@ data class AttachmentEntity(
     val sizeBytes: Long,
     val sortOrder: Int,
     val createdAt: Long,
+    /** Stamps "FOR VERIFICATION PURPOSE ONLY" across a picture the moment it leaves the vault
+     *  via Copy or Share — the file sealed here stays untouched either way. */
+    @ColumnInfo(defaultValue = "0") val watermark: Boolean = false,
 )
