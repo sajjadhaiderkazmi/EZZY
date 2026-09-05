@@ -27,6 +27,13 @@ interface CategoryDao {
     )
     fun observeAllWithCounts(): Flow<List<CategoryWithCount>>
 
+    /** The sections the user has put in Quick access. */
+    @Query("SELECT * FROM categories WHERE isPinned = 1 ORDER BY sortOrder ASC, name ASC")
+    fun observePinned(): Flow<List<CategoryEntity>>
+
+    @Query("UPDATE categories SET isPinned = :pinned WHERE id = :id")
+    suspend fun setPinned(id: String, pinned: Boolean)
+
     @Query("SELECT * FROM categories WHERE id = :id")
     fun observeById(id: String): Flow<CategoryEntity?>
 
@@ -214,6 +221,23 @@ interface ItemGroupDao {
         """
     )
     fun observeAllWithCounts(categoryId: String): Flow<List<ItemGroupWithCount>>
+
+    /** Every group in the vault, whichever section it belongs to. */
+    @Query(
+        """
+        SELECT g.*, (SELECT COUNT(*) FROM items i WHERE i.groupId = g.id) AS itemCount
+        FROM item_groups g
+        ORDER BY g.sortOrder ASC, g.name ASC
+        """
+    )
+    fun observeEveryGroupWithCounts(): Flow<List<ItemGroupWithCount>>
+
+    /** The groups the user has put in Quick access. */
+    @Query("SELECT * FROM item_groups WHERE isPinned = 1 ORDER BY sortOrder ASC, name ASC")
+    fun observePinned(): Flow<List<ItemGroupEntity>>
+
+    @Query("UPDATE item_groups SET isPinned = :pinned WHERE id = :id")
+    suspend fun setPinned(id: String, pinned: Boolean)
 
     @Query("SELECT * FROM item_groups WHERE id = :id")
     fun observeById(id: String): Flow<ItemGroupEntity?>

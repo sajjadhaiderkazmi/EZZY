@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CreateNewFolder
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Home
@@ -69,11 +68,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.ezzy.vault.AppContainer
+import com.ezzy.vault.data.db.CategoryEntity
 import com.ezzy.vault.data.db.CategoryWithCount
+import com.ezzy.vault.data.db.ItemGroupEntity
 import com.ezzy.vault.data.db.ItemWithDetails
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.ui.components.EmptyState
+import com.ezzy.vault.ui.components.GROUP_ICON_KEY
 import com.ezzy.vault.ui.components.IconAvatar
+import com.ezzy.vault.ui.components.QuickKind
+import com.ezzy.vault.ui.components.QuickTarget
 import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.components.StatCard
 import com.ezzy.vault.ui.icons.EzzyMark
@@ -93,6 +97,12 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pinned: StateFlow<List<ItemWithDetails>> = repository.observePinned()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val pinnedCategories: StateFlow<List<CategoryEntity>> = repository.observePinnedCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val pinnedGroups: StateFlow<List<ItemGroupEntity>> = repository.observePinnedGroups()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val recent: StateFlow<List<ItemWithDetails>> = repository.observeRecent()
@@ -118,7 +128,8 @@ fun HomeScreen(
     settings: EzzySettings,
     onOpenCategory: (String) -> Unit,
     onOpenItem: (String) -> Unit,
-    onOpenQuickAccessEdit: () -> Unit,
+    onOpenGroup: (String) -> Unit,
+    onOpenQuickAccess: () -> Unit,
     onAddItem: () -> Unit,
     onAddCategory: () -> Unit,
     onOpenSearch: () -> Unit,
@@ -127,14 +138,58 @@ fun HomeScreen(
     val viewModel: HomeViewModel = ezzyViewModel { HomeViewModel(it) }
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val pinned by viewModel.pinned.collectAsStateWithLifecycle()
+    val pinnedCategories by viewModel.pinnedCategories.collectAsStateWithLifecycle()
+    val pinnedGroups by viewModel.pinnedGroups.collectAsStateWithLifecycle()
     val recent by viewModel.recent.collectAsStateWithLifecycle()
     val itemCount by viewModel.itemCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val canUseBiometrics = remember { AppLock.canAuthenticate(context) }
 
-    val quickAccess = (pinned + recent.filterNot { r -> pinned.any { it.item.id == r.item.id } })
-        .take(8)
     val categoryLookup = categories.associateBy { it.category.id }
+
+    // Quick access holds three different things now — sections, groups and entries — so they
+    // are flattened to one shelf here: whatever was pinned first, then recent entries filling
+    // whatever room is left over.
+    val quickAccess = buildList {
+        pinnedCategories.forEach { section ->
+            add(
+                QuickTarget(
+                    id = section.id,
+                    kind = QuickKind.SECTION,
+                    title = section.name,
+                    subtitle = "",
+                    iconKey = section.iconKey,
+                    colorKey = section.colorKey,
+                )
+            )
+        }
+        pinnedGroups.forEach { group ->
+            add(
+                QuickTarget(
+                    id = group.id,
+                    kind = QuickKind.GROUP,
+                    title = group.name,
+                    subtitle = "",
+                    iconKey = GROUP_ICON_KEY,
+                    // A group borrows its section's colour, so it still reads as part of it.
+                    colorKey = categoryLookup[group.categoryId]?.category?.colorKey,
+                )
+            )
+        }
+        val pinnedEntryIds = pinned.mapTo(mutableSetOf()) { it.item.id }
+        (pinned + recent.filterNot { it.item.id in pinnedEntryIds }).forEach { entry ->
+            add(
+                QuickTarget(
+                    id = entry.item.id,
+                    kind = QuickKind.ENTRY,
+                    title = entry.item.title,
+                    subtitle = "",
+                    iconKey = categoryLookup[entry.item.categoryId]?.category?.iconKey,
+                    colorKey = categoryLookup[entry.item.categoryId]?.category?.colorKey,
+                )
+            )
+        }
+    }.take(8)
 
     // Sections can be dragged into whatever order the user wants. While a drag is running the
     // grid follows this local list instead of the database, so the cards move under the finger
@@ -271,32 +326,19 @@ fun HomeScreen(
                 }
             }
 
-            // The header (and its edit icon) stays up even with nothing pinned yet — that is
-            // the one way in to pin a first entry, so it can't only appear once one already is.
-            if (itemCount > 0) {
+            // The header stays up even with nothing pinned yet — "See all" is the way in to
+            // pin a first thing, so it can't only appear once something already is.
+            if (itemCount > 0 || categories.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SectionHeader(
                         text = "Quick access",
                         modifier = Modifier.padding(top = 4.dp),
                         trailing = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = onOpenQuickAccessEdit,
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Edit,
-                                        contentDescription = "Edit Quick access",
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                TextButton(
-                                    onClick = onOpenSearch,
-                                    contentPadding = PaddingValues(horizontal = 8.dp),
-                                ) {
-                                    Text("See all", style = MaterialTheme.typography.labelMedium)
-                                }
+                            TextButton(
+                                onClick = onOpenQuickAccess,
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                            ) {
+                                Text("See all", style = MaterialTheme.typography.labelMedium)
                             }
                         },
                     )
@@ -307,12 +349,16 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             contentPadding = PaddingValues(vertical = 2.dp),
                         ) {
-                            items(quickAccess, key = { it.item.id }) { entry ->
+                            items(quickAccess, key = { it.key }) { target ->
                                 QuickAccessCard(
-                                    item = entry,
-                                    iconKey = categoryLookup[entry.item.categoryId]?.category?.iconKey,
-                                    colorKey = categoryLookup[entry.item.categoryId]?.category?.colorKey,
-                                    onClick = { onOpenItem(entry.item.id) },
+                                    target = target,
+                                    onClick = {
+                                        when (target.kind) {
+                                            QuickKind.SECTION -> onOpenCategory(target.id)
+                                            QuickKind.GROUP -> onOpenGroup(target.id)
+                                            QuickKind.ENTRY -> onOpenItem(target.id)
+                                        }
+                                    },
                                 )
                             }
                         }
@@ -320,7 +366,8 @@ fun HomeScreen(
                 } else {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
-                            text = "Nothing pinned yet — tap the edit icon above to add one.",
+                            text = "Nothing here yet — tap \"See all\" to put a section, " +
+                                "group or entry in Quick access.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -543,9 +590,7 @@ private fun CategoryCard(
 
 @Composable
 private fun QuickAccessCard(
-    item: ItemWithDetails,
-    iconKey: String?,
-    colorKey: String?,
+    target: QuickTarget,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -558,12 +603,17 @@ private fun QuickAccessCard(
                 .clickable(onClick = onClick)
                 .padding(12.dp),
         ) {
-            IconAvatar(iconKey = iconKey, colorKey = colorKey, size = 36.dp, iconSize = 18.dp)
+            IconAvatar(
+                iconKey = target.iconKey,
+                colorKey = target.colorKey,
+                size = 36.dp,
+                iconSize = 18.dp,
+            )
             Spacer(Modifier.height(10.dp))
             // Always two lines: a row of cards with nothing under the title would otherwise
             // come out ragged, one card short wherever a name happened to fit on one line.
             Text(
-                text = item.item.title,
+                text = target.title,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 minLines = 2,

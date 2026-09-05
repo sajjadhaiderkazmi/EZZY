@@ -25,6 +25,7 @@ data class BackupCategory(
     val colorKey: String,
     val sortOrder: Int,
     val createdAt: Long,
+    val isPinned: Boolean = false,
 )
 
 @Serializable
@@ -86,6 +87,7 @@ data class BackupItemGroup(
     val name: String,
     val sortOrder: Int,
     val createdAt: Long,
+    val isPinned: Boolean = false,
 )
 
 internal val BackupJson = Json {

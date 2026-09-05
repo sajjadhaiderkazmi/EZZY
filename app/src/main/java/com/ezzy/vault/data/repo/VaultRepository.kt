@@ -65,6 +65,10 @@ class VaultRepository(
             colorKey = colorKey,
             sortOrder = existing?.sortOrder ?: dao.nextSortOrder(),
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            // Renaming a section or changing its icon must never quietly drop it out of
+            // Quick access — this form knows nothing about pinning, so it carries the
+            // existing value straight through.
+            isPinned = existing?.isPinned ?: false,
         )
         dao.upsert(entity)
         return entity.id
@@ -264,6 +268,24 @@ class VaultRepository(
         )
     }
 
+    // ---- Quick access -------------------------------------------------------
+
+    /** The sections the user has put in Quick access. */
+    fun observePinnedCategories(): Flow<List<CategoryEntity>> = db.categoryDao().observePinned()
+
+    /** The groups the user has put in Quick access. */
+    fun observePinnedGroups(): Flow<List<ItemGroupEntity>> = db.itemGroupDao().observePinned()
+
+    /** Every group in the vault, whichever section it belongs to — what the picker lists. */
+    fun observeAllGroups(): Flow<List<ItemGroupWithCount>> =
+        db.itemGroupDao().observeEveryGroupWithCounts()
+
+    suspend fun setCategoryPinned(id: String, pinned: Boolean) =
+        db.categoryDao().setPinned(id, pinned)
+
+    suspend fun setGroupPinned(id: String, pinned: Boolean) =
+        db.itemGroupDao().setPinned(id, pinned)
+
     // ---- Item groups --------------------------------------------------------
 
     /** A section's own top level: entries that have not been dragged into one of its groups. */
@@ -411,14 +433,18 @@ class VaultRepository(
         BackupFile(
             exportedAt = System.currentTimeMillis(),
             categories = categories.map {
-                BackupCategory(it.id, it.name, it.iconKey, it.colorKey, it.sortOrder, it.createdAt)
+                BackupCategory(
+                    it.id, it.name, it.iconKey, it.colorKey, it.sortOrder, it.createdAt, it.isPinned,
+                )
             },
             templates = templates.map {
                 BackupTemplate(it.id, it.name, it.iconKey, it.specJson, it.isBuiltIn, it.sortOrder)
             },
             items = backupItems,
             itemGroups = itemGroups.map {
-                BackupItemGroup(it.id, it.categoryId, it.name, it.sortOrder, it.createdAt)
+                BackupItemGroup(
+                    it.id, it.categoryId, it.name, it.sortOrder, it.createdAt, it.isPinned,
+                )
             },
         )
     }
@@ -440,7 +466,9 @@ class VaultRepository(
         db.withTransaction {
             backup.categories.forEach { c ->
                 db.categoryDao().upsert(
-                    CategoryEntity(c.id, c.name, c.iconKey, c.colorKey, c.sortOrder, c.createdAt)
+                    CategoryEntity(
+                        c.id, c.name, c.iconKey, c.colorKey, c.sortOrder, c.createdAt, c.isPinned,
+                    )
                 )
             }
             backup.templates.forEach { t ->
@@ -452,7 +480,9 @@ class VaultRepository(
             // before items do — an item's groupId is a real foreign key.
             backup.itemGroups.forEach { g ->
                 db.itemGroupDao().upsert(
-                    ItemGroupEntity(g.id, g.categoryId, g.name, g.sortOrder, g.createdAt)
+                    ItemGroupEntity(
+                        g.id, g.categoryId, g.name, g.sortOrder, g.createdAt, g.isPinned,
+                    )
                 )
             }
         }

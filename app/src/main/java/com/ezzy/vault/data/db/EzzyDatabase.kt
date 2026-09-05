@@ -28,7 +28,7 @@ class Converters {
         AttachmentEntity::class,
         ItemGroupEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -229,6 +229,18 @@ abstract class EzzyDatabase : RoomDatabase() {
         }
 
         /**
+         * Quick access grew past entries in v5: a section or a group can sit in it too, so both
+         * carry the same pinned flag an entry already had. Plain column additions with a
+         * default — nothing references them, so no table rebuild is needed here.
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE categories ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE item_groups ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
          * Opens the encrypted database. [passphrase] is consumed (and zeroed) by SQLCipher,
          * so callers must hand over a copy they no longer need.
          */
@@ -240,7 +252,7 @@ abstract class EzzyDatabase : RoomDatabase() {
                 NAME,
             )
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
     }

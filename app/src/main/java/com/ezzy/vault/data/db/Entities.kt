@@ -15,6 +15,8 @@ data class CategoryEntity(
     val colorKey: String,
     val sortOrder: Int,
     val createdAt: Long,
+    /** Whether this section sits in Quick access on the home screen. */
+    @ColumnInfo(defaultValue = "0") val isPinned: Boolean = false,
 )
 
 @Entity(tableName = "templates")
@@ -86,6 +88,8 @@ data class ItemGroupEntity(
     val name: String,
     val sortOrder: Int,
     val createdAt: Long,
+    /** Whether this group sits in Quick access on the home screen. */
+    @ColumnInfo(defaultValue = "0") val isPinned: Boolean = false,
 )
 
 @Entity(

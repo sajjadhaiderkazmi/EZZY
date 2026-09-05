@@ -21,7 +21,7 @@ import com.ezzy.vault.ui.screens.EntryGroupScreen
 import com.ezzy.vault.ui.screens.FloatingBarSettingsScreen
 import com.ezzy.vault.ui.screens.HomeScreen
 import com.ezzy.vault.ui.screens.ItemDetailScreen
-import com.ezzy.vault.ui.screens.QuickAccessEditScreen
+import com.ezzy.vault.ui.screens.QuickAccessScreen
 import com.ezzy.vault.ui.screens.SearchScreen
 import com.ezzy.vault.ui.screens.SecuritySettingsScreen
 import com.ezzy.vault.ui.screens.SectionLocksSettingsScreen
@@ -58,7 +58,8 @@ fun EzzyNavHost(
                 settings = settings,
                 onOpenCategory = { navController.navigate(Routes.category(it)) },
                 onOpenItem = { navController.navigate(Routes.item(it)) },
-                onOpenQuickAccessEdit = { navController.navigate(Routes.QUICK_ACCESS_EDIT) },
+                onOpenGroup = { navController.navigate(Routes.itemGroup(it)) },
+                onOpenQuickAccess = { navController.navigate(Routes.QUICK_ACCESS) },
                 onAddItem = { navController.navigate(Routes.editor()) },
                 onAddCategory = { navController.navigate(Routes.categoryEditor()) },
                 onOpenSearch = { navController.navigate(Routes.SEARCH) },
@@ -81,8 +82,13 @@ fun EzzyNavHost(
             )
         }
 
-        composable(Routes.QUICK_ACCESS_EDIT) {
-            QuickAccessEditScreen(onBack = { navController.popBackStack() })
+        composable(Routes.QUICK_ACCESS) {
+            QuickAccessScreen(
+                onBack = { navController.popBackStack() },
+                onOpenCategory = { navController.navigate(Routes.category(it)) },
+                onOpenGroup = { navController.navigate(Routes.itemGroup(it)) },
+                onOpenItem = { navController.navigate(Routes.item(it)) },
+            )
         }
 
         composable(

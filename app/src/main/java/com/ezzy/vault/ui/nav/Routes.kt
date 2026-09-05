@@ -6,7 +6,7 @@ object Routes {
     const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val TEMPLATES = "templates"
-    const val QUICK_ACCESS_EDIT = "quickAccessEdit"
+    const val QUICK_ACCESS = "quickAccess"
 
     // Settings is a hub; each area below is its own page.
     const val SETTINGS_FLOATING_BAR = "settings/floatingBar"
