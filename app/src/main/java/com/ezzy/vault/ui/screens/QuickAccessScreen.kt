@@ -79,9 +79,6 @@ class QuickAccessViewModel(container: AppContainer) : ViewModel() {
     val items: StateFlow<List<ItemWithDetails>> = repository.observeAllItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val recent: StateFlow<List<ItemWithDetails>> = repository.observeRecent()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     fun setSectionPinned(id: String, pinned: Boolean) {
         viewModelScope.launch { repository.setCategoryPinned(id, pinned) }
     }
@@ -113,7 +110,6 @@ fun QuickAccessScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val groups by viewModel.groups.collectAsStateWithLifecycle()
     val items by viewModel.items.collectAsStateWithLifecycle()
-    val recent by viewModel.recent.collectAsStateWithLifecycle()
 
     var editMode by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -166,7 +162,6 @@ fun QuickAccessScreen(
     val pinnedGroups = groups.filter { it.group.isPinned }
     val pinnedEntries = items.filter { it.item.isPinned }
     val nothingPinned = pinnedSections.isEmpty() && pinnedGroups.isEmpty() && pinnedEntries.isEmpty()
-    val recentUnpinned = recent.filterNot { it.item.isPinned }
 
     Scaffold(
         topBar = {
@@ -287,7 +282,7 @@ fun QuickAccessScreen(
                         )
                     }
                 }
-            } else if (nothingPinned && recentUnpinned.isEmpty()) {
+            } else if (nothingPinned) {
                 item(key = "empty") {
                     EmptyState(
                         icon = Icons.Rounded.PushPin,
@@ -300,16 +295,6 @@ fun QuickAccessScreen(
                     )
                 }
             } else {
-                if (nothingPinned) {
-                    item(key = "nothing-pinned") {
-                        Text(
-                            text = "Nothing pinned yet — tap the edit icon to choose what goes here.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
                 if (pinnedSections.isNotEmpty()) {
                     item(key = "sections-header") { SectionHeader(text = "Sections") }
                     items(pinnedSections, key = { "section-" + it.category.id }) { row ->
@@ -333,25 +318,6 @@ fun QuickAccessScreen(
                 if (pinnedEntries.isNotEmpty()) {
                     item(key = "entries-header") { SectionHeader(text = "Entries") }
                     items(pinnedEntries, key = { "entry-" + it.item.id }) { row ->
-                        QuickRow(
-                            target = entryTarget(row),
-                            onClick = { onOpenItem(row.item.id) },
-                        )
-                    }
-                }
-
-                if (recentUnpinned.isNotEmpty()) {
-                    item(key = "recent-header") {
-                        Column {
-                            SectionHeader(text = "Recent")
-                            Text(
-                                text = "Added here on their own as you open things.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    items(recentUnpinned, key = { "recent-" + it.item.id }) { row ->
                         QuickRow(
                             target = entryTarget(row),
                             onClick = { onOpenItem(row.item.id) },

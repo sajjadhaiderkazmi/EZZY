@@ -105,9 +105,6 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     val pinnedGroups: StateFlow<List<ItemGroupEntity>> = repository.observePinnedGroups()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val recent: StateFlow<List<ItemWithDetails>> = repository.observeRecent()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     val itemCount: StateFlow<Int> = repository.observeItemCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
@@ -140,7 +137,6 @@ fun HomeScreen(
     val pinned by viewModel.pinned.collectAsStateWithLifecycle()
     val pinnedCategories by viewModel.pinnedCategories.collectAsStateWithLifecycle()
     val pinnedGroups by viewModel.pinnedGroups.collectAsStateWithLifecycle()
-    val recent by viewModel.recent.collectAsStateWithLifecycle()
     val itemCount by viewModel.itemCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val canUseBiometrics = remember { AppLock.canAuthenticate(context) }
@@ -148,8 +144,9 @@ fun HomeScreen(
     val categoryLookup = categories.associateBy { it.category.id }
 
     // Quick access holds three different things now — sections, groups and entries — so they
-    // are flattened to one shelf here: whatever was pinned first, then recent entries filling
-    // whatever room is left over.
+    // are flattened to one shelf here. Only what the user actually put there shows up: nothing
+    // arrives on its own, so what is on this shelf always matches what is switched on under
+    // "See all", and taking something off is always possible.
     val quickAccess = buildList {
         pinnedCategories.forEach { section ->
             add(
@@ -176,8 +173,7 @@ fun HomeScreen(
                 )
             )
         }
-        val pinnedEntryIds = pinned.mapTo(mutableSetOf()) { it.item.id }
-        (pinned + recent.filterNot { it.item.id in pinnedEntryIds }).forEach { entry ->
+        pinned.forEach { entry ->
             add(
                 QuickTarget(
                     id = entry.item.id,
@@ -189,7 +185,7 @@ fun HomeScreen(
                 )
             )
         }
-    }.take(8)
+    }
 
     // Sections can be dragged into whatever order the user wants. While a drag is running the
     // grid follows this local list instead of the database, so the cards move under the finger
