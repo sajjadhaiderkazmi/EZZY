@@ -395,16 +395,6 @@ fun HomeScreen(
                 )
             }
 
-            if (order.size > 1) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = "Hold and drag a section to reorder it",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
             if (categories.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
