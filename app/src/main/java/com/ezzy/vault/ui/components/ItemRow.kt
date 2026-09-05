@@ -66,7 +66,13 @@ fun ItemRow(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconAvatar(iconKey = iconKey, colorKey = colorKey, size = 44.dp, iconSize = 22.dp)
+            IconAvatar(
+                iconKey = iconKey,
+                colorKey = colorKey,
+                size = 44.dp,
+                iconSize = 22.dp,
+                photoStoredName = item.item.iconPhoto,
+            )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

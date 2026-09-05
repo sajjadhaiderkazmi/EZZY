@@ -247,6 +247,7 @@ private data class PanelEntry(
     val title: String,
     val fieldCount: Int,
     val categoryId: String,
+    val photoStoredName: String? = null,
 )
 
 /** Where the panel currently is: the rail is always visible, this is what fills the sheet. */
@@ -611,6 +612,7 @@ private fun PanelSheet(
                             title = it.item.title,
                             fieldCount = it.fields.size,
                             categoryId = it.item.categoryId,
+                            photoStoredName = it.item.iconPhoto,
                         )
                     },
                     categoriesById = categories.associateBy { it.id },
@@ -641,6 +643,7 @@ private fun PanelSheet(
                                 title = it.item.title,
                                 fieldCount = it.fields.size,
                                 categoryId = it.item.categoryId,
+                                photoStoredName = it.item.iconPhoto,
                             )
                         },
                         categoriesById = categories.associateBy { it.id },
@@ -861,6 +864,7 @@ private fun PanelEntryList(
                         colorKey = category?.colorKey,
                         size = 34.dp,
                         iconSize = 17.dp,
+                        photoStoredName = entry.photoStoredName,
                     )
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {

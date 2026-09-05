@@ -176,6 +176,7 @@ class VaultRepository(
                     // in belongs to the old one and would otherwise leave the entry invisible in
                     // both sections' grids.
                     groupId = existing?.groupId?.takeIf { existing.categoryId == draft.categoryId },
+                    iconPhoto = draft.iconPhoto,
                 )
             )
 
@@ -246,6 +247,7 @@ class VaultRepository(
             subtitle = stored.item.subtitle,
             note = stored.item.note,
             isPinned = stored.item.isPinned,
+            iconPhoto = stored.item.iconPhoto,
             fields = stored.sortedFields.map {
                 FieldDraft(
                     id = it.id,
@@ -410,6 +412,9 @@ class VaultRepository(
                     data = Base64.getEncoder().encodeToString(bytes),
                 )
             }
+            val iconPhotoData = entry.item.iconPhoto
+                ?.let { attachments.read(it) }
+                ?.let { Base64.getEncoder().encodeToString(it) }
             onProgress((index + 1).toFloat() / total)
             BackupItem(
                 id = entry.item.id,
@@ -427,6 +432,7 @@ class VaultRepository(
                 },
                 attachments = backupAttachments,
                 groupId = entry.item.groupId,
+                iconPhotoData = iconPhotoData,
             )
         }
 
@@ -510,6 +516,13 @@ class VaultRepository(
                     )
                 }
 
+                // A fresh stored name on this device, same as every other sealed file a backup
+                // carries — the name recorded in the backup only ever existed on the device
+                // that made it.
+                val iconPhoto = item.iconPhotoData
+                    ?.let { runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
+                    ?.let { attachments.save(it)?.storedName }
+
                 db.withTransaction {
                     db.itemDao().upsert(
                         ItemEntity(
@@ -524,6 +537,7 @@ class VaultRepository(
                             updatedAt = item.updatedAt,
                             lastUsedAt = item.lastUsedAt,
                             groupId = item.groupId,
+                            iconPhoto = iconPhoto,
                         )
                     )
                     db.fieldDao().deleteForItem(item.id)
@@ -546,7 +560,8 @@ class VaultRepository(
     }
 
     private suspend fun sweepOrphanFiles() {
-        val referenced = db.attachmentDao().getAll().map { it.storedName }.toSet()
+        val referenced = db.attachmentDao().getAll().map { it.storedName }.toSet() +
+            db.itemDao().allIconPhotoNames()
         attachments.pruneOrphans(referenced)
     }
 

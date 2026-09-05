@@ -182,6 +182,7 @@ fun HomeScreen(
                     subtitle = "",
                     iconKey = categoryLookup[entry.item.categoryId]?.category?.iconKey,
                     colorKey = categoryLookup[entry.item.categoryId]?.category?.colorKey,
+                    photoStoredName = entry.item.iconPhoto,
                 )
             )
         }
@@ -594,6 +595,7 @@ private fun QuickAccessCard(
                 colorKey = target.colorKey,
                 size = 36.dp,
                 iconSize = 18.dp,
+                photoStoredName = target.photoStoredName,
             )
             Spacer(Modifier.height(10.dp))
             // Always two lines: a row of cards with nothing under the title would otherwise

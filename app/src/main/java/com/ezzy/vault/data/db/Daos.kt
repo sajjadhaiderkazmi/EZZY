@@ -161,6 +161,10 @@ interface ItemDao {
     @Query("SELECT COUNT(*) FROM items")
     fun observeCount(): Flow<Int>
 
+    /** Every custom entry icon still on disk, so an orphan sweep never deletes one in use. */
+    @Query("SELECT iconPhoto FROM items WHERE iconPhoto IS NOT NULL")
+    suspend fun allIconPhotoNames(): List<String>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: ItemEntity)
 

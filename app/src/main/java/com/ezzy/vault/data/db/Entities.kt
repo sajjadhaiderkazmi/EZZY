@@ -63,6 +63,9 @@ data class ItemEntity(
     val lastUsedAt: Long,
     /** The folder this entry has been dragged into within its own section, or null at the top level. */
     @ColumnInfo(defaultValue = "NULL") val groupId: String? = null,
+    /** A custom picture for this entry, sealed in the attachment store — null uses the
+     *  section's own icon instead, everywhere the entry is shown. */
+    @ColumnInfo(defaultValue = "NULL") val iconPhoto: String? = null,
 )
 
 /**

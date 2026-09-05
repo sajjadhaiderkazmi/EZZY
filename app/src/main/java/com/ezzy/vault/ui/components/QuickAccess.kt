@@ -15,6 +15,8 @@ data class QuickTarget(
     val subtitle: String,
     val iconKey: String?,
     val colorKey: String?,
+    /** An entry's own picture, when it has one — null for a section or a group either way. */
+    val photoStoredName: String? = null,
 ) {
     /** Unique across kinds — two tables can hand out the same id without colliding in a list. */
     val key: String get() = "${kind.name}:$id"

@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Crop
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -353,6 +354,13 @@ private fun DetailsStep(
     var renaming by remember { mutableStateOf<FieldDraft?>(null) }
     var cropping by remember { mutableStateOf<String?>(null) }
 
+    // The photo just picked for the entry's own icon, waiting on its crop — separate from
+    // [cropping] above, which keys off an attachment already sitting in the draft.
+    var croppingIcon by remember { mutableStateOf<String?>(null) }
+    val iconPhotoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.importIconPhoto(it) { stored -> croppingIcon = stored } } }
+
     val resolveName = rememberAttachmentNamer()
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -371,17 +379,34 @@ private fun DetailsStep(
         readPickedContact(context, uri)?.let { viewModel.applyContact(it.name, it.phone) }
     }
 
+    val selectedCategory = categories.firstOrNull { it.id == draft.categoryId }
+
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
+            EntryIconPicker(
+                photoStoredName = draft.iconPhoto,
+                fallbackIconKey = selectedCategory?.iconKey,
+                fallbackColorKey = selectedCategory?.colorKey,
+                onPick = {
+                    runCatching {
+                        iconPhotoPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                },
+                onRemove = viewModel::removeIconPhoto,
+            )
+        }
+
+        item {
             ChooserRow(
                 caption = "Section",
-                value = categories.firstOrNull { it.id == draft.categoryId }?.name
-                    ?: "Choose a section",
-                iconKey = categories.firstOrNull { it.id == draft.categoryId }?.iconKey,
-                colorKey = categories.firstOrNull { it.id == draft.categoryId }?.colorKey,
+                value = selectedCategory?.name ?: "Choose a section",
+                iconKey = selectedCategory?.iconKey,
+                colorKey = selectedCategory?.colorKey,
                 options = categories.map { Triple(it.id, it.name, it.iconKey) },
                 selectedId = draft.categoryId,
                 onSelect = viewModel::setCategory,
@@ -598,6 +623,21 @@ private fun DetailsStep(
         onDismiss = { cropping = null },
         onCropped = { id, bytes -> viewModel.replaceAttachmentBytes(id, bytes) },
     )
+
+    croppingIcon?.let { stored ->
+        ImageCropDialog(
+            storedName = stored,
+            circular = true,
+            onCancel = {
+                viewModel.discardUnusedIconPhoto(stored)
+                croppingIcon = null
+            },
+            onCropped = { bytes ->
+                viewModel.setIconPhoto(stored, bytes)
+                croppingIcon = null
+            },
+        )
+    }
 }
 
 /**
@@ -810,6 +850,80 @@ private fun FieldNameDialog(
 }
 
 /** Shared row for the two things an entry is filed under: its section and its type. */
+/**
+ * The entry's own avatar, with a small camera badge to change it. Nothing chosen here shows the
+ * section's own icon exactly as it does everywhere else — picking a photo is what makes this
+ * entry stand out from the rest of its section, not a requirement to fill in.
+ */
+@Composable
+private fun EntryIconPicker(
+    photoStoredName: String?,
+    fallbackIconKey: String?,
+    fallbackColorKey: String?,
+    onPick: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box {
+            IconAvatar(
+                iconKey = fallbackIconKey,
+                colorKey = fallbackColorKey,
+                photoStoredName = photoStoredName,
+                size = 72.dp,
+                iconSize = 34.dp,
+            )
+            Surface(
+                onClick = onPick,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 2.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(26.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Rounded.PhotoCamera,
+                        contentDescription = "Change entry icon",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (photoStoredName != null) "Custom icon" else "Section icon",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = if (photoStoredName != null) {
+                    "Shown everywhere this entry appears"
+                } else {
+                    "Add a picture to use instead of the section's icon"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onPick, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(if (photoStoredName != null) "Change" else "Add photo")
+                }
+                if (photoStoredName != null) {
+                    TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text("Remove")
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ChooserRow(
     caption: String,

@@ -78,6 +78,8 @@ data class BackupItem(
     val fields: List<BackupField>,
     val attachments: List<BackupAttachment>,
     val groupId: String? = null,
+    /** Base64 of the custom icon's decrypted bytes, when this entry has one. */
+    val iconPhotoData: String? = null,
 )
 
 @Serializable

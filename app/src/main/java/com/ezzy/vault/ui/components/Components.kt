@@ -55,7 +55,12 @@ import com.ezzy.vault.ui.theme.LocalIsDarkTheme
 import com.ezzy.vault.ui.theme.ValueMonoStyle
 import kotlinx.coroutines.delay
 
-/** Circular, accent-tinted icon badge used for categories everywhere in the app. */
+/**
+ * Circular, accent-tinted icon badge used for categories everywhere in the app. An entry that
+ * has picked its own picture passes [photoStoredName] to show that instead — the one caller
+ * that ever has one to show, everyone else leaves it null and gets the plain icon exactly as
+ * before.
+ */
 @Composable
 fun IconAvatar(
     iconKey: String?,
@@ -63,7 +68,19 @@ fun IconAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
     iconSize: Dp = 24.dp,
+    photoStoredName: String? = null,
 ) {
+    if (photoStoredName != null) {
+        EncryptedImage(
+            storedName = photoStoredName,
+            contentDescription = null,
+            modifier = modifier
+                .size(size)
+                .clip(CircleShape),
+        )
+        return
+    }
+
     val accent = Accents.color(colorKey, LocalIsDarkTheme.current)
     Box(
         modifier = modifier

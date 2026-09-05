@@ -183,6 +183,53 @@ class EditorViewModel(
         draft.copy(fields = draft.fields.filterNot { it.id == id })
     }
 
+    // ---- Entry icon ---------------------------------------------------------
+
+    /**
+     * Seals a freshly picked photo so the cropper has something to read — nothing is linked to
+     * the draft yet, that only happens once the crop is confirmed, so cancelling leaves nothing
+     * behind to clean up later beyond the one file [discardUnusedIconPhoto] removes right away.
+     */
+    fun importIconPhoto(uri: Uri, onImported: (String) -> Unit) {
+        viewModelScope.launch {
+            val stored = container.attachmentStore.import(uri)
+            if (stored == null) {
+                update { it.copy(message = "Could not add that photo (over 25 MB or unreadable)") }
+                return@launch
+            }
+            onImported(stored.storedName)
+        }
+    }
+
+    /** Confirms a cropped icon. Any custom icon it is replacing is no longer needed. */
+    fun setIconPhoto(storedName: String, bytes: ByteArray) {
+        viewModelScope.launch {
+            val ok = container.attachmentStore.write(storedName, bytes)
+            if (!ok) {
+                update { it.copy(message = "Could not save that icon") }
+                return@launch
+            }
+            val previous = _state.value.draft.iconPhoto
+            updateDraft { it.copy(iconPhoto = storedName) }
+            if (previous != null && previous != storedName) {
+                container.attachmentStore.delete(previous)
+            }
+        }
+    }
+
+    /** Drops back to the section's own icon. */
+    fun removeIconPhoto() {
+        val previous = _state.value.draft.iconPhoto ?: return
+        updateDraft { it.copy(iconPhoto = null) }
+        viewModelScope.launch { container.attachmentStore.delete(previous) }
+    }
+
+    /** A picked photo whose crop was cancelled — nothing ever referenced it, so it does not
+     *  wait for the next orphan sweep. */
+    fun discardUnusedIconPhoto(storedName: String) {
+        viewModelScope.launch { container.attachmentStore.delete(storedName) }
+    }
+
     // ---- Attachments ------------------------------------------------------
 
     fun addAttachments(uris: List<Uri>, resolveName: (Uri) -> Pair<String, String>) {

@@ -43,6 +43,8 @@ data class ItemDraft(
     val isPinned: Boolean = false,
     val fields: List<FieldDraft> = emptyList(),
     val attachments: List<AttachmentDraft> = emptyList(),
+    /** A custom picture for this entry, already sealed on disk — null uses the section's icon. */
+    val iconPhoto: String? = null,
 ) {
     val filledFields: List<FieldDraft> get() = fields.filterNot { it.isBlank }
 }

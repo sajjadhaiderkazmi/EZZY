@@ -147,6 +147,7 @@ fun QuickAccessScreen(
         subtitle = sectionNames[row.item.categoryId].orEmpty(),
         iconKey = sectionIcons[row.item.categoryId],
         colorKey = sectionColors[row.item.categoryId],
+        photoStoredName = row.item.iconPhoto,
     )
 
     fun matches(text: String) = query.isBlank() || text.contains(query.trim(), ignoreCase = true)
@@ -352,6 +353,7 @@ private fun QuickRow(
                 colorKey = target.colorKey,
                 size = 42.dp,
                 iconSize = 20.dp,
+                photoStoredName = target.photoStoredName,
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {

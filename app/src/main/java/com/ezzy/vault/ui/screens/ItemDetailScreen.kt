@@ -220,19 +220,29 @@ fun ItemDetailScreen(
                             .padding(vertical = 26.dp, horizontal = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.22f)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = IconCatalog.image(category?.iconKey),
+                        if (details.item.iconPhoto != null) {
+                            EncryptedImage(
+                                storedName = details.item.iconPhoto,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(30.dp),
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(CircleShape),
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.22f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = IconCatalog.image(category?.iconKey),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(30.dp),
+                                )
+                            }
                         }
                         Spacer(Modifier.height(12.dp))
                         Text(

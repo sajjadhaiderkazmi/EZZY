@@ -43,6 +43,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -77,6 +79,11 @@ fun ImageCropDialog(
     storedName: String,
     onCancel: () -> Unit,
     onCropped: (ByteArray) -> Unit,
+    // A profile-picture-style pick: the frame is locked to a circle from the start, with no
+    // free/square choice to make, the way Google's own avatar cropper works. The saved bytes
+    // are still a plain square JPEG either way — every avatar in the app already clips to a
+    // circle at render time, so nothing needs a transparent PNG just for this.
+    circular: Boolean = false,
 ) {
     val source by rememberDecryptedBitmap(storedName)
     var working by remember { mutableStateOf<Bitmap?>(null) }
@@ -102,7 +109,7 @@ fun ImageCropDialog(
             // Reset the frame whenever the picture itself changes (a rotation makes a new one).
             var crop by remember(bitmap) { mutableStateOf<Rect?>(null) }
             var grip by remember { mutableStateOf(Grip.NONE) }
-            var squareLock by remember { mutableStateOf(false) }
+            var squareLock by remember { mutableStateOf(circular) }
 
             val density = LocalDensity.current
             val handleTouch = with(density) { HANDLE_TOUCH_DP.dp.toPx() }
@@ -119,22 +126,24 @@ fun ImageCropDialog(
                         Icon(Icons.Rounded.Close, contentDescription = "Cancel", tint = Color.White)
                     }
                     Text(
-                        text = "Crop",
+                        text = if (circular) "Crop photo" else "Crop",
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(
-                        onClick = {
-                            squareLock = !squareLock
-                            crop = crop?.let { if (squareLock) it.toSquare(minSide) else it }
+                    if (!circular) {
+                        IconButton(
+                            onClick = {
+                                squareLock = !squareLock
+                                crop = crop?.let { if (squareLock) it.toSquare(minSide) else it }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (squareLock) Icons.Rounded.CropSquare else Icons.Rounded.CropFree,
+                                contentDescription = if (squareLock) "Free size" else "Square",
+                                tint = if (squareLock) MaterialTheme.colorScheme.primary else Color.White,
+                            )
                         }
-                    ) {
-                        Icon(
-                            imageVector = if (squareLock) Icons.Rounded.CropSquare else Icons.Rounded.CropFree,
-                            contentDescription = if (squareLock) "Free size" else "Square",
-                            tint = if (squareLock) MaterialTheme.colorScheme.primary else Color.White,
-                        )
                     }
                     IconButton(
                         onClick = {
@@ -167,7 +176,10 @@ fun ImageCropDialog(
                     }
 
                     LaunchedEffect(displayed) {
-                        if (crop == null && displayed.width > 0f) crop = displayed.inset(0.08f)
+                        if (crop == null && displayed.width > 0f) {
+                            val inset = displayed.inset(0.08f)
+                            crop = if (circular) inset.toSquare(minSide) else inset
+                        }
                     }
 
                     val frame = crop
@@ -191,7 +203,7 @@ fun ImageCropDialog(
                                     }
                                 }
                         ) {
-                            drawCropOverlay(frame)
+                            drawCropOverlay(frame, circular)
                         }
                     }
                 }
@@ -310,44 +322,70 @@ private fun Rect.clampedInside(bounds: Rect): Rect {
 
 // ---- Drawing ----------------------------------------------------------------
 
-private fun DrawScope.drawCropOverlay(frame: Rect) {
+private fun DrawScope.drawCropOverlay(frame: Rect, circular: Boolean) {
     val shade = Color.Black.copy(alpha = 0.55f)
-    // Four bands around the frame, rather than a cut-out, which needs no layer save.
-    drawRect(shade, size = Size(size.width, frame.top))
-    drawRect(shade, topLeft = Offset(0f, frame.bottom), size = Size(size.width, size.height - frame.bottom))
-    drawRect(shade, topLeft = Offset(0f, frame.top), size = Size(frame.left, frame.height))
-    drawRect(
-        shade,
-        topLeft = Offset(frame.right, frame.top),
-        size = Size(size.width - frame.right, frame.height),
-    )
 
-    drawRect(
-        color = Color.White,
-        topLeft = frame.topLeft,
-        size = frame.size,
-        style = Stroke(width = 2f),
-    )
+    if (circular) {
+        // One cut-out shape rather than the rectangular version's four bands: an oval needs
+        // an actual hole rather than bands, which a single even-odd path gives for free.
+        val mask = Path().apply {
+            addRect(Rect(Offset.Zero, size))
+            addOval(frame)
+            fillType = PathFillType.EvenOdd
+        }
+        drawPath(mask, shade)
+        drawOval(color = Color.White, topLeft = frame.topLeft, size = frame.size, style = Stroke(width = 2f))
+    } else {
+        // Four bands around the frame, rather than a cut-out, which needs no layer save.
+        drawRect(shade, size = Size(size.width, frame.top))
+        drawRect(shade, topLeft = Offset(0f, frame.bottom), size = Size(size.width, size.height - frame.bottom))
+        drawRect(shade, topLeft = Offset(0f, frame.top), size = Size(frame.left, frame.height))
+        drawRect(
+            shade,
+            topLeft = Offset(frame.right, frame.top),
+            size = Size(size.width - frame.right, frame.height),
+        )
 
-    // Thirds guides, then the corner grips.
-    val guide = Color.White.copy(alpha = 0.35f)
-    for (i in 1..2) {
-        val x = frame.left + frame.width * i / 3f
-        val y = frame.top + frame.height * i / 3f
-        drawLine(guide, Offset(x, frame.top), Offset(x, frame.bottom), strokeWidth = 1f)
-        drawLine(guide, Offset(frame.left, y), Offset(frame.right, y), strokeWidth = 1f)
+        drawRect(
+            color = Color.White,
+            topLeft = frame.topLeft,
+            size = frame.size,
+            style = Stroke(width = 2f),
+        )
+
+        // Thirds guides — a circular frame has no rectangle to third.
+        val guide = Color.White.copy(alpha = 0.35f)
+        for (i in 1..2) {
+            val x = frame.left + frame.width * i / 3f
+            val y = frame.top + frame.height * i / 3f
+            drawLine(guide, Offset(x, frame.top), Offset(x, frame.bottom), strokeWidth = 1f)
+            drawLine(guide, Offset(frame.left, y), Offset(frame.right, y), strokeWidth = 1f)
+        }
     }
 
-    val grip = 18f
-    val thickness = 5f
-    listOf(
-        frame.topLeft to Offset(1f, 1f),
-        Offset(frame.right, frame.top) to Offset(-1f, 1f),
-        Offset(frame.left, frame.bottom) to Offset(1f, -1f),
-        Offset(frame.right, frame.bottom) to Offset(-1f, -1f),
-    ).forEach { (corner, direction) ->
-        drawLine(Color.White, corner, corner + Offset(grip * direction.x, 0f), strokeWidth = thickness)
-        drawLine(Color.White, corner, corner + Offset(0f, grip * direction.y), strokeWidth = thickness)
+    // The drag handles sit at the same four corners either way — a circular frame still
+    // resizes from the corners of the square that inscribes it — just drawn as small dots
+    // rather than the rectangular version's L-shaped grips.
+    if (circular) {
+        val radius = 6f
+        listOf(
+            frame.topLeft,
+            Offset(frame.right, frame.top),
+            Offset(frame.left, frame.bottom),
+            Offset(frame.right, frame.bottom),
+        ).forEach { corner -> drawCircle(Color.White, radius = radius, center = corner) }
+    } else {
+        val grip = 18f
+        val thickness = 5f
+        listOf(
+            frame.topLeft to Offset(1f, 1f),
+            Offset(frame.right, frame.top) to Offset(-1f, 1f),
+            Offset(frame.left, frame.bottom) to Offset(1f, -1f),
+            Offset(frame.right, frame.bottom) to Offset(-1f, -1f),
+        ).forEach { (corner, direction) ->
+            drawLine(Color.White, corner, corner + Offset(grip * direction.x, 0f), strokeWidth = thickness)
+            drawLine(Color.White, corner, corner + Offset(0f, grip * direction.y), strokeWidth = thickness)
+        }
     }
 }
 

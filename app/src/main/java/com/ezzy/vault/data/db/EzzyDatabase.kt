@@ -28,7 +28,7 @@ class Converters {
         AttachmentEntity::class,
         ItemGroupEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -241,6 +241,16 @@ abstract class EzzyDatabase : RoomDatabase() {
         }
 
         /**
+         * A custom picture per entry arrived in v6. Plain column addition with a default —
+         * nothing references it, so no table rebuild is needed here.
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN iconPhoto TEXT DEFAULT NULL")
+            }
+        }
+
+        /**
          * Opens the encrypted database. [passphrase] is consumed (and zeroed) by SQLCipher,
          * so callers must hand over a copy they no longer need.
          */
@@ -252,7 +262,7 @@ abstract class EzzyDatabase : RoomDatabase() {
                 NAME,
             )
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
         }
     }
