@@ -810,10 +810,7 @@ private fun AttachmentActionRow(
                 WatermarkCustomizer(
                     style = style,
                     onStyleChange = onStyleChange,
-                    onSave = {
-                        onSaveStyle()
-                        status = "Watermark saved"
-                    },
+                    onSave = onSaveStyle,
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -891,6 +888,16 @@ private fun WatermarkCustomizer(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
+    // Shown beside the header after a save, and cleared again shortly after — the panel folds
+    // itself away on Save, so without this there would be nothing to say it had worked.
+    var saved by remember { mutableStateOf(false) }
+    LaunchedEffect(saved) {
+        if (saved) {
+            delay(2500)
+            saved = false
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -906,6 +913,14 @@ private fun WatermarkCustomizer(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
             )
+            if (saved) {
+                Text(
+                    text = "Saved",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+            }
             Icon(
                 imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                 contentDescription = if (expanded) "Hide watermark settings"
@@ -978,7 +993,13 @@ private fun WatermarkCustomizer(
             ) {
                 TextButton(onClick = { onStyleChange(WatermarkStyle.Default) }) { Text("Reset") }
                 Spacer(Modifier.weight(1f))
-                Button(onClick = onSave) { Text("Save") }
+                Button(
+                    onClick = {
+                        onSave()
+                        saved = true
+                        expanded = false
+                    }
+                ) { Text("Save") }
             }
         }
     }
