@@ -85,7 +85,10 @@ import com.ezzy.vault.data.db.AttachmentEntity
 import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.ui.components.EncryptedImage
 import com.ezzy.vault.ui.components.FieldValueRow
+import com.ezzy.vault.ui.components.GROUP_ICON_KEY
 import com.ezzy.vault.ui.components.IconAvatar
+import com.ezzy.vault.ui.components.QuickKind
+import com.ezzy.vault.ui.components.QuickTarget
 import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.nav.Routes
 import com.ezzy.vault.ui.icons.EzzyMark
@@ -254,6 +257,7 @@ private data class PanelEntry(
 private sealed interface PanelView {
     data object Quick : PanelView
     data class Section(val categoryId: String) : PanelView
+    data class Group(val groupId: String) : PanelView
     data class Entry(val itemId: String, val fromCategoryId: String?) : PanelView
 }
 
@@ -557,11 +561,14 @@ private fun PanelSheet(
 ) {
     val context = LocalContext.current
     val repository = remember { context.appContainer.repository }
+    val groups by remember { repository.observeAllGroups() }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     Column(modifier = Modifier.fillMaxWidth()) {
         val title = when (view) {
             is PanelView.Quick -> "Quick access"
             is PanelView.Section -> categories.firstOrNull { it.id == view.categoryId }?.name ?: "Section"
+            is PanelView.Group -> groups.firstOrNull { it.group.id == view.groupId }?.group?.name ?: "Group"
             is PanelView.Entry -> "Details"
         }
 
@@ -571,6 +578,7 @@ private fun PanelSheet(
                 is PanelView.Quick -> false
                 // A section is the root once the star is gone; there is nowhere back to.
                 is PanelView.Section -> showQuickAccess
+                is PanelView.Group -> true
                 is PanelView.Entry -> true
             },
             onBack = {
@@ -587,6 +595,7 @@ private fun PanelSheet(
                 onOpenApp(
                     when (view) {
                         is PanelView.Section -> Routes.category(view.categoryId)
+                        is PanelView.Group -> Routes.itemGroup(view.groupId)
                         is PanelView.Entry -> Routes.item(view.itemId)
                         else -> null
                     }
@@ -597,28 +606,69 @@ private fun PanelSheet(
 
         when (view) {
             is PanelView.Quick -> {
-                val pinned by remember { repository.observePinned() }
+                // Quick access now holds sections and groups too, alongside pinned entries —
+                // the same three lists the home screen's own Quick access flattens, so the bar
+                // never shows something different from what "See all" in the app just showed.
+                // Nothing arrives on its own any more (no more filling the rest with recents):
+                // what is here is exactly what is switched on.
+                val pinnedCategories by remember { repository.observePinnedCategories() }
                     .collectAsStateWithLifecycle(initialValue = emptyList())
-                val recent by remember { repository.observeRecent(10) }
+                val pinnedGroups by remember { repository.observePinnedGroups() }
+                    .collectAsStateWithLifecycle(initialValue = emptyList())
+                val pinnedEntries by remember { repository.observePinned() }
                     .collectAsStateWithLifecycle(initialValue = emptyList())
 
-                val combined = (pinned + recent.filterNot { r -> pinned.any { it.item.id == r.item.id } })
-                    .take(12)
-
-                PanelEntryList(
-                    entries = combined.map {
-                        PanelEntry(
-                            id = it.item.id,
-                            title = it.item.title,
-                            fieldCount = it.fields.size,
-                            categoryId = it.item.categoryId,
-                            photoStoredName = it.item.iconPhoto,
+                val categoriesById = categories.associateBy { it.id }
+                val quickTargets = buildList {
+                    pinnedCategories.forEach { section ->
+                        add(
+                            QuickTarget(
+                                id = section.id,
+                                kind = QuickKind.SECTION,
+                                title = section.name,
+                                subtitle = "",
+                                iconKey = section.iconKey,
+                                colorKey = section.colorKey,
+                            )
                         )
-                    },
-                    categoriesById = categories.associateBy { it.id },
+                    }
+                    pinnedGroups.forEach { group ->
+                        add(
+                            QuickTarget(
+                                id = group.id,
+                                kind = QuickKind.GROUP,
+                                title = group.name,
+                                subtitle = "",
+                                iconKey = GROUP_ICON_KEY,
+                                colorKey = categoriesById[group.categoryId]?.colorKey,
+                            )
+                        )
+                    }
+                    pinnedEntries.forEach { entry ->
+                        add(
+                            QuickTarget(
+                                id = entry.item.id,
+                                kind = QuickKind.ENTRY,
+                                title = entry.item.title,
+                                subtitle = "",
+                                iconKey = categoriesById[entry.item.categoryId]?.iconKey,
+                                colorKey = categoriesById[entry.item.categoryId]?.colorKey,
+                                photoStoredName = entry.item.iconPhoto,
+                            )
+                        )
+                    }
+                }
+
+                PanelQuickList(
+                    targets = quickTargets,
                     maxListHeight = maxListHeight,
-                    emptyMessage = "Pin the entries you use most and they will wait for you right here.",
-                    onOpen = { onNavigate(PanelView.Entry(it, null)) },
+                    onOpen = { target ->
+                        when (target.kind) {
+                            QuickKind.SECTION -> onNavigate(PanelView.Section(target.id))
+                            QuickKind.GROUP -> onNavigate(PanelView.Group(target.id))
+                            QuickKind.ENTRY -> onNavigate(PanelView.Entry(target.id, null))
+                        }
+                    },
                 )
             }
 
@@ -650,6 +700,38 @@ private fun PanelSheet(
                         maxListHeight = maxListHeight,
                         emptyMessage = "Nothing saved in this section yet.",
                         onOpen = { onNavigate(PanelView.Entry(it, view.categoryId)) },
+                    )
+                }
+            }
+
+            is PanelView.Group -> {
+                val row = groups.firstOrNull { it.group.id == view.groupId }
+                val categoryId = row?.group?.categoryId
+                // A group is locked exactly when the section holding it is — the same guard
+                // PanelView.Section applies, just reached from one tap deeper.
+                if (categoryId != null && categoryId in lockedSections && categoryId !in confirmedSections) {
+                    GuardedSheet(
+                        title = row?.group?.name ?: "Group",
+                        onConfirm = { onRequestSectionUnlock(categoryId) },
+                    )
+                } else {
+                    val items by remember(view.groupId) { repository.observeGroupItems(view.groupId) }
+                        .collectAsStateWithLifecycle(initialValue = emptyList())
+
+                    PanelEntryList(
+                        entries = items.map {
+                            PanelEntry(
+                                id = it.item.id,
+                                title = it.item.title,
+                                fieldCount = it.fields.size,
+                                categoryId = it.item.categoryId,
+                                photoStoredName = it.item.iconPhoto,
+                            )
+                        },
+                        categoriesById = categories.associateBy { it.id },
+                        maxListHeight = maxListHeight,
+                        emptyMessage = "Nothing in this group yet.",
+                        onOpen = { onNavigate(PanelView.Entry(it, categoryId)) },
                     )
                 }
             }
@@ -806,6 +888,76 @@ private fun PanelHeader(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
+        }
+    }
+}
+
+/** Quick access's own list — a section, a group and an entry all render the same row here,
+ *  already resolved to an icon and colour by the caller, so this never needs to look either up. */
+@Composable
+private fun PanelQuickList(
+    targets: List<QuickTarget>,
+    maxListHeight: Dp,
+    onOpen: (QuickTarget) -> Unit,
+) {
+    if (targets.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Star,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Pin the sections, groups or entries you use most and they will wait for you right here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.heightIn(max = maxListHeight),
+        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        items(targets, key = { it.key }) { target ->
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clickable { onOpen(target) }
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconAvatar(
+                        iconKey = target.iconKey,
+                        colorKey = target.colorKey,
+                        size = 34.dp,
+                        iconSize = 17.dp,
+                        photoStoredName = target.photoStoredName,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = target.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }
