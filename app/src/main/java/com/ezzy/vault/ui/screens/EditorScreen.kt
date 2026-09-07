@@ -123,9 +123,13 @@ fun EditorScreen(
     categoryId: String?,
     onClose: () -> Unit,
     onSaved: (String) -> Unit,
+    // Set only when something outside the normal wizard already knows which type this entry
+    // should be — the share target's "New entry" path, so far the one caller of this.
+    templateId: String? = null,
 ) {
-    val viewModel: EditorViewModel = ezzyViewModel(key = "editor-${itemId.orEmpty()}-${categoryId.orEmpty()}") {
-        EditorViewModel(it, itemId, categoryId)
+    val key = "editor-${itemId.orEmpty()}-${categoryId.orEmpty()}-${templateId.orEmpty()}"
+    val viewModel: EditorViewModel = ezzyViewModel(key = key) {
+        EditorViewModel(it, itemId, categoryId, templateId)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -1404,18 +1408,22 @@ private fun CropHost(
 @Composable
 private fun rememberAttachmentNamer(): (Uri) -> Pair<String, String> {
     val context = LocalContext.current
-    return remember(context) {
-        { uri ->
-            var name = uri.lastPathSegment?.substringAfterLast('/') ?: "File"
-            runCatching {
-                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (index >= 0 && cursor.moveToFirst()) name = cursor.getString(index) ?: name
-                }
-            }
-            name to (context.contentResolver.getType(uri) ?: "application/octet-stream")
+    return remember(context) { { uri -> resolveAttachmentName(context, uri) } }
+}
+
+/**
+ * The plain, non-Compose half of [rememberAttachmentNamer] — pulled out so the share-target
+ * screen can name an incoming picture the same way without needing a composable to do it.
+ */
+internal fun resolveAttachmentName(context: Context, uri: Uri): Pair<String, String> {
+    var name = uri.lastPathSegment?.substringAfterLast('/') ?: "File"
+    runCatching {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index >= 0 && cursor.moveToFirst()) name = cursor.getString(index) ?: name
         }
     }
+    return name to (context.contentResolver.getType(uri) ?: "application/octet-stream")
 }
 
 /**

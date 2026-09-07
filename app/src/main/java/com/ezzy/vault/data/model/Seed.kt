@@ -37,6 +37,10 @@ object Seed {
     /** The one type whose editor offers to fill itself in from the phone's own contacts. */
     const val CONTACT_TEMPLATE_ID = "tpl_contact"
 
+    /** Where a picture shared into EZZY from another app lands as a new entry. */
+    const val SHARE_TARGET_CATEGORY_ID = "cat_notes"
+    const val SHARE_TARGET_TEMPLATE_ID = "tpl_screenshot"
+
     val categories: List<SeedCategory> = listOf(
         SeedCategory("cat_bank", "Bank & Cards", "bank", "indigo"),
         SeedCategory("cat_documents", "Documents & IDs", "id_card", "blue"),

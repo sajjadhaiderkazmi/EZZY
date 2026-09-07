@@ -88,6 +88,10 @@ class EditorViewModel(
     private val container: AppContainer,
     private val itemId: String?,
     private val presetCategoryId: String?,
+    // Only ever set on a fresh entry — the share target's "New entry" path already knows this
+    // should be Screenshot / Image, so the wizard opens with the type (and its fields) already
+    // applied instead of asking again.
+    private val presetTemplateId: String? = null,
 ) : ViewModel() {
 
     private val repository = container.repository
@@ -103,7 +107,28 @@ class EditorViewModel(
 
     init {
         viewModelScope.launch {
-            val draft = repository.draftFor(itemId, presetCategoryId.orEmpty())
+            var draft = repository.draftFor(itemId, presetCategoryId.orEmpty())
+
+            // A brand-new entry can arrive with its type already decided — applied the same
+            // way picking it by hand does, so the two paths can never drift apart.
+            val presetTemplate = presetTemplateId?.takeIf { itemId == null }
+                ?.let { repository.template(it) }
+            if (presetTemplate != null) {
+                val spec = repository.decodeSpec(presetTemplate.specJson)
+                draft = draft.copy(
+                    templateId = presetTemplate.id,
+                    fields = spec.fields.map {
+                        FieldDraft(label = it.label, type = it.type, fromTemplate = true)
+                    },
+                )
+            }
+
+            // A picture the screen that opened this editor already imported (a shared photo,
+            // so far) — attached once, here, rather than left for the user to add again.
+            if (itemId == null) {
+                draft = draft.copy(attachments = draft.attachments + PendingShareAttachments.take())
+            }
+
             // Once the section is known there is nothing left to ask before the form itself:
             // the type is chosen inside it, next to everything it changes.
             val spec = draft.templateId?.let { repository.templateSpec(it) }
@@ -407,3 +432,22 @@ class EditorViewModel(
 
 /** Used until a type with its own example is picked. */
 const val DEFAULT_TITLE_HINT = "Give this entry a name"
+
+/**
+ * Carries attachments a screen has already imported (decrypted into the vault's own store, not
+ * just picked) into the next fresh editor it opens — the share target's "New entry" path, so
+ * the shared picture is sitting there the moment the wizard appears rather than asked for again.
+ *
+ * Written once, read (and cleared) once, and never persisted: a process death simply drops
+ * whatever was pending, which is the right failure mode — a stale photo silently attaching
+ * itself to whatever editor opens next would be worse than losing it.
+ */
+internal object PendingShareAttachments {
+    private var pending: List<AttachmentDraft> = emptyList()
+
+    fun set(attachments: List<AttachmentDraft>) {
+        pending = attachments
+    }
+
+    fun take(): List<AttachmentDraft> = pending.also { pending = emptyList() }
+}

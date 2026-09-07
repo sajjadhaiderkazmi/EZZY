@@ -119,13 +119,16 @@ fun EzzyNavHost(
             arguments = listOf(
                 navArgument("itemId") { type = NavType.StringType; defaultValue = "" },
                 navArgument("categoryId") { type = NavType.StringType; defaultValue = "" },
+                navArgument("templateId") { type = NavType.StringType; defaultValue = "" },
             ),
         ) { entry ->
             val itemId = entry.arguments?.getString("itemId").orEmpty().ifBlank { null }
             val categoryId = entry.arguments?.getString("categoryId").orEmpty().ifBlank { null }
+            val templateId = entry.arguments?.getString("templateId").orEmpty().ifBlank { null }
             EditorScreen(
                 itemId = itemId,
                 categoryId = categoryId,
+                templateId = templateId,
                 onClose = { navController.popBackStack() },
                 onSaved = { savedId ->
                     // Land on the saved entry rather than back where the user started, so the
