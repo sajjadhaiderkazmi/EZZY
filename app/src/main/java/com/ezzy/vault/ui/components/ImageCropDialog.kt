@@ -11,12 +11,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -96,7 +95,16 @@ fun ImageCropDialog(
 
     Dialog(
         onDismissRequest = onCancel,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        // A Dialog's own window fits inside the system bars by default — but on the phones
+        // where this was still cutting the Save row off, the window was actually drawing
+        // under them anyway (matching the edge-to-edge main Activity), while Compose kept
+        // reporting zero for the bar insets because it still believed the default held. Saying
+        // so explicitly here is what makes safeDrawingPadding() below see the real inset and
+        // actually reserve room for it, rather than measuring nothing.
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
             val bitmap = working
@@ -117,12 +125,7 @@ fun ImageCropDialog(
             val handleTouch = with(density) { HANDLE_TOUCH_DP.dp.toPx() }
             val minSide = with(density) { MIN_CROP_DP.dp.toPx() }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding(),
-            ) {
+            Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
