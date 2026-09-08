@@ -12,15 +12,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +41,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Share
@@ -74,6 +79,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -189,9 +195,27 @@ fun ItemDetailScreen(
     // section's own cards. Cleared whenever the entry itself changes so a stale id can't linger.
     var selectedFileIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var confirmDeleteFiles by remember { mutableStateOf(false) }
+    var galleryOpen by remember { mutableStateOf(false) }
+
+    // A tap means one thing while a selection is running and another while it isn't, and both
+    // the row on this screen and the gallery behind "See more" have to agree on which.
+    val openFile: (AttachmentEntity) -> Unit = { attachment ->
+        if (selectedFileIds.isNotEmpty()) {
+            selectedFileIds = if (attachment.id in selectedFileIds) {
+                selectedFileIds - attachment.id
+            } else {
+                selectedFileIds + attachment.id
+            }
+        } else {
+            previewAttachment = attachment
+        }
+    }
 
     val details = item
-    LaunchedEffect(details?.item?.id) { selectedFileIds = emptySet() }
+    LaunchedEffect(details?.item?.id) {
+        selectedFileIds = emptySet()
+        galleryOpen = false
+    }
 
     Scaffold(
         topBar = {
@@ -398,25 +422,35 @@ fun ItemDetailScreen(
                     }
                 }
                 item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(files, key = { it.id }) { attachment ->
+                    // Two pictures and a "See more", rather than a row that scrolled sideways:
+                    // the third file needed a drag to reach and the fourth was off past that.
+                    val shown = if (files.size <= FILE_TILES) files else files.take(FILE_TILES - 1)
+                    val hidden = files.size - shown.size
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        shown.forEach { attachment ->
                             AttachmentThumb(
                                 attachment = attachment,
                                 selected = attachment.id in selectedFileIds,
                                 selectionMode = selectedFileIds.isNotEmpty(),
-                                onClick = {
-                                    if (selectedFileIds.isNotEmpty()) {
-                                        selectedFileIds = if (attachment.id in selectedFileIds) {
-                                            selectedFileIds - attachment.id
-                                        } else {
-                                            selectedFileIds + attachment.id
-                                        }
-                                    } else {
-                                        previewAttachment = attachment
-                                    }
-                                },
+                                onClick = { openFile(attachment) },
                                 onLongClick = { selectedFileIds = selectedFileIds + attachment.id },
+                                modifier = Modifier.weight(1f),
                             )
+                        }
+                        if (hidden > 0) {
+                            SeeMoreTile(
+                                count = hidden,
+                                onClick = { galleryOpen = true },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        // Keeps one or two files a third of the row wide each rather than
+                        // stretching them across the whole of it.
+                        repeat(FILE_TILES - shown.size - (if (hidden > 0) 1 else 0)) {
+                            Spacer(Modifier.weight(1f))
                         }
                     }
                 }
@@ -445,6 +479,33 @@ fun ItemDetailScreen(
                 }
             }
         }
+    }
+
+    val galleryFiles = details?.sortedAttachments
+        ?.filterNot { it.mimeType.startsWith("audio/") }
+        .orEmpty()
+    // Closes itself if the selection it was showing has just been deleted out from under it.
+    if (galleryOpen && galleryFiles.isNotEmpty()) {
+        FilesGalleryDialog(
+            files = galleryFiles,
+            selectedIds = selectedFileIds,
+            onDismiss = { galleryOpen = false },
+            onFileClick = openFile,
+            onFileLongClick = { selectedFileIds = selectedFileIds + it.id },
+            onCopySelected = {
+                val selected = galleryFiles.filter { it.id in selectedFileIds }
+                fileActions.copyMultiple(selected) { ok ->
+                    scope.launch {
+                        snackbar.showSnackbar(
+                            if (ok) "Copied — paste in any app" else "Could not copy them"
+                        )
+                    }
+                }
+                selectedFileIds = emptySet()
+            },
+            onDeleteSelected = { confirmDeleteFiles = true },
+            onClearSelection = { selectedFileIds = emptySet() },
+        )
     }
 
     previewAttachment?.let { attachment ->
@@ -524,9 +585,10 @@ private fun FileSelectionBar(
     onCopy: () -> Unit,
     onDelete: () -> Unit,
     onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(top = 10.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -568,6 +630,129 @@ private fun HeroChip(text: String) {
     }
 }
 
+/**
+ * Every file the entry has, in a grid — where the third, fourth and everything after it live
+ * now that the row on the entry itself shows two and a "See more" instead of scrolling.
+ *
+ * Sized as a card with a margin around it rather than edge to edge: a dialog's own window does
+ * not always report the system bars back to Compose, and a full-bleed layout that trusts it
+ * puts its bottom row underneath the navigation bar when it doesn't.
+ */
+@Composable
+private fun FilesGalleryDialog(
+    files: List<AttachmentEntity>,
+    selectedIds: Set<String>,
+    onDismiss: () -> Unit,
+    onFileClick: (AttachmentEntity) -> Unit,
+    onFileLongClick: (AttachmentEntity) -> Unit,
+    onCopySelected: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onClearSelection: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier
+                .safeDrawingPadding()
+                .padding(horizontal = 12.dp, vertical = 24.dp)
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f),
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 4.dp, top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Files (${files.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Close")
+                    }
+                }
+
+                if (selectedIds.isNotEmpty()) {
+                    FileSelectionBar(
+                        count = selectedIds.size,
+                        onCopy = onCopySelected,
+                        onDelete = onDeleteSelected,
+                        onCancel = onClearSelection,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(FILE_TILES),
+                    // weight, not fillMaxSize: an unweighted child asks for the card's whole
+                    // height on top of the header above it and overflows the bottom by it.
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(files, key = { it.id }) { attachment ->
+                        AttachmentThumb(
+                            attachment = attachment,
+                            selected = attachment.id in selectedIds,
+                            selectionMode = selectedIds.isNotEmpty(),
+                            onClick = { onFileClick(attachment) },
+                            onLongClick = { onFileLongClick(attachment) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The third tile of the files row once there are more files than fit in it. */
+@Composable
+private fun SeeMoreTile(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier,
+    ) {
+        Column(modifier = Modifier.clickable(onClick = onClick)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PhotoLibrary,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "+$count",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(
+                text = "See more",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AttachmentThumb(
@@ -576,11 +761,12 @@ private fun AttachmentThumb(
     selectionMode: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val isImage = attachment.mimeType.startsWith("image/")
     val isPdf = attachment.mimeType == "application/pdf"
     val isVideo = attachment.mimeType.startsWith("video/")
-    Box(modifier = Modifier.width(124.dp)) {
+    Box(modifier = modifier) {
         Surface(
             shape = MaterialTheme.shapes.medium,
             color = if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -1070,6 +1256,9 @@ private data class ExpiryStatus(
 
 /** The format the editor's date picker writes, so a stored date always reads back cleanly. */
 private val STORED_DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+/** Tiles across the files row on the entry, and columns in the gallery behind "See more". */
+private const val FILE_TILES = 3
 
 private val EXPIRY_WORDS = listOf("expir", "ends", "valid", "renew")
 

@@ -4,12 +4,14 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -95,22 +98,28 @@ fun ImageCropDialog(
 
     Dialog(
         onDismissRequest = onCancel,
-        // A Dialog's own window fits inside the system bars by default — but on the phones
-        // where this was still cutting the Save row off, the window was actually drawing
-        // under them anyway (matching the edge-to-edge main Activity), while Compose kept
-        // reporting zero for the bar insets because it still believed the default held. Saying
-        // so explicitly here is what makes safeDrawingPadding() below see the real inset and
-        // actually reserve room for it, rather than measuring nothing.
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
+        // A card with a margin around it rather than an edge-to-edge black screen. Two rounds
+        // of trusting the window's own insets (statusBarsPadding, then safeDrawingPadding with
+        // decorFitsSystemWindows = false) still left Save under the navigation bar, because a
+        // dialog's window does not reliably report those bars back to Compose. Sizing the card
+        // to a fraction of the screen does not depend on them at all: the leftover margin
+        // clears the bars whether the insets come through or not — and it reads as part of the
+        // app rather than a separate full-screen mode, which is what was asked for.
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier
+                .safeDrawingPadding()
+                .padding(horizontal = 12.dp, vertical = 24.dp)
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f),
+        ) {
             val bitmap = working
             if (bitmap == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White)
+                    CircularProgressIndicator()
                 }
                 return@Surface
             }
@@ -125,7 +134,7 @@ fun ImageCropDialog(
             val handleTouch = with(density) { HANDLE_TOUCH_DP.dp.toPx() }
             val minSide = with(density) { MIN_CROP_DP.dp.toPx() }
 
-            Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -133,12 +142,11 @@ fun ImageCropDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onCancel) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Cancel", tint = Color.White)
+                        Icon(Icons.Rounded.Close, contentDescription = "Cancel")
                     }
                     Text(
                         text = if (circular) "Crop photo" else "Crop",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
                         modifier = Modifier.weight(1f),
                     )
                     if (!circular) {
@@ -151,7 +159,8 @@ fun ImageCropDialog(
                             Icon(
                                 imageVector = if (squareLock) Icons.Rounded.CropSquare else Icons.Rounded.CropFree,
                                 contentDescription = if (squareLock) "Free size" else "Square",
-                                tint = if (squareLock) MaterialTheme.colorScheme.primary else Color.White,
+                                tint = if (squareLock) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -161,7 +170,7 @@ fun ImageCropDialog(
                             crop = null
                         }
                     ) {
-                        Icon(Icons.Rounded.RotateRight, contentDescription = "Rotate", tint = Color.White)
+                        Icon(Icons.Rounded.RotateRight, contentDescription = "Rotate")
                     }
                 }
 
@@ -169,6 +178,9 @@ fun ImageCropDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(Color.Black)
                         .onSizeChanged {
                             containerSize = Size(it.width.toFloat(), it.height.toFloat())
                         },
@@ -225,9 +237,7 @@ fun ImageCropDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = { crop = null }) {
-                        Text("Reset", color = Color.White)
-                    }
+                    TextButton(onClick = { crop = null }) { Text("Reset") }
                     Spacer(Modifier.weight(1f))
                     Button(
                         enabled = !saving && crop != null,
