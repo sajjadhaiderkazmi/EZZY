@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +28,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -72,8 +76,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -188,7 +196,7 @@ fun ItemDetailScreen(
     val scope = rememberCoroutineScope()
 
     var confirmDelete by remember { mutableStateOf(false) }
-    var previewAttachment by remember { mutableStateOf<AttachmentEntity?>(null) }
+    var previewFileId by remember { mutableStateOf<String?>(null) }
 
     // Long-pressing a file turns the row into a multi-select — a plain tap toggles from then
     // on, until the selection is cleared, the same gesture pattern the app already uses for a
@@ -207,7 +215,7 @@ fun ItemDetailScreen(
                 selectedFileIds + attachment.id
             }
         } else {
-            previewAttachment = attachment
+            previewFileId = attachment.id
         }
     }
 
@@ -508,25 +516,21 @@ fun ItemDetailScreen(
         )
     }
 
-    previewAttachment?.let { attachment ->
+    // The preview opens on the tapped file but can be swiped through every other one, so it
+    // takes the whole list. Holding an id rather than a copy of the row also means a watermark
+    // switched on here is read straight back from the entry itself, instead of the snapshot
+    // this used to keep in sync by hand.
+    val previewIndex = galleryFiles.indexOfFirst { it.id == previewFileId }
+    if (previewIndex >= 0) {
         AttachmentPreviewDialog(
-            attachment = attachment,
-            onDismiss = { previewAttachment = null },
-            onToggleWatermark = { enabled ->
-                viewModel.setAttachmentWatermark(attachment.id, enabled)
-                // Keeps the open dialog's own switch in sync — it holds a snapshot of the row,
-                // not the live one, so it would otherwise sit one tap behind.
-                previewAttachment = attachment.copy(watermark = enabled)
+            files = galleryFiles,
+            startIndex = previewIndex,
+            onDismiss = { previewFileId = null },
+            onToggleWatermark = { file, enabled ->
+                viewModel.setAttachmentWatermark(file.id, enabled)
             },
-            onSaveWatermarkStyle = { style ->
-                viewModel.setAttachmentWatermarkStyle(attachment.id, style)
-                previewAttachment = attachment.copy(
-                    watermarkOpacity = style.opacity,
-                    watermarkScale = style.scale,
-                    watermarkX = style.offsetX,
-                    watermarkY = style.offsetY,
-                    watermarkColor = style.colorKey,
-                )
+            onSaveWatermarkStyle = { file, style ->
+                viewModel.setAttachmentWatermarkStyle(file.id, style)
             },
         )
     }
@@ -855,26 +859,53 @@ private fun AttachmentThumb(
     }
 }
 
+/**
+ * The picture the user tapped, and every other file in the entry a swipe away either side of
+ * it. Pinch zooms, a drag pans what is zoomed, and a double tap goes in and back out again —
+ * the swipe between files is held off while a picture is zoomed, so the two gestures never
+ * fight over the same drag.
+ */
 @Composable
 private fun AttachmentPreviewDialog(
-    attachment: AttachmentEntity,
+    files: List<AttachmentEntity>,
+    startIndex: Int,
     onDismiss: () -> Unit,
-    onToggleWatermark: (Boolean) -> Unit,
-    onSaveWatermarkStyle: (WatermarkStyle) -> Unit,
+    onToggleWatermark: (AttachmentEntity, Boolean) -> Unit,
+    onSaveWatermarkStyle: (AttachmentEntity, WatermarkStyle) -> Unit,
 ) {
-    val isPdf = attachment.mimeType == "application/pdf"
-    val isVideo = attachment.mimeType.startsWith("video/")
+    if (files.isEmpty()) return
+
+    val pagerState = rememberPagerState(
+        initialPage = startIndex.coerceIn(0, files.lastIndex),
+    ) { files.size }
+    val attachment = files.getOrNull(pagerState.currentPage) ?: files.first()
+
+    // What the picture on screen is zoomed to. The pager reads it to know whether a drag is a
+    // swipe to the next file or a pan across this one.
+    var pageZoom by remember { mutableStateOf(1f) }
 
     // The sliders move this and the picture above redraws from it on every change; the file
     // only hears about it once Save is pressed, so an experiment can always be walked back.
     var style by remember(attachment.id) { mutableStateOf(attachment.watermarkStyle) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Surface(
-            shape = MaterialTheme.shapes.large,
+            shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier
+                .safeDrawingPadding()
+                .padding(horizontal = 12.dp, vertical = 24.dp)
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f),
         ) {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -892,55 +923,160 @@ private fun AttachmentPreviewDialog(
                         Icon(Icons.Rounded.Close, contentDescription = "Close preview")
                     }
                 }
-                if (attachment.mimeType.startsWith("image/")) {
-                    EncryptedImage(
-                        storedName = attachment.storedName,
-                        contentDescription = attachment.displayName,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(420.dp),
-                        watermark = attachment.watermark,
-                        watermarkStyle = style,
-                    )
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            imageVector = when {
-                                isPdf -> Icons.Rounded.PictureAsPdf
-                                isVideo -> Icons.Rounded.Videocam
-                                else -> Icons.Rounded.Description
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(46.dp),
-                            tint = if (isPdf) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+
+                HorizontalPager(
+                    state = pagerState,
+                    // A zoomed picture keeps its own drags; the swipe comes back the moment it
+                    // is back to full view.
+                    userScrollEnabled = pageZoom <= 1f,
+                    pageSpacing = 12.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(PREVIEW_HEIGHT),
+                ) { page ->
+                    val file = files[page]
+                    val current = page == pagerState.currentPage
+                    if (file.mimeType.startsWith("image/")) {
+                        ZoomablePicture(
+                            file = file,
+                            // Only the picture being looked at follows the sliders; the rest
+                            // show the stamp they already carry.
+                            style = if (current) style else file.watermarkStyle,
+                            active = current,
+                            onZoomChange = { pageZoom = it },
+                            modifier = Modifier.fillMaxSize(),
                         )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            text = "Stored securely · ${attachment.sizeBytes / 1024} KB",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    } else {
+                        NonPicturePage(file = file, modifier = Modifier.fillMaxSize())
                     }
+                }
+
+                if (files.size > 1) {
+                    Text(
+                        text = "${pagerState.currentPage + 1} of ${files.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    )
                 }
 
                 AttachmentActionRow(
                     attachment = attachment,
                     style = style,
-                    onToggleWatermark = onToggleWatermark,
+                    onToggleWatermark = { onToggleWatermark(attachment, it) },
                     onStyleChange = { style = it },
-                    onSaveStyle = { onSaveWatermarkStyle(style) },
+                    onSaveStyle = { onSaveWatermarkStyle(attachment, style) },
                 )
                 Spacer(Modifier.height(6.dp))
             }
         }
+    }
+}
+
+/**
+ * One picture in the preview, with the two gestures a picture is expected to answer: pinch to
+ * zoom, drag to pan once zoomed, double tap to go in and back out. Nothing is written anywhere
+ * — this only ever changes how the same decrypted bitmap is drawn.
+ */
+@Composable
+private fun ZoomablePicture(
+    file: AttachmentEntity,
+    style: WatermarkStyle,
+    active: Boolean,
+    onZoomChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var zoom by remember(file.id) { mutableStateOf(1f) }
+    var offset by remember(file.id) { mutableStateOf(Offset.Zero) }
+
+    // A page swiped away from goes back to how it started, and hands the pager a plain 1f as
+    // it goes — a zoom left behind on one picture would otherwise lock the swipe for good.
+    LaunchedEffect(active) {
+        if (!active) {
+            zoom = 1f
+            offset = Offset.Zero
+        }
+        onZoomChange(if (active) zoom else 1f)
+    }
+
+    Box(
+        modifier = modifier
+            .clipToBounds()
+            .pointerInput(file.id) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        zoom = if (zoom > 1f) 1f else DOUBLE_TAP_ZOOM
+                        offset = Offset.Zero
+                        onZoomChange(zoom)
+                    },
+                )
+            }
+            .pointerInput(file.id) {
+                detectTransformGestures { _, pan, pinch, _ ->
+                    val next = (zoom * pinch).coerceIn(1f, MAX_ZOOM)
+                    // How far the picture may travel before its own edge would cross the
+                    // middle of the frame — past that there is nothing left to look at.
+                    val limitX = size.width * (next - 1f) / 2f
+                    val limitY = size.height * (next - 1f) / 2f
+                    val moved = if (next <= 1f) Offset.Zero else offset + pan
+                    offset = Offset(
+                        x = moved.x.coerceIn(-limitX, limitX),
+                        y = moved.y.coerceIn(-limitY, limitY),
+                    )
+                    zoom = next
+                    onZoomChange(next)
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        EncryptedImage(
+            storedName = file.storedName,
+            contentDescription = file.displayName,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = zoom
+                    scaleY = zoom
+                    translationX = offset.x
+                    translationY = offset.y
+                },
+            watermark = file.watermark,
+            watermarkStyle = style,
+        )
+    }
+}
+
+/** A PDF, a video or a plain file, on its own page of the preview. */
+@Composable
+private fun NonPicturePage(file: AttachmentEntity, modifier: Modifier = Modifier) {
+    val isPdf = file.mimeType == "application/pdf"
+    val isVideo = file.mimeType.startsWith("video/")
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = when {
+                isPdf -> Icons.Rounded.PictureAsPdf
+                isVideo -> Icons.Rounded.Videocam
+                else -> Icons.Rounded.Description
+            },
+            contentDescription = null,
+            modifier = Modifier.size(46.dp),
+            tint = if (isPdf) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "Stored securely · ${file.sizeBytes / 1024} KB",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -1259,6 +1395,13 @@ private val STORED_DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefau
 
 /** Tiles across the files row on the entry, and columns in the gallery behind "See more". */
 private const val FILE_TILES = 3
+
+/** How tall the preview's own picture is, with room left under it for the actions. */
+private val PREVIEW_HEIGHT = 400.dp
+
+/** Far enough in to read the small print on a receipt without losing where you are. */
+private const val MAX_ZOOM = 5f
+private const val DOUBLE_TAP_ZOOM = 2.5f
 
 private val EXPIRY_WORDS = listOf("expir", "ends", "valid", "renew")
 
