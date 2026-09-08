@@ -1,6 +1,7 @@
 package com.ezzy.vault.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -178,6 +181,8 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 14.dp),
             )
         }
+
+        item { BuiltByFooter() }
     }
 
     if (editName) {
@@ -273,6 +278,51 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
         }
     }
 }
+
+/**
+ * The one line of attribution the app carries, at the very bottom of Settings — past every
+ * switch, where a credit belongs and nothing else needs to compete with it for attention.
+ * "Sajjad" is the only clickable word: tapping it opens the system's own email composer
+ * addressed to the developer, rather than this app trying to send anything itself.
+ */
+@Composable
+private fun BuiltByFooter() {
+    val uriHandler = LocalUriHandler.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row {
+            Text(
+                text = "Built By ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Sajjad",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable {
+                    runCatching {
+                        uriHandler.openUri("mailto:$DEVELOPER_EMAIL")
+                    }
+                },
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = "From \uD83C\uDDF5\uD83C\uDDF0 For \uD83C\uDF0D",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private const val DEVELOPER_EMAIL = "sajjadhaiderconnect@gmail.com"
 
 /** Edits the name in a draft, so a half-typed name never reaches the greeting. */
 @Composable
