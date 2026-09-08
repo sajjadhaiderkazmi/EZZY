@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.PhotoLibrary
@@ -883,6 +885,9 @@ private fun AttachmentPreviewDialog(
     // What the picture on screen is zoomed to. The pager reads it to know whether a drag is a
     // swipe to the next file or a pan across this one.
     var pageZoom by remember { mutableStateOf(1f) }
+    var fullScreen by remember { mutableStateOf(false) }
+
+    val isPicture = attachment.mimeType.startsWith("image/")
 
     // The sliders move this and the picture above redraws from it on every change; the file
     // only hears about it once Save is pressed, so an experiment can always be walked back.
@@ -901,11 +906,7 @@ private fun AttachmentPreviewDialog(
                 .fillMaxWidth()
                 .fillMaxHeight(0.9f),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -919,6 +920,14 @@ private fun AttachmentPreviewDialog(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    if (isPicture) {
+                        IconButton(onClick = { fullScreen = true }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Fullscreen,
+                                contentDescription = "View full screen",
+                            )
+                        }
+                    }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Rounded.Close, contentDescription = "Close preview")
                     }
@@ -930,9 +939,11 @@ private fun AttachmentPreviewDialog(
                     // is back to full view.
                     userScrollEnabled = pageZoom <= 1f,
                     pageSpacing = 12.dp,
+                    // Whatever is left over after the actions below, rather than a fixed
+                    // height that left half the card empty under them.
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(PREVIEW_HEIGHT),
+                        .weight(1f),
                 ) { page ->
                     val file = files[page]
                     val current = page == pagerState.currentPage
@@ -963,14 +974,110 @@ private fun AttachmentPreviewDialog(
                     )
                 }
 
-                AttachmentActionRow(
-                    attachment = attachment,
-                    style = style,
-                    onToggleWatermark = { onToggleWatermark(attachment, it) },
-                    onStyleChange = { style = it },
-                    onSaveStyle = { onSaveWatermarkStyle(attachment, style) },
+                // Scrolls within itself once the watermark's own settings are opened, so the
+                // picture above keeps a usable amount of the card either way.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = ACTIONS_MAX_HEIGHT)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    AttachmentActionRow(
+                        attachment = attachment,
+                        style = style,
+                        onToggleWatermark = { onToggleWatermark(attachment, it) },
+                        onStyleChange = { style = it },
+                        onSaveStyle = { onSaveWatermarkStyle(attachment, style) },
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+            }
+        }
+    }
+
+    val pictures = files.filter { it.mimeType.startsWith("image/") }
+    if (fullScreen && pictures.isNotEmpty()) {
+        FullScreenPictures(
+            pictures = pictures,
+            startIndex = pictures.indexOfFirst { it.id == attachment.id }.coerceAtLeast(0),
+            onDismiss = { fullScreen = false },
+        )
+    }
+}
+
+/**
+ * The pictures on their own, on black, with nothing else on screen — the same pinch, pan,
+ * double tap and swipe as the preview, just with the whole display to do it in.
+ *
+ * The only thing over the picture is a white close button, which is deliberately the only
+ * thing here that has to be reachable: everything else is either the picture itself or a line
+ * of text, so a bottom inset the dialog's window fails to report costs nothing.
+ */
+@Composable
+private fun FullScreenPictures(
+    pictures: List<AttachmentEntity>,
+    startIndex: Int,
+    onDismiss: () -> Unit,
+) {
+    val pagerState = rememberPagerState(
+        initialPage = startIndex.coerceIn(0, pictures.lastIndex),
+    ) { pictures.size }
+    var pageZoom by remember { mutableStateOf(1f) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                userScrollEnabled = pageZoom <= 1f,
+                pageSpacing = 12.dp,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                val picture = pictures[page]
+                ZoomablePicture(
+                    file = picture,
+                    style = picture.watermarkStyle,
+                    active = page == pagerState.currentPage,
+                    onZoomChange = { pageZoom = it },
+                    modifier = Modifier.fillMaxSize(),
                 )
-                Spacer(Modifier.height(6.dp))
+            }
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .safeDrawingPadding()
+                    .padding(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.45f)),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "Close full screen",
+                    tint = Color.White,
+                )
+            }
+
+            if (pictures.size > 1) {
+                Text(
+                    text = "${pagerState.currentPage + 1} of ${pictures.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .safeDrawingPadding()
+                        .padding(bottom = 20.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
             }
         }
     }
@@ -1396,8 +1503,8 @@ private val STORED_DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", Locale.getDefau
 /** Tiles across the files row on the entry, and columns in the gallery behind "See more". */
 private const val FILE_TILES = 3
 
-/** How tall the preview's own picture is, with room left under it for the actions. */
-private val PREVIEW_HEIGHT = 400.dp
+/** As much of the preview as the watermark's settings may take before scrolling instead. */
+private val ACTIONS_MAX_HEIGHT = 330.dp
 
 /** Far enough in to read the small print on a receipt without losing where you are. */
 private const val MAX_ZOOM = 5f
