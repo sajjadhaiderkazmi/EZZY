@@ -79,6 +79,10 @@ async function start() {
       $('phone-name').textContent = result.link.phoneName || 'your phone';
       chrome.runtime.sendMessage({ type: 'unlocked' }).catch(() => {});
       setStep(2);
+      // Connected: close this pairing tab on its own after a moment.
+      setTimeout(() => {
+        chrome.tabs.getCurrent((tab) => (tab ? chrome.tabs.remove(tab.id) : window.close()));
+      }, 1500);
     } catch (err) {
       setStep(0);
       showError(err instanceof PhoneOfflineError

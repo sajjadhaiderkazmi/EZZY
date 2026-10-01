@@ -129,6 +129,7 @@ function back() {
     S.view = prev.view;
     S.params = prev.params;
   }
+  if (S.view !== 'section' && S.view !== 'item') S.unlockedSections = new Set();
   render();
 }
 
@@ -141,8 +142,8 @@ async function loadCache() {
     S.syncedAt = cached.syncedAt;
   }
   S.recent = await getRecent();
-  const session = await getSessionState();
-  S.unlockedSections = new Set(session?.sections || []);
+  S.unlockedSections = new Set();
+  setUnlockedSections([]).catch(() => {});
 }
 
 async function refresh({ force = false, quiet = true } = {}) {
@@ -835,10 +836,11 @@ root.addEventListener('click', async (ev) => {
   if (d.key) return onKey(d.key);
   if (d.openSection) {
     const id = d.openSection;
-    if (isLockedSection(id)) {
+    // A locked section asks for the PIN every time it is opened, and stays open only until
+    // the user goes back out of it.
+    if (category(id)?.locked) {
       if (!(await pinDialog(`Open ${category(id)?.name || 'section'}`))) return;
-      S.unlockedSections.add(id);
-      await setUnlockedSections([...S.unlockedSections]);
+      S.unlockedSections = new Set([id]);
     }
     return go('section', { id });
   }
