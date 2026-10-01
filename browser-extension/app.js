@@ -2,7 +2,7 @@
 
 import { icon } from './lib/icons.js';
 import {
-  getLink, getPrefs, setPrefs, getSessionKey, getSessionState, setUnlockedSections, unlock, verifyPin,
+  getLink, getPrefs, setPrefs, getSessionKey, setUnlockedSections, unlock, verifyPin,
   lockNow, readCache, sync, call, getRecent, pushRecent, logout, securityState,
   LinkRevokedError, PhoneOfflineError,
 } from './lib/link.js';
@@ -142,8 +142,6 @@ async function loadCache() {
     S.syncedAt = cached.syncedAt;
   }
   S.recent = await getRecent();
-  S.unlockedSections = new Set();
-  setUnlockedSections([]).catch(() => {});
 }
 
 async function refresh({ force = false, quiet = true } = {}) {
@@ -1034,6 +1032,10 @@ chrome.runtime.onMessage.addListener((message) => {
 // ---- Start -------------------------------------------------------------------------------------
 
 async function openVault() {
+  // Locked sections start shut every time the vault opens. Not done in loadCache(): that also
+  // runs on each background sync and would drop the unlock while the section is still open.
+  S.unlockedSections = new Set();
+  setUnlockedSections([]).catch(() => {});
   await loadCache();
   S.view = 'home';
   S.stack = [];
