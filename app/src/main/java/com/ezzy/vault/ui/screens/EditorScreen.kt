@@ -1548,11 +1548,13 @@ private fun AddFieldPanel(
                 )
             }
         }
-        FlowRow(
+        // One swipeable line of chips, running edge to edge like the type carousel above.
+        LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            modifier = Modifier.bleedHorizontally(16.dp),
         ) {
-            QUICK_FIELDS.forEach { (label, type) ->
+            items(QUICK_FIELDS) { (label, type) ->
                 Surface(
                     onClick = { onQuickAdd(label, type) },
                     shape = CircleShape,
