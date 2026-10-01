@@ -469,9 +469,9 @@ private fun SectionStep(
                 color = accentCard(category.colorKey),
                 contentColor = accentOnCard(),
                 border = if (selected) {
-                    androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface)
+                    androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                 } else {
-                    null
+                    androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -882,6 +882,7 @@ private fun TitleCard(
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = accentCard(category?.colorKey),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         contentColor = accentOnCard(),
         modifier = Modifier.fillMaxWidth(),
     ) {

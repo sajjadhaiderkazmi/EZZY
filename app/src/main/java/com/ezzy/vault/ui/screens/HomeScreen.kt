@@ -55,6 +55,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.ezzy.vault.ui.theme.EzzyGreen
+import com.ezzy.vault.ui.theme.EzzyGreenBright
+import com.ezzy.vault.ui.components.ItemRow
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.BorderStroke
 import com.ezzy.vault.ui.theme.LocalIsDarkTheme
 import com.ezzy.vault.ui.components.bleedHorizontally
 import androidx.compose.ui.draw.clip
@@ -117,6 +126,10 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     val itemCount: StateFlow<Int> = repository.observeItemCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /** The last few entries touched, for "Recently opened" at the bottom of Home. */
+    val recent: StateFlow<List<ItemWithDetails>> = repository.observeRecent(3)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val settings = container.settings
 
     fun enableBiometricLock() {
@@ -147,6 +160,7 @@ fun HomeScreen(
     val pinnedCategories by viewModel.pinnedCategories.collectAsStateWithLifecycle()
     val pinnedGroups by viewModel.pinnedGroups.collectAsStateWithLifecycle()
     val itemCount by viewModel.itemCount.collectAsStateWithLifecycle()
+    val recent by viewModel.recent.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val canUseBiometrics = remember { AppLock.canAuthenticate(context) }
 
@@ -219,53 +233,6 @@ fun HomeScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                // The bar used to carry nothing but the search icon, leaving the whole left
-                // side blank. The name and the promise underneath it fill that space and say
-                // what the app is every time it opens.
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(RoundedCornerShape(9.dp))
-                                // The ink tile vanishes into the dark theme's background, so
-                                // there it turns lime with an ink bolt instead.
-                                .background(if (LocalIsDarkTheme.current) EzzyLime else EzzyMark.Brand),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = EzzyMark.Bolt,
-                                contentDescription = null,
-                                tint = if (LocalIsDarkTheme.current) EzzyOnLime else EzzyMark.Spark,
-                                modifier = Modifier.size(22.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "EZZY",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 2.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = "Your Digital Wallet",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                },
-                // Search lives in the hero card's search bar now, one big target instead of a
-                // small icon up here as well.
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
-        },
         bottomBar = {
             HomeBottomBar(
                 onAdd = onAddItem,
@@ -281,20 +248,30 @@ fun HomeScreen(
             state = gridState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(padding)
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                HomeHero(
+                HomeHeader(
                     greeting = buildString {
                         append(greeting)
                         if (settings.displayName.isNotBlank()) append(", ${settings.displayName}")
                     },
+                    onSearch = onOpenSearch,
+                    onAdd = onAddItem,
+                )
+            }
+
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                BentoTop(
                     itemCount = itemCount,
-                    pinnedCount = pinned.size,
                     sectionCount = categories.size,
+                    pinnedCount = quickAccess.size,
+                    onPinned = onOpenQuickAccess,
+                    onAddSection = onAddCategory,
                 )
             }
 
@@ -328,82 +305,12 @@ fun HomeScreen(
                 }
             }
 
-            // The header stays up even with nothing pinned yet — "See all" is the way in to
-            // pin a first thing, so it can't only appear once something already is.
-            if (itemCount > 0 || categories.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SectionHeader(
-                        text = "Quick access",
-                        modifier = Modifier.padding(top = 4.dp),
-                        trailing = {
-                            TextButton(
-                                onClick = onOpenQuickAccess,
-                                contentPadding = PaddingValues(horizontal = 8.dp),
-                                modifier = Modifier.height(32.dp),
-                            ) {
-                                Text("See all", style = MaterialTheme.typography.labelMedium)
-                            }
-                        },
-                    )
-                }
-                if (quickAccess.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        // Runs edge to edge, past the grid's side padding, so the last card
-                        // slides off the screen edge and reads as "scroll for more" rather
-                        // than being sliced off mid-page.
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
-                            modifier = Modifier.bleedHorizontally(16.dp),
-                        ) {
-                            items(quickAccess, key = { it.key }) { target ->
-                                QuickAccessCard(
-                                    target = target,
-                                    onClick = {
-                                        when (target.kind) {
-                                            QuickKind.SECTION -> onOpenCategory(target.id)
-                                            QuickKind.GROUP -> onOpenGroup(target.id)
-                                            QuickKind.ENTRY -> onOpenItem(target.id)
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Nothing here yet — tap \"See all\" to put a section, " +
-                                "group or entry in Quick access.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
             item(span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader(
-                    text = "My Sections",
-                    modifier = Modifier.padding(top = 8.dp),
-                    trailing = {
-                        TextButton(
-                            onClick = onAddCategory,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp),
-                        ) {
-                            Text(
-                                text = "Create Section",
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Rounded.CreateNewFolder,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    },
+                HomeLabel(
+                    text = "My sections",
+                    action = "+ New",
+                    onAction = onAddCategory,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
 
@@ -452,14 +359,240 @@ fun HomeScreen(
                     )
                 }
             }
+
+            if (recent.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    HomeLabel(
+                        text = "Recently opened",
+                        action = "Search",
+                        onAction = onOpenSearch,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+                items(recent, key = { "recent-" + it.item.id }, span = { GridItemSpan(maxLineSpan) }) { entry ->
+                    val section = categoryLookup[entry.item.categoryId]?.category
+                    ItemRow(
+                        item = entry,
+                        iconKey = section?.iconKey,
+                        colorKey = section?.colorKey,
+                        onClick = { onOpenItem(entry.item.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The top of Home: the greeting over "My Vault", with square Search and Add buttons. */
+@Composable
+private fun HomeHeader(greeting: String, onSearch: () -> Unit, onAdd: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = greeting,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "My Vault",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        SquareIconButton(Icons.Rounded.Search, "Search", onSearch)
+        Spacer(Modifier.width(8.dp))
+        SquareIconButton(Icons.Rounded.Add, "Add entry", onAdd)
+    }
+}
+
+@Composable
+private fun SquareIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.size(44.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+/** A small uppercase heading with an optional green action on the right. */
+@Composable
+private fun HomeLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+    action: String? = null,
+    onAction: () -> Unit = {},
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.sp,
+            modifier = Modifier.weight(1f),
+        )
+        if (action != null) {
+            Text(
+                text = action,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
         }
     }
 }
 
 /**
- * Home's own bottom bar: a solid lime bar that runs edge to edge and all the way down behind
- * the system navigation, with a round hump in the middle that wraps the raised Add button —
- * the same shape as the wallet reference. Home, Pinned, Search and Settings sit either side.
+ * The bento block: one tall green tile with the vault total on the left, and two smaller
+ * tiles stacked beside it — Pinned and a new section.
+ */
+@Composable
+private fun BentoTop(
+    itemCount: Int,
+    sectionCount: Int,
+    pinnedCount: Int,
+    onPinned: () -> Unit,
+    onAddSection: () -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier
+                .weight(1.15f)
+                .fillMaxHeight(),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Icon(
+                    imageVector = Icons.Rounded.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "$itemCount",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    text = if (itemCount == 1) "entry safe" else "entries safe",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = if (sectionCount == 1) "1 section" else "$sectionCount sections",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                )
+            }
+        }
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f),
+        ) {
+            BentoTile(
+                icon = Icons.Rounded.PushPin,
+                title = "Pinned",
+                caption = if (pinnedCount == 1) "1 item" else "$pinnedCount items",
+                onClick = onPinned,
+            )
+            BentoTile(
+                icon = Icons.Rounded.CreateNewFolder,
+                title = "New section",
+                caption = "Banks, IDs, bills…",
+                onClick = onAddSection,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BentoTile(icon: ImageVector, title: String, caption: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(14.dp))
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** One section in the grid: a white tile with its green icon, name and how many entries. */
+@Composable
+private fun CategoryCard(
+    row: CategoryWithCount,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    dragging: Boolean = false,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = if (dragging) 10.dp else 0.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .scale(if (dragging) 1.04f else 1f),
+    ) {
+        Column(
+            modifier = Modifier
+                .clickable(onClick = onClick)
+                .padding(14.dp),
+        ) {
+            IconAvatar(
+                iconKey = row.category.iconKey,
+                colorKey = row.category.colorKey,
+                size = 40.dp,
+                iconSize = 21.dp,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = row.category.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = if (row.itemCount == 1) "1 entry" else "${row.itemCount} entries",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Home's bottom bar: a plain card-coloured bar running down behind the gesture area, with
+ * Home in the middle as a dark pill. Pinned and Search sit to its left, Add and Settings to
+ * its right.
  */
 @Composable
 private fun HomeBottomBar(
@@ -468,116 +601,49 @@ private fun HomeBottomBar(
     onSearch: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Surface(
-            shape = HumpBarShape,
-            color = EzzyLime,
-            contentColor = EzzyOnLime,
-            shadowElevation = 12.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column {
-                Spacer(Modifier.height(HUMP_TOP))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(BAR_BODY)
-                        .padding(horizontal = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BottomBarAction(Icons.Rounded.Home, "Home", selected = true, onClick = {}, modifier = Modifier.weight(1f))
-                    BottomBarAction(Icons.Rounded.PushPin, "Pinned", selected = false, onClick = onPinned, modifier = Modifier.weight(1f))
-                    Spacer(Modifier.width(ADD_SIZE + 16.dp))
-                    BottomBarAction(Icons.Rounded.Search, "Search", selected = false, onClick = onSearch, modifier = Modifier.weight(1f))
-                    BottomBarAction(Icons.Rounded.Settings, "Settings", selected = false, onClick = onSettings, modifier = Modifier.weight(1f))
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shadowElevation = 8.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(68.dp)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BottomBarAction(Icons.Rounded.PushPin, "Pinned", onPinned, Modifier.weight(1f))
+                BottomBarAction(Icons.Rounded.Search, "Search", onSearch, Modifier.weight(1f))
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1.3f)) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        contentColor = MaterialTheme.colorScheme.surface,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Home,
+                                contentDescription = null,
+                                tint = if (LocalIsDarkTheme.current) EzzyGreen else EzzyGreenBright,
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("Home", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
-                // The lime carries on under the gesture bar instead of stopping short of it.
-                Spacer(Modifier.fillMaxWidth().navigationBarsPadding())
+                BottomBarAction(Icons.Rounded.Add, "Add", onAdd, Modifier.weight(1f))
+                BottomBarAction(Icons.Rounded.Settings, "Settings", onSettings, Modifier.weight(1f))
             }
+            Spacer(Modifier.fillMaxWidth().navigationBarsPadding())
         }
-
-        // The raised button: a dark disc centred in the hump, with a little lime gap around it.
-        Surface(
-            onClick = onAdd,
-            shape = CircleShape,
-            color = EzzyOnLime,
-            contentColor = EzzyLime,
-            shadowElevation = 6.dp,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = ADD_TOP)
-                .size(ADD_SIZE),
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "Add entry",
-                    modifier = Modifier.size(30.dp),
-                )
-            }
-        }
-    }
-}
-
-private val HUMP_TOP = 30.dp
-private val BAR_BODY = 68.dp
-private val ADD_SIZE = 62.dp
-private val ADD_TOP = 9.dp
-private val HUMP_RADIUS = 40.dp
-private val BAR_CORNER = 28.dp
-
-/**
- * Flat bottom, rounded top corners, and a round hump in the middle of the top edge that is
- * concentric with the Add button. The hump meets the bar through two small curves whose ends
- * run along the bar and along the circle, so there is no corner where they join.
- */
-private object HumpBarShape : androidx.compose.ui.graphics.Shape {
-    override fun createOutline(
-        size: androidx.compose.ui.geometry.Size,
-        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-        density: androidx.compose.ui.unit.Density,
-    ): androidx.compose.ui.graphics.Outline = with(density) {
-        val top = HUMP_TOP.toPx()
-        val corner = BAR_CORNER.toPx()
-        val r = HUMP_RADIUS.toPx()
-        val mid = size.width / 2f
-        // Centre of the hump circle = centre of the Add button.
-        val cy = (ADD_TOP + ADD_SIZE / 2).toPx()
-
-        // Where each blend curve meets the circle: a little above the bar's top edge.
-        val joinY = top - 10.dp.toPx()
-        val dy = joinY - cy
-        val dx = kotlin.math.sqrt((r * r - dy * dy).coerceAtLeast(0f))
-        // Follow the circle's tangent at that point back down to the bar's edge; that is
-        // where the curve's control point goes, so both ends of the blend are smooth.
-        val tx = -dy / r
-        val ty = dx / r
-        val back = (top - joinY) / ty
-        val controlX = dx + tx * back
-        val startX = controlX + 18.dp.toPx()
-
-        val startAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), (-dx).toDouble())).toFloat()
-        val endAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
-
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(0f, size.height)
-            lineTo(0f, top + corner)
-            quadraticTo(0f, top, corner, top)
-            lineTo(mid - startX, top)
-            quadraticTo(mid - controlX, top, mid - dx, joinY)
-            arcTo(
-                rect = androidx.compose.ui.geometry.Rect(mid - r, cy - r, mid + r, cy + r),
-                startAngleDegrees = startAngle,
-                sweepAngleDegrees = endAngle - startAngle + 360f * (if (endAngle < startAngle) 1 else 0),
-                forceMoveTo = false,
-            )
-            quadraticTo(mid + controlX, top, mid + startX, top)
-            lineTo(size.width - corner, top)
-            quadraticTo(size.width, top, size.width, top + corner)
-            lineTo(size.width, size.height)
-            close()
-        }
-        androidx.compose.ui.graphics.Outline.Generic(path)
     }
 }
 
@@ -585,7 +651,6 @@ private object HumpBarShape : androidx.compose.ui.graphics.Shape {
 private fun BottomBarAction(
     icon: ImageVector,
     label: String,
-    selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -593,185 +658,12 @@ private fun BottomBarAction(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            modifier = Modifier
-                .size(width = 40.dp, height = 28.dp)
-                .clip(CircleShape)
-                .background(if (selected) EzzyOnLime.copy(alpha = 0.12f) else Color.Transparent),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(22.dp))
-        }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-        )
-    }
-}
-
-@Composable
-private fun CategoryCard(
-    row: CategoryWithCount,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    dragging: Boolean = false,
-) {
-    // Each section wears a bright pastel of its own colour — mint, lavender, butter — in both
-    // themes, so the grid reads at a glance and glows on the dark theme instead of going muddy.
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
-        else accentCard(row.category.colorKey),
-        contentColor = accentOnCard(),
-        shadowElevation = if (dragging) 10.dp else 0.dp,
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(if (dragging) 1.04f else 1f),
-    ) {
-        Column(
-            modifier = Modifier
-                .background(accentSheen())
-                .clickable(onClick = onClick)
-                .padding(16.dp),
-        ) {
-            Row(verticalAlignment = Alignment.Top) {
-                IconAvatar(
-                    iconKey = row.category.iconKey,
-                    colorKey = row.category.colorKey,
-                    size = 46.dp,
-                    iconSize = 23.dp,
-                    onCard = !dragging,
-                )
-                Spacer(Modifier.weight(1f))
-                Surface(
-                    shape = CircleShape,
-                    color = if (dragging) MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
-                    else accentChip(),
-                    contentColor = if (dragging) MaterialTheme.colorScheme.onSurface else accentOnCard(),
-                ) {
-                    Text(
-                        text = "${row.itemCount}",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = row.category.name,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (dragging) MaterialTheme.colorScheme.onSurface else accentOnCard(),
-                maxLines = 2,
-                minLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/**
- * The top of Home: a big lime card with the greeting and how much the vault holds — the one
- * place besides the bottom bar where the app's colour is spent in full.
- */
-@Composable
-private fun HomeHero(
-    greeting: String,
-    itemCount: Int,
-    pinnedCount: Int,
-    sectionCount: Int,
-) {
-    Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        // Dark ink with lime writing, so it stands apart from the lime bar at the bottom.
-        color = HeroInk,
-        contentColor = Color.White,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "$greeting 👋",
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "$itemCount",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = EzzyLime,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = if (itemCount == 1) "entry\nsafe in your vault" else "entries\nsafe in your vault",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HeroChip("$sectionCount sections")
-                HeroChip("$pinnedCount pinned")
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroChip(text: String) {
-    Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f)) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        )
-    }
-}
-
-@Composable
-private fun QuickAccessCard(
-    target: QuickTarget,
-    onClick: () -> Unit,
-) {
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = accentCard(target.colorKey),
-        contentColor = accentOnCard(),
-        modifier = Modifier.width(150.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .background(accentSheen())
-                .clickable(onClick = onClick)
-                .padding(12.dp),
-        ) {
-            IconAvatar(
-                iconKey = target.iconKey,
-                colorKey = target.colorKey,
-                size = 36.dp,
-                iconSize = 18.dp,
-                photoStoredName = target.photoStoredName,
-                onCard = true,
-            )
-            Spacer(Modifier.height(10.dp))
-            // Always two lines: a row of cards with nothing under the title would otherwise
-            // come out ragged, one card short wherever a name happened to fit on one line.
-            Text(
-                text = target.title,
-                style = MaterialTheme.typography.labelLarge,
-                color = accentOnCard(),
-                minLines = 2,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.height(3.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -859,4 +751,3 @@ private fun cardIndexUnder(
 }
 
 /** The hero card's ground: the launcher icon's ink, a touch lifted so it reads as a card. */
-private val HeroInk = Color(0xFF1C2213)

@@ -11,23 +11,32 @@ import androidx.compose.ui.graphics.Color
 // screen is unmistakable, and calm enough around it that a vault full of numbers stays easy to
 // read. The light scheme keeps the same hues on a warm off-white.
 
-/** The lime used for the big call-to-action buttons and the hero card in both themes. */
-val EzzyLime = Color(0xFFC8F25A)
+/** The app's green: icons, links and the main buttons in both themes. */
+val EzzyGreen = Color(0xFF2F8A3B)
 
-/** What is written on top of [EzzyLime] — always the dark ink, never white. */
-val EzzyOnLime = Color(0xFF151A04)
+/** A lighter green for green-on-dark: icons and text on the dark theme's surfaces. */
+val EzzyGreenBright = Color(0xFF7BD37E)
+
+/**
+ * The fill of the main call-to-action buttons. Once a lime, now the app's green — the name is
+ * kept so every button across the app follows the one palette.
+ */
+val EzzyLime = EzzyGreen
+
+/** What is written on top of [EzzyLime]: white on the green. */
+val EzzyOnLime = Color(0xFFFFFFFF)
 
 internal val EzzyLightColors = lightColorScheme(
-    primary = Color(0xFF4B6A00),
+    primary = Color(0xFF2F8A3B),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD6F77E),
-    onPrimaryContainer = Color(0xFF151F00),
-    inversePrimary = Color(0xFFB4DC45),
+    primaryContainer = Color(0xFFE4F3DF),
+    onPrimaryContainer = Color(0xFF0F3317),
+    inversePrimary = Color(0xFF7BD37E),
 
-    secondary = Color(0xFF55624A),
+    secondary = Color(0xFF52604E),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFDDE9CB),
-    onSecondaryContainer = Color(0xFF131F0B),
+    secondaryContainer = Color(0xFFE3EADD),
+    onSecondaryContainer = Color(0xFF161E13),
 
     tertiary = Color(0xFF5C4DB0),
     onTertiary = Color(0xFFFFFFFF),
@@ -39,40 +48,40 @@ internal val EzzyLightColors = lightColorScheme(
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
 
-    background = Color(0xFFF5F6EF),
-    onBackground = Color(0xFF181B13),
-    surface = Color(0xFFF5F6EF),
-    onSurface = Color(0xFF181B13),
-    surfaceVariant = Color(0xFFE1E5D5),
-    onSurfaceVariant = Color(0xFF52584A),
-    surfaceTint = Color(0xFF4B6A00),
+    background = Color(0xFFF4F5F1),
+    onBackground = Color(0xFF121410),
+    surface = Color(0xFFF4F5F1),
+    onSurface = Color(0xFF121410),
+    surfaceVariant = Color(0xFFE6E8E1),
+    onSurfaceVariant = Color(0xFF5F6558),
+    surfaceTint = Color(0xFF2F8A3B),
     inverseSurface = Color(0xFF1C1F17),
     inverseOnSurface = Color(0xFFF0F2E6),
 
-    outline = Color(0xFF7A8070),
-    outlineVariant = Color(0xFFD2D7C5),
+    outline = Color(0xFF8A9082),
+    outlineVariant = Color(0xFFE3E6DD),
     scrim = Color(0xFF000000),
 
-    surfaceBright = Color(0xFFF5F6EF),
-    surfaceDim = Color(0xFFD9DCCF),
+    surfaceBright = Color(0xFFF4F5F1),
+    surfaceDim = Color(0xFFDCDED6),
     surfaceContainerLowest = Color(0xFFFFFFFF),
     surfaceContainerLow = Color(0xFFFFFFFF),
-    surfaceContainer = Color(0xFFEDEFE5),
-    surfaceContainerHigh = Color(0xFFE6E9DD),
-    surfaceContainerHighest = Color(0xFFDFE3D4),
+    surfaceContainer = Color(0xFFEFF0EB),
+    surfaceContainerHigh = Color(0xFFE9EBE4),
+    surfaceContainerHighest = Color(0xFFE2E5DC),
 )
 
 internal val EzzyDarkColors = darkColorScheme(
-    primary = EzzyLime,
-    onPrimary = EzzyOnLime,
-    primaryContainer = Color(0xFF34420F),
-    onPrimaryContainer = Color(0xFFE2FB9E),
-    inversePrimary = Color(0xFF4B6A00),
+    primary = Color(0xFF7BD37E),
+    onPrimary = Color(0xFF0E100D),
+    primaryContainer = Color(0xFF1E2E1C),
+    onPrimaryContainer = Color(0xFFCFEFCB),
+    inversePrimary = Color(0xFF2F8A3B),
 
-    secondary = Color(0xFFBFD0A8),
+    secondary = Color(0xFFBCC8B4),
     onSecondary = Color(0xFF29341D),
-    secondaryContainer = Color(0xFF2E3626),
-    onSecondaryContainer = Color(0xFFDDE9CB),
+    secondaryContainer = Color(0xFF262C22),
+    onSecondaryContainer = Color(0xFFDDE6D6),
 
     tertiary = Color(0xFFC9BCFF),
     onTertiary = Color(0xFF2B1C7C),
@@ -84,27 +93,27 @@ internal val EzzyDarkColors = darkColorScheme(
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
 
-    background = Color(0xFF0E0F0B),
-    onBackground = Color(0xFFE7EADD),
-    surface = Color(0xFF0E0F0B),
-    onSurface = Color(0xFFE7EADD),
-    surfaceVariant = Color(0xFF3A3F33),
-    onSurfaceVariant = Color(0xFFB7BDA9),
-    surfaceTint = EzzyLime,
+    background = Color(0xFF0E100D),
+    onBackground = Color(0xFFF1F3EC),
+    surface = Color(0xFF0E100D),
+    onSurface = Color(0xFFF1F3EC),
+    surfaceVariant = Color(0xFF2A2E26),
+    onSurfaceVariant = Color(0xFF9EA496),
+    surfaceTint = Color(0xFF7BD37E),
     inverseSurface = Color(0xFFE7EADD),
     inverseOnSurface = Color(0xFF1C1F17),
 
-    outline = Color(0xFF858B7A),
-    outlineVariant = Color(0xFF353A2E),
+    outline = Color(0xFF7E8476),
+    outlineVariant = Color(0xFF272B23),
     scrim = Color(0xFF000000),
 
-    surfaceBright = Color(0xFF34382D),
-    surfaceDim = Color(0xFF0E0F0B),
-    surfaceContainerLowest = Color(0xFF090A07),
-    surfaceContainerLow = Color(0xFF171913),
-    surfaceContainer = Color(0xFF1C1F17),
-    surfaceContainerHigh = Color(0xFF25291F),
-    surfaceContainerHighest = Color(0xFF2F3428),
+    surfaceBright = Color(0xFF30352C),
+    surfaceDim = Color(0xFF0E100D),
+    surfaceContainerLowest = Color(0xFF090A08),
+    surfaceContainerLow = Color(0xFF1A1D18),
+    surfaceContainer = Color(0xFF1F221C),
+    surfaceContainerHigh = Color(0xFF262A23),
+    surfaceContainerHighest = Color(0xFF2E332A),
 )
 
 /** A category accent, with a variant for each theme so contrast holds either way. */
@@ -158,35 +167,25 @@ fun brandBannerColors(): List<Color> = if (LocalIsDarkTheme.current) {
 val AccentInk = Color(0xFF15170F)
 
 /**
- * The fill of a section's big card: a soft pastel of its colour on the light theme, and a deep
- * jewel tone on the dark one — colourful in both, without glaring against the black or going
- * muddy like a thin tint does.
+ * The fill of a section's big card. Every card in the app is now the same plain white card
+ * (dark grey on the dark theme) with black writing and a green icon, so this is the card
+ * surface whatever the section's colour.
  */
 @Composable
-fun accentCard(colorKey: String?): Color {
-    val accent = Accents.of(colorKey)
-    return if (LocalIsDarkTheme.current) accent.cardDark else accent.cardLight
-}
+fun accentCard(@Suppress("UNUSED_PARAMETER") colorKey: String?): Color =
+    androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
 
-/** What is written on an [accentCard]: dark ink on the pastels, soft white on the jewel tones. */
+/** What is written on an [accentCard]: the normal text colour. */
 @Composable
-fun accentOnCard(): Color = if (LocalIsDarkTheme.current) Color(0xFFF4F6EC) else AccentInk
+fun accentOnCard(): Color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
 
 /** The little count / label pills sitting on an [accentCard]. */
 @Composable
-fun accentChip(): Color =
-    if (LocalIsDarkTheme.current) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.6f)
+fun accentChip(): Color = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
 
-/**
- * A gentle gradient laid over an [accentCard] so it has depth: a light sheen from the top on
- * the pastels, and a soft fall into shadow toward the corner on the jewel tones.
- */
+/** Kept for the cards that used to carry a sheen: the plain white cards need none. */
 @Composable
-fun accentSheen(): Brush = if (LocalIsDarkTheme.current) {
-    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.06f), Color.Black.copy(alpha = 0.32f)))
-} else {
-    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0f)))
-}
+fun accentSheen(): Brush = Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
 
 /**
  * A soft pastel wash of a category's accent, for quieter tinted surfaces. Kept low-alpha over

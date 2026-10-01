@@ -309,6 +309,7 @@ fun ItemDetailScreen(
                 Surface(
                     shape = MaterialTheme.shapes.extraLarge,
                     color = accentCard(category?.colorKey),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     contentColor = accentOnCard(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {

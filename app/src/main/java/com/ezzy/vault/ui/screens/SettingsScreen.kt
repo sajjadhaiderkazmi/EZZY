@@ -201,12 +201,13 @@ fun SettingsScreen(
 
 @Composable
 private fun ProfileCard(name: String, onEdit: () -> Unit) {
-    // Same dark-ink card as Home's hero, so "you" looks the same in both places.
+    // The same soft green tile as Home's vault total, so "you" looks the same in both places.
+    val tile = MaterialTheme.colorScheme.primaryContainer
     Surface(
         onClick = onEdit,
         shape = MaterialTheme.shapes.extraLarge,
-        color = ProfileInk,
-        contentColor = Color.White,
+        color = tile,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -248,7 +249,7 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
                         .background(EzzyMark.Brand)
                         .border(
                             width = 2.dp,
-                            color = ProfileInk,
+                            color = tile,
                             shape = CircleShape,
                         ),
                     contentAlignment = Alignment.Center,
@@ -272,20 +273,20 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
                 Text(
                     text = "Your vault · offline & encrypted",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )
             }
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.12f)),
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Edit,
                     contentDescription = "Edit name",
-                    tint = EzzyLime,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
             }

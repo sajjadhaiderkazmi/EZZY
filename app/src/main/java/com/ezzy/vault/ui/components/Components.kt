@@ -83,15 +83,11 @@ fun IconAvatar(
         return
     }
 
-    // On an accent card the avatar becomes a dark disc with the bright accent icon, so it
-    // stands off the card instead of vanishing into it.
-    val accent = if (onCard) Accents.of(colorKey).dark
-    else Accents.color(colorKey, LocalIsDarkTheme.current)
-    val disc = when {
-        !onCard -> accent.copy(alpha = if (LocalIsDarkTheme.current) 0.22f else 0.14f)
-        LocalIsDarkTheme.current -> Color.Black.copy(alpha = 0.28f)
-        else -> com.ezzy.vault.ui.theme.AccentInk
-    }
+    // Every avatar is the same soft green disc with a green icon, whatever the section's
+    // colour, so the whole app reads as one white-black-green palette.
+    @Suppress("UNUSED_VARIABLE") val unused = onCard to colorKey
+    val accent = MaterialTheme.colorScheme.primary
+    val disc = MaterialTheme.colorScheme.primaryContainer
     Box(
         modifier = modifier
             .size(size)
@@ -231,8 +227,10 @@ fun FieldValueRow(
     }
 
     val shown = if (revealed) value else "•".repeat(value.length.coerceIn(6, 14))
-    val accent = accentKey?.let { Accents.color(it, LocalIsDarkTheme.current) }
-    val accentDisc = accentKey?.let { com.ezzy.vault.ui.theme.accentCard(it) }
+    // The section colour no longer tints the row: every row is the plain card with a hairline.
+    @Suppress("UNUSED_VARIABLE") val unusedKey = accentKey
+    val accent: Color? = null
+    val accentDisc: Color? = null
     val monospaced = type in MONO_TYPES
 
     Surface(
@@ -240,12 +238,8 @@ fun FieldValueRow(
         shape = if (compact) MaterialTheme.shapes.medium else MaterialTheme.shapes.large,
         // With a section colour the row picks up a faint tint of it, so the details read as part
         // of the entry's card instead of flat grey slabs on the dark theme.
-        color = if (accent != null) {
-            accent.copy(alpha = if (LocalIsDarkTheme.current) 0.09f else 0.07f)
-                .compositeOver(MaterialTheme.colorScheme.surfaceContainerLow)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
-        },
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         tonalElevation = 0.dp,
     ) {
         Row(

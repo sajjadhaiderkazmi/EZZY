@@ -64,12 +64,11 @@ fun ItemRow(
             .fillMaxWidth()
             .scale(if (dragging) 1.03f else 1f),
         shape = MaterialTheme.shapes.large,
-        // A faint tint of the section's colour, so a list of entries carries the colour of the
-        // section card it came from instead of a column of flat grey slabs.
+        // The plain white card with a hairline edge, like every other card in the app.
         color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
-        else Accents.color(colorKey, LocalIsDarkTheme.current)
-            .copy(alpha = if (LocalIsDarkTheme.current) 0.09f else 0.07f)
-            .compositeOver(MaterialTheme.colorScheme.surfaceContainerLow),
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+        border = if (dragging) null
+        else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = if (dragging) 12.dp else 0.dp,
     ) {
         Row(
@@ -121,7 +120,7 @@ fun ItemRow(
                 Spacer(Modifier.width(8.dp))
                 Surface(
                     shape = CircleShape,
-                    color = Accents.color(colorKey, LocalIsDarkTheme.current).copy(alpha = 0.22f),
+                    color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ) {
                     Row(
