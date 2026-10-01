@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +70,7 @@ fun IconAvatar(
     size: Dp = 48.dp,
     iconSize: Dp = 24.dp,
     photoStoredName: String? = null,
+    onCard: Boolean = false,
 ) {
     if (photoStoredName != null) {
         EncryptedImage(
@@ -81,12 +83,17 @@ fun IconAvatar(
         return
     }
 
-    val accent = Accents.color(colorKey, LocalIsDarkTheme.current)
+    // On a bright accent card the avatar flips to an ink disc with the glowing pastel icon,
+    // so it pops off the card instead of vanishing into it.
+    val accent = if (onCard) Accents.of(colorKey).cardDark
+    else Accents.color(colorKey, LocalIsDarkTheme.current)
+    val disc = if (onCard) com.ezzy.vault.ui.theme.AccentInk
+    else accent.copy(alpha = if (LocalIsDarkTheme.current) 0.22f else 0.14f)
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(accent.copy(alpha = if (LocalIsDarkTheme.current) 0.22f else 0.14f)),
+            .background(disc),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -208,6 +215,7 @@ fun FieldValueRow(
     modifier: Modifier = Modifier,
     startMasked: Boolean = true,
     compact: Boolean = false,
+    accentKey: String? = null,
 ) {
     var revealed by remember(value) { mutableStateOf(!type.isMasked || !startMasked) }
     var justCopied by remember { mutableStateOf(false) }
@@ -220,12 +228,21 @@ fun FieldValueRow(
     }
 
     val shown = if (revealed) value else "•".repeat(value.length.coerceIn(6, 14))
+    val accent = accentKey?.let { Accents.color(it, LocalIsDarkTheme.current) }
+    val accentDisc = accentKey?.let { com.ezzy.vault.ui.theme.accentCard(it) }
     val monospaced = type in MONO_TYPES
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = if (compact) MaterialTheme.shapes.medium else MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        // With a section colour the row picks up a faint tint of it, so the details read as part
+        // of the entry's card instead of flat grey slabs on the dark theme.
+        color = if (accent != null) {
+            accent.copy(alpha = if (LocalIsDarkTheme.current) 0.10f else 0.07f)
+                .compositeOver(MaterialTheme.colorScheme.surfaceContainer)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
         tonalElevation = 0.dp,
     ) {
         Row(
@@ -246,7 +263,7 @@ fun FieldValueRow(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = accent ?: MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -282,10 +299,16 @@ fun FieldValueRow(
                     justCopied = true
                 },
                 shape = CircleShape,
-                color = if (justCopied) com.ezzy.vault.ui.theme.EzzyLime
-                else MaterialTheme.colorScheme.primaryContainer,
-                contentColor = if (justCopied) com.ezzy.vault.ui.theme.EzzyOnLime
-                else MaterialTheme.colorScheme.onPrimaryContainer,
+                color = when {
+                    justCopied -> com.ezzy.vault.ui.theme.EzzyLime
+                    accentDisc != null -> accentDisc
+                    else -> MaterialTheme.colorScheme.primaryContainer
+                },
+                contentColor = when {
+                    justCopied -> com.ezzy.vault.ui.theme.EzzyOnLime
+                    accentDisc != null -> com.ezzy.vault.ui.theme.AccentInk
+                    else -> MaterialTheme.colorScheme.onPrimaryContainer
+                },
                 modifier = Modifier.size(if (compact) 36.dp else 42.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {

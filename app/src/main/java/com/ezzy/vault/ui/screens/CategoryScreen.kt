@@ -24,7 +24,9 @@ import com.ezzy.vault.ui.components.CircleIconButton
 import com.ezzy.vault.ui.components.LimeButton
 import com.ezzy.vault.ui.theme.EzzyLime
 import com.ezzy.vault.ui.theme.EzzyOnLime
-import com.ezzy.vault.ui.theme.accentWash
+import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentCard
+import com.ezzy.vault.ui.theme.accentSheen
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,6 +72,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
@@ -748,11 +751,14 @@ private const val GROUP_KEY_PREFIX = "group:"
 private fun SectionBanner(category: CategoryEntity?, entryCount: Int, groupCount: Int) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
-        color = accentWash(category?.colorKey),
+        color = accentCard(category?.colorKey),
+        contentColor = AccentInk,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier
+                .background(accentSheen())
+                .padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconAvatar(
@@ -760,6 +766,7 @@ private fun SectionBanner(category: CategoryEntity?, entryCount: Int, groupCount
                 colorKey = category?.colorKey,
                 size = 60.dp,
                 iconSize = 30.dp,
+                onCard = true,
             )
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -783,7 +790,7 @@ private fun SectionBanner(category: CategoryEntity?, entryCount: Int, groupCount
 
 @Composable
 private fun BannerChip(text: String) {
-    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
+    Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.6f), contentColor = AccentInk) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,

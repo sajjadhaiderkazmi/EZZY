@@ -113,7 +113,9 @@ import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.rememberAttachmentActions
 import com.ezzy.vault.ui.components.LimeButton
 import com.ezzy.vault.ui.components.IconAvatar
-import com.ezzy.vault.ui.theme.accentWash
+import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentCard
+import com.ezzy.vault.ui.theme.accentSheen
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.VerifiedUser
 import com.ezzy.vault.ui.rememberCopier
@@ -290,12 +292,14 @@ fun ItemDetailScreen(
                 // at home in either theme instead of a fixed dark slab.
                 Surface(
                     shape = MaterialTheme.shapes.extraLarge,
-                    color = accentWash(category?.colorKey),
+                    color = accentCard(category?.colorKey),
+                    contentColor = AccentInk,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .background(accentSheen())
                             .padding(vertical = 24.dp, horizontal = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
@@ -305,12 +309,13 @@ fun ItemDetailScreen(
                             photoStoredName = details.item.iconPhoto,
                             size = 72.dp,
                             iconSize = 34.dp,
+                            onCard = true,
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
                             text = details.item.title,
                             style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = AccentInk,
                             textAlign = TextAlign.Center,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -319,7 +324,7 @@ fun ItemDetailScreen(
                             Text(
                                 text = details.item.subtitle,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = AccentInk.copy(alpha = 0.7f),
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -368,6 +373,7 @@ fun ItemDetailScreen(
                         type = field.type,
                         startMasked = settings.maskSecrets,
                         onCopy = { copy(field.label, field.value, field.type.isMasked) },
+                        accentKey = category?.colorKey ?: "lime",
                     )
                 }
             }
@@ -607,12 +613,12 @@ private fun FileSelectionBar(
 private fun HeroChip(text: String) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        color = Color.White.copy(alpha = 0.6f),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = AccentInk,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }

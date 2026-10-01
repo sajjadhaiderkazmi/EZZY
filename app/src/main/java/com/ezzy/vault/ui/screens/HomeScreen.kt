@@ -84,7 +84,9 @@ import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.icons.EzzyMark
 import com.ezzy.vault.ui.theme.EzzyLime
 import com.ezzy.vault.ui.theme.EzzyOnLime
-import com.ezzy.vault.ui.theme.accentWash
+import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentCard
+import com.ezzy.vault.ui.theme.accentSheen
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.util.EzzySettings
 import kotlinx.coroutines.flow.SharingStarted
@@ -608,12 +610,13 @@ private fun CategoryCard(
     modifier: Modifier = Modifier,
     dragging: Boolean = false,
 ) {
-    // Each section wears a soft wash of its own colour — mint, lavender, butter — so the grid
-    // reads at a glance instead of as a wall of identical grey boxes.
+    // Each section wears a bright pastel of its own colour — mint, lavender, butter — in both
+    // themes, so the grid reads at a glance and glows on the dark theme instead of going muddy.
     Surface(
         shape = MaterialTheme.shapes.large,
         color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
-        else accentWash(row.category.colorKey),
+        else accentCard(row.category.colorKey),
+        contentColor = AccentInk,
         shadowElevation = if (dragging) 10.dp else 0.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -621,6 +624,7 @@ private fun CategoryCard(
     ) {
         Column(
             modifier = Modifier
+                .background(accentSheen())
                 .clickable(onClick = onClick)
                 .padding(16.dp),
         ) {
@@ -630,11 +634,14 @@ private fun CategoryCard(
                     colorKey = row.category.colorKey,
                     size = 46.dp,
                     iconSize = 23.dp,
+                    onCard = !dragging,
                 )
                 Spacer(Modifier.weight(1f))
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                    color = if (dragging) MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                    else Color.White.copy(alpha = 0.6f),
+                    contentColor = if (dragging) MaterialTheme.colorScheme.onSurface else AccentInk,
                 ) {
                     Text(
                         text = "${row.itemCount}",
@@ -648,7 +655,7 @@ private fun CategoryCard(
             Text(
                 text = row.category.name,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (dragging) MaterialTheme.colorScheme.onSurface else AccentInk,
                 maxLines = 2,
                 minLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -724,11 +731,13 @@ private fun QuickAccessCard(
 ) {
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = accentCard(target.colorKey),
+        contentColor = AccentInk,
         modifier = Modifier.width(150.dp),
     ) {
         Column(
             modifier = Modifier
+                .background(accentSheen())
                 .clickable(onClick = onClick)
                 .padding(12.dp),
         ) {
@@ -738,6 +747,7 @@ private fun QuickAccessCard(
                 size = 36.dp,
                 iconSize = 18.dp,
                 photoStoredName = target.photoStoredName,
+                onCard = true,
             )
             Spacer(Modifier.height(10.dp))
             // Always two lines: a row of cards with nothing under the title would otherwise
@@ -745,7 +755,7 @@ private fun QuickAccessCard(
             Text(
                 text = target.title,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = AccentInk,
                 minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

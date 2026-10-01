@@ -161,7 +161,9 @@ import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.theme.EzzyLime
 import com.ezzy.vault.ui.theme.EzzyOnLime
 import com.ezzy.vault.ui.theme.ValueMonoStyle
-import com.ezzy.vault.ui.theme.accentWash
+import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentCard
+import com.ezzy.vault.ui.theme.accentSheen
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -462,26 +464,32 @@ private fun SectionStep(
             Surface(
                 onClick = { onSelect(category.id) },
                 shape = MaterialTheme.shapes.large,
-                color = accentWash(category.colorKey),
+                color = accentCard(category.colorKey),
+                contentColor = AccentInk,
                 border = if (selected) {
-                    androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                    androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface)
                 } else {
                     null
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier
+                        .background(accentSheen())
+                        .padding(16.dp),
+                ) {
                     IconAvatar(
                         iconKey = category.iconKey,
                         colorKey = category.colorKey,
                         size = 48.dp,
                         iconSize = 24.dp,
+                        onCard = true,
                     )
                     Spacer(Modifier.height(22.dp))
                     Text(
                         text = category.name,
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = AccentInk,
                         maxLines = 2,
                         minLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -867,10 +875,15 @@ private fun TitleCard(
 ) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
-        color = accentWash(category?.colorKey),
+        color = accentCard(category?.colorKey),
+        contentColor = AccentInk,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(
+            modifier = Modifier
+                .background(accentSheen())
+                .padding(18.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
                     Surface(onClick = onPickPhoto, shape = CircleShape, color = Color.Transparent) {
@@ -880,6 +893,7 @@ private fun TitleCard(
                             photoStoredName = photoStoredName,
                             size = 64.dp,
                             iconSize = 30.dp,
+                            onCard = true,
                         )
                     }
                     Surface(
@@ -909,7 +923,7 @@ private fun TitleCard(
                     Text(
                         text = "Name",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = AccentInk.copy(alpha = 0.65f),
                         modifier = Modifier.padding(start = 2.dp),
                     )
                     TextField(
@@ -934,6 +948,11 @@ private fun TitleCard(
                             unfocusedContainerColor = Color.Transparent,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = AccentInk,
+                            unfocusedTextColor = AccentInk,
+                            cursorColor = AccentInk,
+                            focusedPlaceholderColor = AccentInk.copy(alpha = 0.45f),
+                            unfocusedPlaceholderColor = AccentInk.copy(alpha = 0.45f),
                         ),
                         modifier = Modifier
                             .fillMaxWidth()

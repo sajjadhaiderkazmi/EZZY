@@ -3,6 +3,7 @@ package com.ezzy.vault.ui.theme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // EZZY's own palette: "lime noir". A near-black olive ink with an electric lime accent and soft
@@ -112,22 +113,26 @@ data class AccentColor(
     val label: String,
     val light: Color,
     val dark: Color,
+    /** The bright pastel a big card of this colour is filled with on the light theme. */
+    val cardLight: Color,
+    /** The same card on the dark theme — a little richer so it glows against the black. */
+    val cardDark: Color,
 )
 
 object Accents {
 
     val all: List<AccentColor> = listOf(
-        AccentColor("indigo", "Indigo", Color(0xFF5B5BD6), Color(0xFFA5A4FB)),
-        AccentColor("lime", "Lime", Color(0xFF557A00), Color(0xFFC8F25A)),
-        AccentColor("blue", "Blue", Color(0xFF2C6FDD), Color(0xFF89B7FF)),
-        AccentColor("teal", "Teal", Color(0xFF0E8F81), Color(0xFF54D3C2)),
-        AccentColor("green", "Green", Color(0xFF2A8A4E), Color(0xFF74D69A)),
-        AccentColor("amber", "Amber", Color(0xFFB07C08), Color(0xFFF0C24B)),
-        AccentColor("orange", "Orange", Color(0xFFC4581B), Color(0xFFFFA26B)),
-        AccentColor("red", "Red", Color(0xFFC4342F), Color(0xFFFF9490)),
-        AccentColor("pink", "Pink", Color(0xFFBE3A73), Color(0xFFF991BA)),
-        AccentColor("purple", "Purple", Color(0xFF7C4DD1), Color(0xFFC3A7FF)),
-        AccentColor("slate", "Slate", Color(0xFF566275), Color(0xFFA9B6C8)),
+        AccentColor("indigo", "Indigo", Color(0xFF5B5BD6), Color(0xFFA5A4FB), Color(0xFFDCDBFF), Color(0xFFB4B1FF)),
+        AccentColor("lime", "Lime", Color(0xFF557A00), Color(0xFFC8F25A), Color(0xFFE4F9A8), Color(0xFFC8F25A)),
+        AccentColor("blue", "Blue", Color(0xFF2C6FDD), Color(0xFF89B7FF), Color(0xFFD2E3FF), Color(0xFF9DC4FF)),
+        AccentColor("teal", "Teal", Color(0xFF0E8F81), Color(0xFF54D3C2), Color(0xFFC6F1EA), Color(0xFF7EE2D3)),
+        AccentColor("green", "Green", Color(0xFF2A8A4E), Color(0xFF74D69A), Color(0xFFCDF1D9), Color(0xFF8FE5B0)),
+        AccentColor("amber", "Amber", Color(0xFFB07C08), Color(0xFFF0C24B), Color(0xFFFFEAB0), Color(0xFFF7D168)),
+        AccentColor("orange", "Orange", Color(0xFFC4581B), Color(0xFFFFA26B), Color(0xFFFFDCC6), Color(0xFFFFB68D)),
+        AccentColor("red", "Red", Color(0xFFC4342F), Color(0xFFFF9490), Color(0xFFFFD7D4), Color(0xFFFFA8A3)),
+        AccentColor("pink", "Pink", Color(0xFFBE3A73), Color(0xFFF991BA), Color(0xFFFFD6E8), Color(0xFFFAA9CC)),
+        AccentColor("purple", "Purple", Color(0xFF7C4DD1), Color(0xFFC3A7FF), Color(0xFFE8DCFF), Color(0xFFCFB7FF)),
+        AccentColor("slate", "Slate", Color(0xFF566275), Color(0xFFA9B6C8), Color(0xFFDDE3EC), Color(0xFFBCC8D8)),
     )
 
     private val byKey = all.associateBy { it.key }
@@ -149,10 +154,28 @@ fun brandBannerColors(): List<Color> = if (LocalIsDarkTheme.current) {
     listOf(Color(0xFF3D5600), Color(0xFF1E2A05))
 }
 
+/** The dark ink written on every accent card, in both themes. */
+val AccentInk = Color(0xFF15170F)
+
 /**
- * A soft pastel wash of a category's accent, for big tinted cards (the reference look: mint,
- * lavender, butter tiles). Kept low-alpha over the surface so text on it stays the normal
- * on-surface colour in both themes.
+ * The solid fill of a section's big card: a bright pastel of its colour (mint, lavender,
+ * butter) in both themes, always carrying [AccentInk] writing — on the dark theme the cards
+ * glow against the black like the lime bar does, instead of sinking into a muddy tint.
+ */
+@Composable
+fun accentCard(colorKey: String?): Color {
+    val accent = Accents.of(colorKey)
+    return if (LocalIsDarkTheme.current) accent.cardDark else accent.cardLight
+}
+
+/** A soft light sheen laid over an [accentCard], so the flat pastel picks up a little depth. */
+fun accentSheen(): Brush = Brush.linearGradient(
+    listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0f)),
+)
+
+/**
+ * A soft pastel wash of a category's accent, for quieter tinted surfaces. Kept low-alpha over
+ * the surface so text on it stays the normal on-surface colour in both themes.
  */
 @Composable
 fun accentWash(colorKey: String?): Color {
