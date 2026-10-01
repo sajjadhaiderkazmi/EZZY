@@ -195,14 +195,9 @@ fun EditorScreen(
     // Bumped each time Continue or Save is tapped without a title: the title box takes the
     // focus and turns red, and a small message says what is missing.
     var titleNudge by remember { mutableStateOf(0) }
-    val nudgeScope = rememberCoroutineScope()
     val askForTitle: () -> Unit = {
         if (state.step != EditorStep.DETAILS) viewModel.goTo(EditorStep.DETAILS)
         titleNudge++
-        nudgeScope.launch {
-            snackbar.currentSnackbarData?.dismiss()
-            snackbar.showSnackbar("Please add a title to continue")
-        }
     }
 
     LaunchedEffect(state.message) {
@@ -237,6 +232,7 @@ fun EditorScreen(
         bottomBar = {
             EditorBottomBar(
                 state = state,
+                titleNudge = titleNudge,
                 isLastStep = state.step == state.steps.last(),
                 onBack = { viewModel.back() },
                 onNext = {
@@ -389,6 +385,7 @@ private fun EditorHeader(
 @Composable
 private fun EditorBottomBar(
     state: EditorUiState,
+    titleNudge: Int,
     isLastStep: Boolean,
     onBack: () -> Unit,
     onNext: () -> Unit,
@@ -401,6 +398,38 @@ private fun EditorBottomBar(
             .navigationBarsPadding()
             .imePadding(),
     ) {
+        // A small popup right above the buttons, which ride above the keyboard, so it is never
+        // hidden behind it the way a snackbar at the bottom of the screen was.
+        var showTitlePopup by remember { mutableStateOf(false) }
+        LaunchedEffect(titleNudge) {
+            if (titleNudge > 0) {
+                showTitlePopup = true
+                kotlinx.coroutines.delay(2200)
+                showTitlePopup = false
+            }
+        }
+        AnimatedVisibility(
+            visible = showTitlePopup && state.draft.title.isBlank(),
+            enter = fadeIn() + scaleIn(initialScale = 0.9f),
+            exit = fadeOut() + scaleOut(targetScale = 0.9f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.inverseSurface,
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                ) {
+                    Text(
+                        text = "Please add a title to continue",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                    )
+                }
+            }
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
