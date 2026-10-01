@@ -84,7 +84,8 @@ import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.icons.EzzyMark
 import com.ezzy.vault.ui.theme.EzzyLime
 import com.ezzy.vault.ui.theme.EzzyOnLime
-import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentChip
+import com.ezzy.vault.ui.theme.accentOnCard
 import com.ezzy.vault.ui.theme.accentCard
 import com.ezzy.vault.ui.theme.accentSheen
 import com.ezzy.vault.ui.ezzyViewModel
@@ -616,7 +617,7 @@ private fun CategoryCard(
         shape = MaterialTheme.shapes.large,
         color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
         else accentCard(row.category.colorKey),
-        contentColor = AccentInk,
+        contentColor = accentOnCard(),
         shadowElevation = if (dragging) 10.dp else 0.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -640,8 +641,8 @@ private fun CategoryCard(
                 Surface(
                     shape = CircleShape,
                     color = if (dragging) MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
-                    else Color.White.copy(alpha = 0.6f),
-                    contentColor = if (dragging) MaterialTheme.colorScheme.onSurface else AccentInk,
+                    else accentChip(),
+                    contentColor = if (dragging) MaterialTheme.colorScheme.onSurface else accentOnCard(),
                 ) {
                     Text(
                         text = "${row.itemCount}",
@@ -655,7 +656,7 @@ private fun CategoryCard(
             Text(
                 text = row.category.name,
                 style = MaterialTheme.typography.titleSmall,
-                color = if (dragging) MaterialTheme.colorScheme.onSurface else AccentInk,
+                color = if (dragging) MaterialTheme.colorScheme.onSurface else accentOnCard(),
                 maxLines = 2,
                 minLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -732,7 +733,7 @@ private fun QuickAccessCard(
     Surface(
         shape = MaterialTheme.shapes.large,
         color = accentCard(target.colorKey),
-        contentColor = AccentInk,
+        contentColor = accentOnCard(),
         modifier = Modifier.width(150.dp),
     ) {
         Column(
@@ -755,7 +756,7 @@ private fun QuickAccessCard(
             Text(
                 text = target.title,
                 style = MaterialTheme.typography.labelLarge,
-                color = AccentInk,
+                color = accentOnCard(),
                 minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

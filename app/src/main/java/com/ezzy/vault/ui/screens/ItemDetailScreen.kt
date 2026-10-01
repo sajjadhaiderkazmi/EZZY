@@ -113,7 +113,8 @@ import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.rememberAttachmentActions
 import com.ezzy.vault.ui.components.LimeButton
 import com.ezzy.vault.ui.components.IconAvatar
-import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentChip
+import com.ezzy.vault.ui.theme.accentOnCard
 import com.ezzy.vault.ui.theme.accentCard
 import com.ezzy.vault.ui.theme.accentSheen
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -293,7 +294,7 @@ fun ItemDetailScreen(
                 Surface(
                     shape = MaterialTheme.shapes.extraLarge,
                     color = accentCard(category?.colorKey),
-                    contentColor = AccentInk,
+                    contentColor = accentOnCard(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
@@ -315,7 +316,7 @@ fun ItemDetailScreen(
                         Text(
                             text = details.item.title,
                             style = MaterialTheme.typography.headlineSmall,
-                            color = AccentInk,
+                            color = accentOnCard(),
                             textAlign = TextAlign.Center,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -324,7 +325,7 @@ fun ItemDetailScreen(
                             Text(
                                 text = details.item.subtitle,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = AccentInk.copy(alpha = 0.7f),
+                                color = accentOnCard().copy(alpha = 0.7f),
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -613,12 +614,12 @@ private fun FileSelectionBar(
 private fun HeroChip(text: String) {
     Surface(
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.6f),
+        color = accentChip(),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
-            color = AccentInk,
+            color = accentOnCard(),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }

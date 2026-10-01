@@ -161,7 +161,8 @@ import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.theme.EzzyLime
 import com.ezzy.vault.ui.theme.EzzyOnLime
 import com.ezzy.vault.ui.theme.ValueMonoStyle
-import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentChip
+import com.ezzy.vault.ui.theme.accentOnCard
 import com.ezzy.vault.ui.theme.accentCard
 import com.ezzy.vault.ui.theme.accentSheen
 import kotlinx.coroutines.launch
@@ -465,7 +466,7 @@ private fun SectionStep(
                 onClick = { onSelect(category.id) },
                 shape = MaterialTheme.shapes.large,
                 color = accentCard(category.colorKey),
-                contentColor = AccentInk,
+                contentColor = accentOnCard(),
                 border = if (selected) {
                     androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface)
                 } else {
@@ -489,7 +490,7 @@ private fun SectionStep(
                     Text(
                         text = category.name,
                         style = MaterialTheme.typography.titleSmall,
-                        color = AccentInk,
+                        color = accentOnCard(),
                         maxLines = 2,
                         minLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -876,7 +877,7 @@ private fun TitleCard(
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = accentCard(category?.colorKey),
-        contentColor = AccentInk,
+        contentColor = accentOnCard(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -923,7 +924,7 @@ private fun TitleCard(
                     Text(
                         text = "Name",
                         style = MaterialTheme.typography.labelMedium,
-                        color = AccentInk.copy(alpha = 0.65f),
+                        color = accentOnCard().copy(alpha = 0.65f),
                         modifier = Modifier.padding(start = 2.dp),
                     )
                     TextField(
@@ -948,11 +949,11 @@ private fun TitleCard(
                             unfocusedContainerColor = Color.Transparent,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = AccentInk,
-                            unfocusedTextColor = AccentInk,
-                            cursorColor = AccentInk,
-                            focusedPlaceholderColor = AccentInk.copy(alpha = 0.45f),
-                            unfocusedPlaceholderColor = AccentInk.copy(alpha = 0.45f),
+                            focusedTextColor = accentOnCard(),
+                            unfocusedTextColor = accentOnCard(),
+                            cursorColor = accentOnCard(),
+                            focusedPlaceholderColor = accentOnCard().copy(alpha = 0.45f),
+                            unfocusedPlaceholderColor = accentOnCard().copy(alpha = 0.45f),
                         ),
                         modifier = Modifier
                             .fillMaxWidth()

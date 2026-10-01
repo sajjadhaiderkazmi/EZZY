@@ -115,24 +115,24 @@ data class AccentColor(
     val dark: Color,
     /** The bright pastel a big card of this colour is filled with on the light theme. */
     val cardLight: Color,
-    /** The same card on the dark theme — a little richer so it glows against the black. */
+    /** The same card on the dark theme: a deep jewel tone, rich but easy on the eyes. */
     val cardDark: Color,
 )
 
 object Accents {
 
     val all: List<AccentColor> = listOf(
-        AccentColor("indigo", "Indigo", Color(0xFF5B5BD6), Color(0xFFA5A4FB), Color(0xFFDCDBFF), Color(0xFFB4B1FF)),
-        AccentColor("lime", "Lime", Color(0xFF557A00), Color(0xFFC8F25A), Color(0xFFE4F9A8), Color(0xFFC8F25A)),
-        AccentColor("blue", "Blue", Color(0xFF2C6FDD), Color(0xFF89B7FF), Color(0xFFD2E3FF), Color(0xFF9DC4FF)),
-        AccentColor("teal", "Teal", Color(0xFF0E8F81), Color(0xFF54D3C2), Color(0xFFC6F1EA), Color(0xFF7EE2D3)),
-        AccentColor("green", "Green", Color(0xFF2A8A4E), Color(0xFF74D69A), Color(0xFFCDF1D9), Color(0xFF8FE5B0)),
-        AccentColor("amber", "Amber", Color(0xFFB07C08), Color(0xFFF0C24B), Color(0xFFFFEAB0), Color(0xFFF7D168)),
-        AccentColor("orange", "Orange", Color(0xFFC4581B), Color(0xFFFFA26B), Color(0xFFFFDCC6), Color(0xFFFFB68D)),
-        AccentColor("red", "Red", Color(0xFFC4342F), Color(0xFFFF9490), Color(0xFFFFD7D4), Color(0xFFFFA8A3)),
-        AccentColor("pink", "Pink", Color(0xFFBE3A73), Color(0xFFF991BA), Color(0xFFFFD6E8), Color(0xFFFAA9CC)),
-        AccentColor("purple", "Purple", Color(0xFF7C4DD1), Color(0xFFC3A7FF), Color(0xFFE8DCFF), Color(0xFFCFB7FF)),
-        AccentColor("slate", "Slate", Color(0xFF566275), Color(0xFFA9B6C8), Color(0xFFDDE3EC), Color(0xFFBCC8D8)),
+        AccentColor("indigo", "Indigo", Color(0xFF5B5BD6), Color(0xFFA5A4FB), Color(0xFFDCDBFF), Color(0xFF3D3B95)),
+        AccentColor("lime", "Lime", Color(0xFF557A00), Color(0xFFC8F25A), Color(0xFFE4F9A8), Color(0xFF4A5E12)),
+        AccentColor("blue", "Blue", Color(0xFF2C6FDD), Color(0xFF89B7FF), Color(0xFFD2E3FF), Color(0xFF1F4F98)),
+        AccentColor("teal", "Teal", Color(0xFF0E8F81), Color(0xFF54D3C2), Color(0xFFC6F1EA), Color(0xFF0F6B62)),
+        AccentColor("green", "Green", Color(0xFF2A8A4E), Color(0xFF74D69A), Color(0xFFCDF1D9), Color(0xFF1C6B41)),
+        AccentColor("amber", "Amber", Color(0xFFB07C08), Color(0xFFF0C24B), Color(0xFFFFEAB0), Color(0xFF7A5A0E)),
+        AccentColor("orange", "Orange", Color(0xFFC4581B), Color(0xFFFFA26B), Color(0xFFFFDCC6), Color(0xFF8A4018)),
+        AccentColor("red", "Red", Color(0xFFC4342F), Color(0xFFFF9490), Color(0xFFFFD7D4), Color(0xFF8C2E2E)),
+        AccentColor("pink", "Pink", Color(0xFFBE3A73), Color(0xFFF991BA), Color(0xFFFFD6E8), Color(0xFF8A2D5C)),
+        AccentColor("purple", "Purple", Color(0xFF7C4DD1), Color(0xFFC3A7FF), Color(0xFFE8DCFF), Color(0xFF5B3C9E)),
+        AccentColor("slate", "Slate", Color(0xFF566275), Color(0xFFA9B6C8), Color(0xFFDDE3EC), Color(0xFF3A4659)),
     )
 
     private val byKey = all.associateBy { it.key }
@@ -154,13 +154,13 @@ fun brandBannerColors(): List<Color> = if (LocalIsDarkTheme.current) {
     listOf(Color(0xFF3D5600), Color(0xFF1E2A05))
 }
 
-/** The dark ink written on every accent card, in both themes. */
+/** The dark ink written on accent cards on the light theme. */
 val AccentInk = Color(0xFF15170F)
 
 /**
- * The solid fill of a section's big card: a bright pastel of its colour (mint, lavender,
- * butter) in both themes, always carrying [AccentInk] writing — on the dark theme the cards
- * glow against the black like the lime bar does, instead of sinking into a muddy tint.
+ * The fill of a section's big card: a soft pastel of its colour on the light theme, and a deep
+ * jewel tone on the dark one — colourful in both, without glaring against the black or going
+ * muddy like a thin tint does.
  */
 @Composable
 fun accentCard(colorKey: String?): Color {
@@ -168,10 +168,25 @@ fun accentCard(colorKey: String?): Color {
     return if (LocalIsDarkTheme.current) accent.cardDark else accent.cardLight
 }
 
-/** A soft light sheen laid over an [accentCard], so the flat pastel picks up a little depth. */
-fun accentSheen(): Brush = Brush.linearGradient(
-    listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0f)),
-)
+/** What is written on an [accentCard]: dark ink on the pastels, soft white on the jewel tones. */
+@Composable
+fun accentOnCard(): Color = if (LocalIsDarkTheme.current) Color(0xFFF4F6EC) else AccentInk
+
+/** The little count / label pills sitting on an [accentCard]. */
+@Composable
+fun accentChip(): Color =
+    if (LocalIsDarkTheme.current) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.6f)
+
+/**
+ * A gentle gradient laid over an [accentCard] so it has depth: a light sheen from the top on
+ * the pastels, and a soft fall into shadow toward the corner on the jewel tones.
+ */
+@Composable
+fun accentSheen(): Brush = if (LocalIsDarkTheme.current) {
+    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.06f), Color.Black.copy(alpha = 0.32f)))
+} else {
+    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0f)))
+}
 
 /**
  * A soft pastel wash of a category's accent, for quieter tinted surfaces. Kept low-alpha over

@@ -24,7 +24,8 @@ import com.ezzy.vault.ui.components.CircleIconButton
 import com.ezzy.vault.ui.components.LimeButton
 import com.ezzy.vault.ui.theme.EzzyLime
 import com.ezzy.vault.ui.theme.EzzyOnLime
-import com.ezzy.vault.ui.theme.AccentInk
+import com.ezzy.vault.ui.theme.accentChip
+import com.ezzy.vault.ui.theme.accentOnCard
 import com.ezzy.vault.ui.theme.accentCard
 import com.ezzy.vault.ui.theme.accentSheen
 import androidx.compose.foundation.layout.padding
@@ -752,7 +753,7 @@ private fun SectionBanner(category: CategoryEntity?, entryCount: Int, groupCount
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = accentCard(category?.colorKey),
-        contentColor = AccentInk,
+        contentColor = accentOnCard(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -790,7 +791,7 @@ private fun SectionBanner(category: CategoryEntity?, entryCount: Int, groupCount
 
 @Composable
 private fun BannerChip(text: String) {
-    Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.6f), contentColor = AccentInk) {
+    Surface(shape = CircleShape, color = accentChip(), contentColor = accentOnCard()) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,

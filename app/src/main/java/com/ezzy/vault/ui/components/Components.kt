@@ -83,12 +83,15 @@ fun IconAvatar(
         return
     }
 
-    // On a bright accent card the avatar flips to an ink disc with the glowing pastel icon,
-    // so it pops off the card instead of vanishing into it.
-    val accent = if (onCard) Accents.of(colorKey).cardDark
+    // On an accent card the avatar becomes a dark disc with the bright accent icon, so it
+    // stands off the card instead of vanishing into it.
+    val accent = if (onCard) Accents.of(colorKey).dark
     else Accents.color(colorKey, LocalIsDarkTheme.current)
-    val disc = if (onCard) com.ezzy.vault.ui.theme.AccentInk
-    else accent.copy(alpha = if (LocalIsDarkTheme.current) 0.22f else 0.14f)
+    val disc = when {
+        !onCard -> accent.copy(alpha = if (LocalIsDarkTheme.current) 0.22f else 0.14f)
+        LocalIsDarkTheme.current -> Color.Black.copy(alpha = 0.28f)
+        else -> com.ezzy.vault.ui.theme.AccentInk
+    }
     Box(
         modifier = modifier
             .size(size)
@@ -306,7 +309,7 @@ fun FieldValueRow(
                 },
                 contentColor = when {
                     justCopied -> com.ezzy.vault.ui.theme.EzzyOnLime
-                    accentDisc != null -> com.ezzy.vault.ui.theme.AccentInk
+                    accentDisc != null -> com.ezzy.vault.ui.theme.accentOnCard()
                     else -> MaterialTheme.colorScheme.onPrimaryContainer
                 },
                 modifier = Modifier.size(if (compact) 36.dp else 42.dp),
