@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
@@ -594,8 +595,8 @@ private fun CategoryCard(
 }
 
 /**
- * Home's bottom bar: a plain card-coloured bar running down behind the gesture area, with
- * Home in the middle as a dark pill. Pinned and Search sit to its left, Add and Settings to
+ * Home's bottom bar: a plain card-coloured bar running down behind the gesture area, five
+ * equal items with Home in the middle. Pinned and Search sit to its left, Add and Settings to
  * its right.
  */
 @Composable
@@ -622,27 +623,7 @@ private fun HomeBottomBar(
             ) {
                 BottomBarAction(Icons.Rounded.PushPin, "Pinned", onPinned, Modifier.weight(1f))
                 BottomBarAction(Icons.Rounded.Search, "Search", onSearch, Modifier.weight(1f))
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1.3f)) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        contentColor = MaterialTheme.colorScheme.surface,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Home,
-                                contentDescription = null,
-                                tint = if (LocalIsDarkTheme.current) EzzyGreen else EzzyGreenBright,
-                                modifier = Modifier.size(22.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text("Home", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+                BottomBarAction(Icons.Rounded.Home, "Home", {}, Modifier.weight(1f), selected = true)
                 BottomBarAction(Icons.Rounded.Add, "Add", onAdd, Modifier.weight(1f))
                 BottomBarAction(Icons.Rounded.Settings, "Settings", onSettings, Modifier.weight(1f))
             }
@@ -657,17 +638,38 @@ private fun BottomBarAction(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
 ) {
+    // Every item has the same icon and label size; the current one (Home) only gets a green
+    // pill behind its icon and a bold green label.
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Box(
+            modifier = Modifier
+                .size(width = 52.dp, height = 30.dp)
+                .clip(CircleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                modifier = Modifier.size(24.dp),
+            )
+        }
         Spacer(Modifier.height(3.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+        )
     }
 }
 
