@@ -236,8 +236,6 @@ fun ConnectBrowserScreen(onBack: () -> Unit) {
                         LogoutButton(onClick = { askLogout = true }, modifier = Modifier.weight(1f))
                     }
                 }
-                item { SettingsGroup("The extension") }
-                item { ExtensionCard(extension, viewModel) }
             }
         }
     }
