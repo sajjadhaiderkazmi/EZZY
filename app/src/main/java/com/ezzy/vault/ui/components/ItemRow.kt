@@ -119,7 +119,11 @@ fun ItemRow(
             }
             if (item.attachments.isNotEmpty()) {
                 Spacer(Modifier.width(8.dp))
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Surface(
+                    shape = CircleShape,
+                    color = Accents.color(colorKey, LocalIsDarkTheme.current).copy(alpha = 0.22f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -127,13 +131,13 @@ fun ItemRow(
                         Icon(
                             imageVector = Icons.Rounded.AttachFile,
                             contentDescription = "${item.attachments.size} files",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(13.dp),
                         )
                         Text(
                             text = "${item.attachments.size}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }

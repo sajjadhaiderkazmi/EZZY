@@ -278,12 +278,15 @@ fun ItemDetailScreen(
             )
         },
         floatingActionButton = {
-            LimeButton(
-                text = "Edit",
-                icon = Icons.Rounded.Edit,
-                onClick = onEdit,
-                modifier = Modifier.navigationBarsPadding(),
-            )
+            // Hidden while a file is open on top, or its lime edge peeks out under the sheet.
+            if (previewFileId == null) {
+                LimeButton(
+                    text = "Edit",
+                    icon = Icons.Rounded.Edit,
+                    onClick = onEdit,
+                    modifier = Modifier.navigationBarsPadding(),
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
