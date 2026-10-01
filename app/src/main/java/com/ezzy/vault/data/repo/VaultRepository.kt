@@ -432,6 +432,7 @@ class VaultRepository(
                 )
             )
         }
+        db.fieldDao().unmaskBankAccountNumbers()
     }
 
     suspend fun attachmentBytes(storedName: String): ByteArray? = attachments.read(storedName)

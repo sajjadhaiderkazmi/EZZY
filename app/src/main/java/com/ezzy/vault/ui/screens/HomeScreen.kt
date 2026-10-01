@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -79,8 +80,10 @@ import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.QuickKind
 import com.ezzy.vault.ui.components.QuickTarget
 import com.ezzy.vault.ui.components.SectionHeader
-import com.ezzy.vault.ui.components.StatCard
 import com.ezzy.vault.ui.icons.EzzyMark
+import com.ezzy.vault.ui.theme.EzzyLime
+import com.ezzy.vault.ui.theme.EzzyOnLime
+import com.ezzy.vault.ui.theme.accentWash
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.util.EzzySettings
 import kotlinx.coroutines.flow.SharingStarted
@@ -227,7 +230,7 @@ fun HomeScreen(
                             Icon(
                                 imageVector = EzzyMark.Bolt,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = EzzyMark.Spark,
                                 modifier = Modifier.size(22.dp),
                             )
                         }
@@ -248,11 +251,8 @@ fun HomeScreen(
                         }
                     }
                 },
-                actions = {
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Rounded.Search, contentDescription = "Search")
-                    }
-                },
+                // Search lives in the hero card's search bar now, one big target instead of a
+                // small icon up here as well.
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -274,23 +274,17 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    text = buildString {
+                HomeHero(
+                    greeting = buildString {
                         append(greeting)
                         if (settings.displayName.isNotBlank()) append(", ${settings.displayName}")
-                        append(" 👋")
                     },
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    itemCount = itemCount,
+                    pinnedCount = pinned.size,
+                    sectionCount = categories.size,
+                    onSearch = onOpenSearch,
+                    onAdd = onAddItem,
                 )
-            }
-
-            item(span = { GridItemSpan(1) }) {
-                StatCard(value = "$itemCount", label = if (itemCount == 1) "Total item" else "Total items")
-            }
-            item(span = { GridItemSpan(1) }) {
-                StatCard(value = "${pinned.size}", label = "Pinned")
             }
 
             if (!settings.overlayEnabled) {
@@ -545,33 +539,148 @@ private fun CategoryCard(
     modifier: Modifier = Modifier,
     dragging: Boolean = false,
 ) {
+    // Each section wears a soft wash of its own colour — mint, lavender, butter — so the grid
+    // reads at a glance instead of as a wall of identical grey boxes.
     Surface(
         shape = MaterialTheme.shapes.large,
         color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
-        else MaterialTheme.colorScheme.surfaceContainerLow,
+        else accentWash(row.category.colorKey),
         shadowElevation = if (dragging) 10.dp else 0.dp,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .scale(if (dragging) 1.04f else 1f),
     ) {
         Column(
             modifier = Modifier
                 .clickable(onClick = onClick)
-                .padding(14.dp),
+                .padding(16.dp),
         ) {
-            IconAvatar(
-                iconKey = row.category.iconKey,
-                colorKey = row.category.colorKey,
-                size = 46.dp,
-                iconSize = 23.dp,
-            )
-            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                IconAvatar(
+                    iconKey = row.category.iconKey,
+                    colorKey = row.category.colorKey,
+                    size = 46.dp,
+                    iconSize = 23.dp,
+                )
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                ) {
+                    Text(
+                        text = "${row.itemCount}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
             Text(
                 text = row.category.name,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
+                minLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/**
+ * The top of Home: a big lime card with the greeting, how much the vault holds, a search bar
+ * and the add button — the one place the app's colour is spent in full.
+ */
+@Composable
+private fun HomeHero(
+    greeting: String,
+    itemCount: Int,
+    pinnedCount: Int,
+    sectionCount: Int,
+    onSearch: () -> Unit,
+    onAdd: () -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = EzzyLime,
+        contentColor = EzzyOnLime,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "$greeting 👋",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "$itemCount",
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (itemCount == 1) "entry\nsafe in your vault" else "entries\nsafe in your vault",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HeroChip("$sectionCount sections")
+                HeroChip("$pinnedCount pinned")
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    onClick = onSearch,
+                    shape = CircleShape,
+                    color = EzzyOnLime.copy(alpha = 0.08f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = "Search your vault",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = EzzyOnLime.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Surface(
+                    onClick = onAdd,
+                    shape = CircleShape,
+                    color = EzzyOnLime,
+                    contentColor = EzzyLime,
+                    modifier = Modifier.size(50.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Add entry")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroChip(text: String) {
+    Surface(shape = CircleShape, color = EzzyOnLime.copy(alpha = 0.1f)) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 
@@ -581,7 +690,7 @@ private fun QuickAccessCard(
     onClick: () -> Unit,
 ) {
     Surface(
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.width(150.dp),
     ) {

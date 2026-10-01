@@ -47,7 +47,7 @@ fun EzzyLogo(size: androidx.compose.ui.unit.Dp = 88.dp) {
         Icon(
             imageVector = EzzyMark.Bolt,
             contentDescription = null,
-            tint = Color.White,
+            tint = EzzyMark.Spark,
             modifier = Modifier.size(size * 0.74f),
         )
     }

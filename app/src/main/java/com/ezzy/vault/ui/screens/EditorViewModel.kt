@@ -46,7 +46,21 @@ data class EditorUiState(
     val loading: Boolean = true,
     val importing: Boolean = false,
     val message: String? = null,
+    /** The draft exactly as the editor opened it — anything different is unsaved work. */
+    val pristine: ItemDraft? = null,
 ) {
+    /** True once the user has typed, picked or attached anything worth asking about on exit. */
+    val isDirty: Boolean
+        get() {
+            val before = pristine ?: return false
+            fun ItemDraft.typed() = fields.filter { it.value.isNotBlank() }.map { Triple(it.label.trim(), it.value.trim(), it.type) }
+            return draft.title.trim() != before.title.trim() ||
+                draft.note.trim() != before.note.trim() ||
+                draft.iconPhoto != before.iconPhoto ||
+                draft.attachments.map { it.storedName } != before.attachments.map { it.storedName } ||
+                draft.typed() != before.typed()
+        }
+
     val canContinue: Boolean
         get() = when (step) {
             EditorStep.SECTION -> draft.categoryId.isNotBlank()
@@ -144,6 +158,7 @@ class EditorViewModel(
                 titleHint = spec?.titleHint?.takeIf { it.isNotBlank() } ?: DEFAULT_TITLE_HINT,
                 needsPhoto = needsPhoto,
                 loading = false,
+                pristine = draft,
             )
         }
     }
@@ -231,6 +246,51 @@ class EditorViewModel(
 
     fun removeField(id: String) = updateDraft { draft ->
         draft.copy(fields = draft.fields.filterNot { it.id == id })
+    }
+
+    /** Puts a just-removed field back where it was — the Undo on the "Field removed" bar. */
+    fun restoreField(field: FieldDraft, index: Int) = updateDraft { draft ->
+        if (draft.fields.any { it.id == field.id }) return@updateDraft draft
+        val at = index.coerceIn(0, draft.fields.size)
+        draft.copy(fields = draft.fields.toMutableList().apply { add(at, field) })
+    }
+
+    /** Adds a field with a value already in it — the one-tap suggestion chips use this. */
+    fun addFieldWithValue(label: String, type: FieldType, value: String = "") = updateDraft { draft ->
+        draft.copy(
+            fields = draft.fields + FieldDraft(
+                label = label.trim(),
+                type = type,
+                value = value,
+                fromTemplate = false,
+            )
+        )
+    }
+
+    /**
+     * Places a copy right under the original — same name, kind and value — so a second phone
+     * number or a second account is one long-press away instead of a whole new field. The copy
+     * is the user's own field, so it can be renamed ("Phone 2") straight away.
+     */
+    fun duplicateField(id: String) = updateDraft { draft ->
+        val index = draft.fields.indexOfFirst { it.id == id }
+        if (index < 0) return@updateDraft draft
+        val source = draft.fields[index]
+        val copy = FieldDraft(
+            label = source.label,
+            value = source.value,
+            type = source.type,
+            fromTemplate = false,
+        )
+        draft.copy(fields = draft.fields.toMutableList().apply { add(index + 1, copy) })
+    }
+
+    /** Moves a field up (negative) or down (positive). The order is what gets saved. */
+    fun moveField(id: String, delta: Int) = updateDraft { draft ->
+        val from = draft.fields.indexOfFirst { it.id == id }
+        val to = (from + delta).coerceIn(0, draft.fields.lastIndex)
+        if (from < 0 || from == to) return@updateDraft draft
+        draft.copy(fields = draft.fields.toMutableList().apply { add(to, removeAt(from)) })
     }
 
     // ---- Entry icon ---------------------------------------------------------

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Flat brand indigo. The gradient this replaced read as two different colours once Android
+  Flat brand ink (near-black olive), the ground the lime bolt sits on. The gradient this replaced read as two different colours once Android
   masked it into a circle or a squircle; a solid ground keeps the mark the same on every
   launcher.
 -->
@@ -10,6 +10,6 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#FF3A26B4"
+        android:fillColor="#FF14170F"
         android:pathData="M0,0h108v108h-108z" />
 </vector>

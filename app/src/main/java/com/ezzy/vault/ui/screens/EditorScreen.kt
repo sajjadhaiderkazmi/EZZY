@@ -5,94 +5,137 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import android.provider.OpenableColumns
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.AlternateEmail
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Contacts
-import androidx.compose.material.icons.rounded.Crop
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.PhotoCamera
-import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Crop
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Numbers
+import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezzy.vault.data.db.CategoryEntity
@@ -102,21 +145,27 @@ import com.ezzy.vault.data.model.FieldDraft
 import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.ui.LocalSnackbar
+import com.ezzy.vault.ui.components.CircleIconButton
 import com.ezzy.vault.ui.components.DeleteAttachmentButton
 import com.ezzy.vault.ui.components.EncryptedImage
+import com.ezzy.vault.ui.components.IconAvatar
 import com.ezzy.vault.ui.components.ImageCropDialog
+import com.ezzy.vault.ui.components.LimeButton
+import com.ezzy.vault.ui.components.SoftPillButton
 import com.ezzy.vault.ui.components.VOICE_NOTE_MIME
 import com.ezzy.vault.ui.components.VoiceNoteDialog
 import com.ezzy.vault.ui.components.VoiceNoteRow
-import com.ezzy.vault.ui.components.IconAvatar
-import com.ezzy.vault.ui.components.SectionHeader
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.ui.icons.IconCatalog
+import com.ezzy.vault.ui.theme.EzzyLime
+import com.ezzy.vault.ui.theme.EzzyOnLime
+import com.ezzy.vault.ui.theme.ValueMonoStyle
+import com.ezzy.vault.ui.theme.accentWash
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditorScreen(
     itemId: String?,
@@ -135,6 +184,7 @@ fun EditorScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val templates by viewModel.templates.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbar.current
+    var confirmDiscard by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -143,43 +193,31 @@ fun EditorScreen(
         }
     }
 
+    // One way out, wherever it is pressed from: a step back first, then — only if something
+    // was actually typed — a quick "discard?" instead of silently throwing the entry away.
+    val leave: () -> Unit = {
+        if (!viewModel.back()) {
+            if (state.isDirty) confirmDiscard = true else onClose()
+        }
+    }
+    BackHandler(onBack = leave)
+
     val stepIndex = state.steps.indexOf(state.step).coerceAtLeast(0)
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = if (state.draft.isNew) "New entry" else "Edit entry",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(
-                            text = "Step ${stepIndex + 1} of ${state.steps.size} · ${state.step.title}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { if (!viewModel.back()) onClose() }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Discard")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
+            EditorHeader(
+                isNew = state.draft.isNew,
+                stepIndex = stepIndex,
+                stepCount = state.steps.size,
+                stepTitle = state.step.title,
+                stepCaption = state.step.caption,
+                onBack = leave,
             )
         },
         bottomBar = {
             EditorBottomBar(
                 state = state,
-                stepIndex = stepIndex,
                 isLastStep = state.step == state.steps.last(),
                 onBack = { viewModel.back() },
                 onNext = { viewModel.next() },
@@ -198,6 +236,14 @@ fun EditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
+            transitionSpec = {
+                // Forward slides in from the right, back from the left — like turning the
+                // page of a form rather than swapping one screen for another.
+                val forward = state.steps.indexOf(targetState) > state.steps.indexOf(initialState)
+                val dir = if (forward) 1 else -1
+                (slideInHorizontally(tween(260)) { it / 3 * dir } + fadeIn(tween(220)))
+                    .togetherWith(slideOutHorizontally(tween(220)) { -it / 3 * dir } + fadeOut(tween(160)))
+            },
             label = "editor-step",
         ) { step ->
             when (step) {
@@ -221,78 +267,162 @@ fun EditorScreen(
             }
         }
     }
+
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+            title = { Text(if (state.draft.isNew) "Discard this entry?" else "Discard your changes?") },
+            text = { Text("What you typed here has not been saved yet.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    onClose()
+                }) {
+                    Text("Discard", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") }
+            },
+        )
+    }
 }
 
+/**
+ * The editor's own header: a round back button, what is being made and where in the form the
+ * user is, and a segmented progress bar that fills as they move through the steps.
+ */
 @Composable
-private fun EditorBottomBar(
-    state: EditorUiState,
+private fun EditorHeader(
+    isNew: Boolean,
     stepIndex: Int,
-    isLastStep: Boolean,
+    stepCount: Int,
+    stepTitle: String,
+    stepCaption: String,
     onBack: () -> Unit,
-    onNext: () -> Unit,
-    onSave: () -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            if (state.steps.size > 1) {
-                StepDots(
-                    total = state.steps.size,
-                    current = stepIndex,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircleIconButton(
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                onClick = onBack,
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isNew) "New entry" else "Edit entry",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = if (stepCount > 1) "Step ${stepIndex + 1} of $stepCount · $stepCaption"
+                    else stepCaption,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
-                if (state.step != state.steps.first()) {
-                    TextButton(onClick = onBack) { Text("Back") }
-                }
-                Spacer(Modifier.weight(1f))
-
-                // Once the entry has a name it can be saved from any step — no need to walk
-                // through files just to store a phone number.
-                if (!isLastStep && state.canSave) {
-                    TextButton(onClick = onSave) { Text("Save now") }
-                }
-
-                if (isLastStep) {
-                    Button(onClick = onSave, enabled = state.canSave) {
-                        Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Save entry")
+                Text(
+                    text = stepTitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+        if (stepCount > 1) {
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(stepCount) { index ->
+                    val fill by animateFloatAsState(
+                        targetValue = if (index <= stepIndex) 1f else 0f,
+                        animationSpec = tween(320),
+                        label = "step-$index",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(5.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fill)
+                                .height(5.dp)
+                                .clip(CircleShape)
+                                .background(EzzyLime),
+                        )
                     }
-                } else {
-                    Button(onClick = onNext, enabled = state.canContinue) { Text("Continue") }
                 }
             }
         }
     }
 }
 
-/** The step progress as dots rather than a bar — reads clearly at a glance for 2–4 steps. */
 @Composable
-private fun StepDots(total: Int, current: Int, modifier: Modifier = Modifier) {
+private fun EditorBottomBar(
+    state: EditorUiState,
+    isLastStep: Boolean,
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+    onSave: () -> Unit,
+) {
     Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        repeat(total) { index ->
-            val active = index == current
-            Box(
-                modifier = Modifier
-                    .size(if (active) 8.dp else 6.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant
-                    )
+        if (state.step != state.steps.first()) {
+            CircleIconButton(
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Previous step",
+                onClick = onBack,
+                size = 56.dp,
+            )
+        }
+
+        // Once the entry has a name it can be saved from any step — no need to walk
+        // through files just to store a phone number.
+        if (!isLastStep && state.canSave) {
+            SoftPillButton(
+                text = "Save",
+                icon = Icons.Rounded.Check,
+                onClick = onSave,
+            )
+        }
+
+        if (isLastStep) {
+            LimeButton(
+                text = if (state.draft.isNew) "Save entry" else "Save changes",
+                icon = Icons.Rounded.Check,
+                onClick = onSave,
+                enabled = state.canSave,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            LimeButton(
+                text = "Continue",
+                trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
+                onClick = onNext,
+                enabled = state.canContinue,
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -312,32 +442,40 @@ private fun SectionStep(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Text(
+                text = "Pick a section",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
         items(categories, key = { it.id }) { category ->
             val selected = category.id == selectedId
             Surface(
+                onClick = { onSelect(category.id) },
                 shape = MaterialTheme.shapes.large,
-                color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerLow,
+                color = accentWash(category.colorKey),
+                border = if (selected) {
+                    androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                } else {
+                    null
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(
-                    modifier = Modifier
-                        .clickable { onSelect(category.id) }
-                        .padding(14.dp),
-                ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     IconAvatar(
                         iconKey = category.iconKey,
                         colorKey = category.colorKey,
-                        size = 44.dp,
-                        iconSize = 22.dp,
+                        size = 48.dp,
+                        iconSize = 24.dp,
                     )
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(22.dp))
                     Text(
                         text = category.name,
                         style = MaterialTheme.typography.titleSmall,
-                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
+                        minLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -348,6 +486,7 @@ private fun SectionStep(
 
 // ---- Details step -----------------------------------------------------------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailsStep(
     viewModel: EditorViewModel,
@@ -357,9 +496,13 @@ private fun DetailsStep(
 ) {
     val draft = state.draft
     val context = LocalContext.current
+    val snackbar = LocalSnackbar.current
+    val scope = rememberCoroutineScope()
     var newField by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<FieldDraft?>(null) }
+    var actionsFor by remember { mutableStateOf<FieldDraft?>(null) }
     var cropping by remember { mutableStateOf<String?>(null) }
+    var choosing by remember { mutableStateOf<Chooser?>(null) }
 
     // The photo just picked for the entry's own icon, waiting on its crop — separate from
     // [cropping] above, which keys off an attachment already sitting in the draft.
@@ -369,26 +512,8 @@ private fun DetailsStep(
     ) { uri -> uri?.let { viewModel.importIconPhoto(it) { stored -> croppingIcon = stored } } }
 
     val resolveName = rememberAttachmentNamer()
-    val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
-
-    // A CNIC, a passport or a degree arrives as a scan just as often as a photo, so the
-    // document step takes every attachment type on the same screen — the same buttons as the
-    // Files step — rather than hiding video, audio and generic files behind a later step.
-    val filePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
-
-    val videoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
-
-    val audioPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
-
     var recording by remember { mutableStateOf(false) }
+    val pickers = rememberAttachPickers(viewModel, resolveName)
 
     val contactPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -398,116 +523,114 @@ private fun DetailsStep(
     }
 
     val selectedCategory = categories.firstOrNull { it.id == draft.categoryId }
+    val selectedTemplate = templates.firstOrNull { it.id == draft.templateId }
+
+    val removeWithUndo: (FieldDraft) -> Unit = { field ->
+        val index = draft.fields.indexOfFirst { it.id == field.id }
+        viewModel.removeField(field.id)
+        scope.launch {
+            val result = snackbar.showSnackbar(
+                message = "\"${field.label.ifBlank { "Field" }}\" removed",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.restoreField(field, index)
+        }
+    }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            EntryIconPicker(
+        item(key = "title-card") {
+            TitleCard(
+                title = draft.title,
+                titleHint = state.titleHint,
+                onTitleChange = viewModel::setTitle,
                 photoStoredName = draft.iconPhoto,
-                fallbackIconKey = selectedCategory?.iconKey,
-                fallbackColorKey = selectedCategory?.colorKey,
-                onPick = {
+                category = selectedCategory,
+                template = selectedTemplate,
+                onPickPhoto = {
                     runCatching {
                         iconPhotoPicker.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     }
                 },
-                onRemove = viewModel::removeIconPhoto,
+                onRemovePhoto = viewModel::removeIconPhoto,
+                onChooseSection = { choosing = Chooser.SECTION },
+                onChooseType = { choosing = Chooser.TYPE },
             )
         }
 
-        item {
-            ChooserRow(
-                caption = "Section",
-                value = selectedCategory?.name ?: "Choose a section",
-                iconKey = selectedCategory?.iconKey,
-                colorKey = selectedCategory?.colorKey,
-                options = categories.map { Triple(it.id, it.name, it.iconKey) },
-                selectedId = draft.categoryId,
-                onSelect = viewModel::setCategory,
-            )
+        // A brand-new entry with no type yet starts like a survey: "what are you saving?",
+        // answered with one tap on a tile, and the right questions appear underneath.
+        if (draft.templateId == null && templates.isNotEmpty()) {
+            item(key = "type-strip") {
+                Column {
+                    Text(
+                        text = "What are you saving?",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(templates, key = { it.id }) { template ->
+                            TypeTile(
+                                name = template.name,
+                                iconKey = template.iconKey,
+                                onClick = { viewModel.applyTemplate(template) },
+                            )
+                        }
+                    }
+                }
+            }
         }
-
-        item {
-            ChooserRow(
-                caption = "Type",
-                value = templates.firstOrNull { it.id == draft.templateId }?.name
-                    ?: "Choose a type",
-                iconKey = templates.firstOrNull { it.id == draft.templateId }?.iconKey,
-                colorKey = null,
-                options = templates.map { Triple(it.id, it.name, it.iconKey) },
-                selectedId = draft.templateId.orEmpty(),
-                onSelect = { id -> viewModel.applyTemplate(templates.firstOrNull { it.id == id }) },
-            )
-        }
-
-        item {
-            OutlinedTextField(
-                value = draft.title,
-                onValueChange = viewModel::setTitle,
-                label = { Text("Title") },
-                placeholder = { Text(state.titleHint) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            )
-        }
-
-        // Pinning stays reachable from the entry's own detail screen (its top bar) once it
-        // exists — asking for it here, before there is even anything to pin to quick access
-        // yet, was one more decision in the way of just saving the entry.
 
         // Only the Contact type offers this — pulling a name and number off the phone means
-        // nothing for a bank account or a receipt, and the generic little icon button that used
-        // to sit here on every entry type read as clutter more than as a feature.
+        // nothing for a bank account or a receipt.
         if (draft.templateId == Seed.CONTACT_TEMPLATE_ID) {
-            item {
+            item(key = "contact-import") {
                 Surface(
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            runCatching {
-                                contactPicker.launch(
-                                    Intent(
-                                        Intent.ACTION_PICK,
-                                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                                    )
+                    onClick = {
+                        runCatching {
+                            contactPicker.launch(
+                                Intent(
+                                    Intent.ACTION_PICK,
+                                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                                 )
-                            }
-                        },
+                            )
+                        }
+                    },
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Contacts,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Import from your contacts",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
                             Text(
                                 text = "Fills in the name and phone number",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
                             )
                         }
                         Icon(
                             imageVector = Icons.Rounded.ChevronRight,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
                     }
                 }
@@ -515,159 +638,133 @@ private fun DetailsStep(
         }
 
         if (state.needsPhoto) {
-            item {
-                SectionHeader(
-                    text = "Files",
-                    modifier = Modifier.padding(top = 6.dp),
+            item(key = "files-header") { FormHeader(title = "Files", trailing = null) }
+
+            // A document's proof is as often a video, a voice note or a plain file as it is a
+            // photo or a PDF, so every kind is one tap away right under the title.
+            item(key = "attach-tiles") {
+                AttachTiles(
+                    enabled = !state.importing,
+                    pickers = pickers,
+                    onRecord = { recording = true },
                 )
             }
 
-            // The same buttons as the Files step, right under the title — a document's proof
-            // is as often a video, a voice note or a plain file as it is a photo or a PDF.
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AttachButton(
-                        icon = Icons.Rounded.AddPhotoAlternate,
-                        label = "Photo",
-                        enabled = !state.importing,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            runCatching {
-                                photoPicker.launch(
-                                    PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.ImageOnly
-                                    )
-                                )
-                            }
-                        },
-                    )
-                    AttachButton(
-                        icon = Icons.Rounded.AttachFile,
-                        label = "File",
-                        enabled = !state.importing,
-                        modifier = Modifier.weight(1f),
-                        onClick = { runCatching { filePicker.launch(DOCUMENT_MIME_TYPES) } },
-                    )
-                    AttachButton(
-                        icon = Icons.Rounded.Mic,
-                        label = "Voice",
-                        enabled = !state.importing,
-                        modifier = Modifier.weight(1f),
-                        onClick = { recording = true },
-                    )
-                }
-            }
-
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AttachButton(
-                        icon = Icons.Rounded.Videocam,
-                        label = "Video",
-                        enabled = !state.importing,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            runCatching {
-                                videoPicker.launch(
-                                    PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.VideoOnly
-                                    )
-                                )
-                            }
-                        },
-                    )
-                    AttachButton(
-                        icon = Icons.Rounded.AudioFile,
-                        label = "Audio",
-                        enabled = !state.importing,
-                        modifier = Modifier.weight(1f),
-                        onClick = { runCatching { audioPicker.launch(arrayOf("audio/*")) } },
-                    )
-                    Spacer(Modifier.weight(1f))
-                }
-            }
-
-            val scans = draft.attachments
-            if (scans.isEmpty()) {
-                item {
-                    Text(
-                        text = "Add a photo, PDF, video, voice note or file, and write on it what it shows.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            items(scans, key = { "scan-" + it.id }) { scan ->
-                if (scan.isAudio) {
-                    VoiceNoteRow(
-                        storedName = scan.storedName,
-                        displayName = scan.displayName,
-                        trailing = {
-                            DeleteAttachmentButton { viewModel.removeAttachment(scan.id) }
-                        },
-                    )
-                } else {
-                    AttachmentEditorRow(
-                        attachment = scan,
-                        onCaptionChange = { viewModel.setAttachmentCaption(scan.id, it) },
-                        canCrop = scan.isImage,
-                        onCrop = { cropping = scan.id },
-                        onRemove = { viewModel.removeAttachment(scan.id) },
-                        onToggleWatermark = { viewModel.setAttachmentWatermark(scan.id, it) },
-                    )
+            items(draft.attachments, key = { "scan-" + it.id }) { scan ->
+                Box(Modifier.animateItem()) {
+                    if (scan.isAudio) {
+                        VoiceNoteRow(
+                            storedName = scan.storedName,
+                            displayName = scan.displayName,
+                            trailing = {
+                                DeleteAttachmentButton { viewModel.removeAttachment(scan.id) }
+                            },
+                        )
+                    } else {
+                        AttachmentEditorRow(
+                            attachment = scan,
+                            onCaptionChange = { viewModel.setAttachmentCaption(scan.id, it) },
+                            canCrop = scan.isImage,
+                            onCrop = { cropping = scan.id },
+                            onRemove = { viewModel.removeAttachment(scan.id) },
+                            onToggleWatermark = { viewModel.setAttachmentWatermark(scan.id, it) },
+                        )
+                    }
                 }
             }
         }
 
-        item {
-            SectionHeader(
-                text = "Fields",
-                modifier = Modifier.padding(top = 6.dp),
-            )
-        }
-
-        if (draft.fields.isEmpty()) {
-            item {
+        if (draft.fields.isNotEmpty()) {
+            item(key = "fields-header") {
+                val filled = draft.fields.count { it.value.isNotBlank() }
+                FormHeader(
+                    title = "Details",
+                    trailing = "$filled of ${draft.fields.size} filled",
+                    progress = filled.toFloat() / draft.fields.size,
+                )
+            }
+            item(key = "fields-tip") {
                 Text(
-                    text = "Pick a type above to get its usual fields, or add your own.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Tip: long-press a field to duplicate, move or delete it.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        items(draft.fields, key = { it.id }) { field ->
-            FieldInput(
+        itemsIndexed(draft.fields, key = { _, field -> field.id }) { index, field ->
+            FieldCard(
+                number = index + 1,
                 field = field,
+                isLast = index == draft.fields.lastIndex,
                 onValueChange = { text -> viewModel.updateField(field.id) { it.copy(value = text) } },
-                canRename = !field.fromTemplate,
-                onRename = { renaming = field },
-                onRemove = { viewModel.removeField(field.id) },
+                onLongPress = { actionsFor = field },
+                modifier = Modifier.animateItem(),
             )
         }
 
-        item {
-            FilledTonalButton(
-                onClick = { newField = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Add a field")
-            }
+        item(key = "add-field") {
+            AddFieldPanel(
+                onCustom = { newField = true },
+                onQuickAdd = { label, type -> viewModel.addFieldWithValue(label, type) },
+            )
         }
 
         // These types have no second step to hold it, so the note comes along here.
         if (state.needsPhoto) {
-            item {
-                OutlinedTextField(
-                    value = draft.note,
-                    onValueChange = viewModel::setNote,
-                    label = { Text("Note (optional)") },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            item(key = "note") {
+                NoteField(value = draft.note, onValueChange = viewModel::setNote)
             }
         }
+    }
+
+    choosing?.let { which ->
+        ChooserSheet(
+            title = if (which == Chooser.SECTION) "Move to section" else "Entry type",
+            options = if (which == Chooser.SECTION) {
+                categories.map { ChooserOption(it.id, it.name, it.iconKey, it.colorKey) }
+            } else {
+                templates.map { ChooserOption(it.id, it.name, it.iconKey, null) }
+            },
+            selectedId = if (which == Chooser.SECTION) draft.categoryId else draft.templateId.orEmpty(),
+            onDismiss = { choosing = null },
+            onSelect = { id ->
+                choosing = null
+                if (which == Chooser.SECTION) {
+                    viewModel.setCategory(id)
+                } else {
+                    viewModel.applyTemplate(templates.firstOrNull { it.id == id })
+                }
+            },
+        )
+    }
+
+    actionsFor?.let { target ->
+        val index = draft.fields.indexOfFirst { it.id == target.id }
+        FieldActionsSheet(
+            field = draft.fields.getOrNull(index) ?: target,
+            canMoveUp = index > 0,
+            canMoveDown = index in 0 until draft.fields.lastIndex,
+            onDismiss = { actionsFor = null },
+            onDuplicate = {
+                actionsFor = null
+                viewModel.duplicateField(target.id)
+            },
+            onMoveUp = { viewModel.moveField(target.id, -1) },
+            onMoveDown = { viewModel.moveField(target.id, 1) },
+            onRename = {
+                actionsFor = null
+                renaming = draft.fields.getOrNull(index) ?: target
+            },
+            onClear = {
+                actionsFor = null
+                viewModel.updateField(target.id) { it.copy(value = "") }
+            },
+            onDelete = {
+                actionsFor = null
+                removeWithUndo(draft.fields.getOrNull(index) ?: target)
+            },
+        )
     }
 
     if (newField) {
@@ -685,7 +782,7 @@ private fun DetailsStep(
 
     renaming?.let { field ->
         FieldNameDialog(
-            title = "Rename field",
+            title = "Edit field",
             initialLabel = field.label,
             initialType = field.type,
             onDismiss = { renaming = null },
@@ -734,114 +831,427 @@ private fun DetailsStep(
     }
 }
 
+private enum class Chooser { SECTION, TYPE }
+
+private data class ChooserOption(
+    val id: String,
+    val name: String,
+    val iconKey: String,
+    val colorKey: String?,
+)
+
 /**
- * One stored value. The name sits above as a caption and only the data below it is typed in —
- * a field that came from the entry's type has a fixed name, and one the user added was named
- * when it was created, so neither needs an editable name box sitting in the form.
+ * The top of the form: the entry's picture, its name typed big, and where it is filed — the
+ * section and the type as two tappable pills — all on one card washed in the section's colour.
  */
 @Composable
-private fun FieldInput(
-    field: FieldDraft,
-    onValueChange: (String) -> Unit,
-    canRename: Boolean,
-    onRename: () -> Unit,
-    onRemove: () -> Unit,
+private fun TitleCard(
+    title: String,
+    titleHint: String,
+    onTitleChange: (String) -> Unit,
+    photoStoredName: String?,
+    category: CategoryEntity?,
+    template: TemplateEntity?,
+    onPickPhoto: () -> Unit,
+    onRemovePhoto: () -> Unit,
+    onChooseSection: () -> Unit,
+    onChooseType: () -> Unit,
 ) {
-    var revealed by remember { mutableStateOf(false) }
-    var datePickerOpen by remember { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = field.label.ifBlank { "Untitled field" }.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                letterSpacing = 0.8.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Box {
-                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(30.dp)) {
-                    Icon(
-                        imageVector = Icons.Rounded.MoreVert,
-                        contentDescription = "${field.label} options",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    if (canRename) {
-                        DropdownMenuItem(
-                            text = { Text("Rename") },
-                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onRename()
-                            },
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = accentWash(category?.colorKey),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    Surface(onClick = onPickPhoto, shape = CircleShape, color = Color.Transparent) {
+                        IconAvatar(
+                            iconKey = category?.iconKey,
+                            colorKey = category?.colorKey,
+                            photoStoredName = photoStoredName,
+                            size = 64.dp,
+                            iconSize = 30.dp,
                         )
                     }
-                    DropdownMenuItem(
-                        text = { Text("Remove", color = MaterialTheme.colorScheme.error) },
-                        leadingIcon = {
+                    Surface(
+                        onClick = if (photoStoredName != null) onRemovePhoto else onPickPhoto,
+                        shape = CircleShape,
+                        color = if (photoStoredName != null) MaterialTheme.colorScheme.inverseSurface
+                        else EzzyLime,
+                        contentColor = if (photoStoredName != null) MaterialTheme.colorScheme.inverseOnSurface
+                        else EzzyOnLime,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(24.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
+                                imageVector = if (photoStoredName != null) Icons.Rounded.Close
+                                else Icons.Rounded.PhotoCamera,
+                                contentDescription = if (photoStoredName != null) "Remove entry picture"
+                                else "Add entry picture",
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Name",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 2.dp),
+                    )
+                    TextField(
+                        value = title,
+                        onValueChange = onTitleChange,
+                        placeholder = {
+                            Text(
+                                text = titleHint,
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         },
-                        onClick = {
-                            menuOpen = false
-                            onRemove()
-                        },
+                        textStyle = MaterialTheme.typography.titleLarge,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            imeAction = ImeAction.Next,
+                        ),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 0.dp),
                     )
                 }
             }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PillChooser(
+                    caption = "Section",
+                    value = category?.name ?: "Choose",
+                    iconKey = category?.iconKey,
+                    onClick = onChooseSection,
+                    modifier = Modifier.weight(1f),
+                )
+                PillChooser(
+                    caption = "Type",
+                    value = template?.name ?: "Choose",
+                    iconKey = template?.iconKey,
+                    onClick = onChooseType,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
+    }
+}
 
-        Spacer(Modifier.height(4.dp))
+@Composable
+private fun PillChooser(
+    caption: String,
+    value: String,
+    iconKey: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = IconCatalog.image(iconKey),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = caption,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = "Change $caption",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
 
-        OutlinedTextField(
-            value = field.value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-            singleLine = field.type != FieldType.MULTILINE,
-            minLines = if (field.type == FieldType.MULTILINE) 3 else 1,
-            readOnly = field.type == FieldType.DATE,
-            visualTransformation = if (field.type.isMasked && !revealed) {
-                PasswordVisualTransformation()
-            } else {
-                VisualTransformation.None
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = field.type.keyboardType()),
-            // Filled and borderless rather than an outlined box: a soft tonal field reads as
-            // "part of this card" instead of a separate boxed input sitting on top of it.
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-            ),
-            trailingIcon = {
-                when {
-                    field.type.isMasked -> IconButton(onClick = { revealed = !revealed }) {
-                        Icon(
-                            imageVector = if (revealed) Icons.Rounded.VisibilityOff
-                            else Icons.Rounded.Visibility,
-                            contentDescription = if (revealed) "Hide value" else "Show value",
-                        )
+/** One answer in the "What are you saving?" strip. */
+@Composable
+private fun TypeTile(name: String, iconKey: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.width(104.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = IconCatalog.image(iconKey),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                minLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** A section title in the form, with an optional count and a thin lime progress line. */
+@Composable
+private fun FormHeader(title: String, trailing: String?, progress: Float? = null) {
+    Column(modifier = Modifier.padding(top = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            if (trailing != null) {
+                Text(
+                    text = trailing,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (progress != null) {
+            val animated by animateFloatAsState(progress, tween(300), label = "form-progress")
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { animated },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CircleShape),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                drawStopIndicator = {},
+            )
+        }
+    }
+}
+
+/**
+ * One question of the form. The number badge turns into a lime tick once it is answered, the
+ * card lights up while it is being typed in, and a long-press anywhere on its header opens the
+ * field's actions (duplicate, move, rename, delete).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FieldCard(
+    number: Int,
+    field: FieldDraft,
+    isLast: Boolean,
+    onValueChange: (String) -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var revealed by remember { mutableStateOf(false) }
+    var datePickerOpen by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    val answered = field.value.isNotBlank()
+
+    val borderColor by animateColorAsState(
+        targetValue = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent,
+        label = "field-border",
+    )
+
+    // Tapping anywhere on a date field opens the calendar — the box itself is read-only.
+    val dateTaps = remember { MutableInteractionSource() }
+    if (field.type == FieldType.DATE) {
+        LaunchedEffect(dateTaps) {
+            dateTaps.interactions.collect { if (it is PressInteraction.Release) datePickerOpen = true }
+        }
+    }
+
+    val openActions = {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        onLongPress()
+    }
+
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column {
+            // The header is the long-press target: a long-press inside the text box itself is
+            // left alone, so selecting or pasting text keeps working the normal way.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        interactionSource = null,
+                        indication = null,
+                        onClick = {},
+                        onLongClick = openActions,
+                    )
+                    .padding(start = 14.dp, end = 4.dp, top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AnimatedContent(targetState = answered, label = "badge") { done ->
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (done) EzzyLime else MaterialTheme.colorScheme.surfaceContainerHighest
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (done) {
+                            Icon(
+                                Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = EzzyOnLime,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        } else {
+                            Text(
+                                text = "$number",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
-
-                    field.type == FieldType.DATE -> IconButton(onClick = { datePickerOpen = true }) {
-                        Icon(Icons.Rounded.CalendarMonth, contentDescription = "Pick a date")
-                    }
-
-                    else -> Unit
                 }
-            },
-        )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = field.label.ifBlank { "Untitled field" },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (field.type.isMasked) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = "Hidden field",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                IconButton(onClick = openActions, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreHoriz,
+                        contentDescription = "${field.label} options",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+
+            TextField(
+                value = field.value,
+                onValueChange = onValueChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focused = it.isFocused },
+                placeholder = { Text(field.type.placeholder()) },
+                textStyle = if (field.type.isNumeric()) {
+                    ValueMonoStyle.copy(color = MaterialTheme.colorScheme.onSurface)
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                },
+                singleLine = field.type != FieldType.MULTILINE,
+                minLines = if (field.type == FieldType.MULTILINE) 3 else 1,
+                readOnly = field.type == FieldType.DATE,
+                interactionSource = dateTaps,
+                visualTransformation = if (field.type.isMasked && !revealed) {
+                    PasswordVisualTransformation()
+                } else {
+                    VisualTransformation.None
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = field.type.keyboardType(),
+                    capitalization = field.type.capitalization(),
+                    autoCorrectEnabled = field.type == FieldType.TEXT || field.type == FieldType.MULTILINE,
+                    imeAction = when {
+                        field.type == FieldType.MULTILINE -> ImeAction.Default
+                        isLast -> ImeAction.Done
+                        else -> ImeAction.Next
+                    },
+                ),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+                trailingIcon = when {
+                    field.type.isMasked -> {
+                        {
+                            IconButton(onClick = { revealed = !revealed }) {
+                                Icon(
+                                    imageVector = if (revealed) Icons.Rounded.VisibilityOff
+                                    else Icons.Rounded.Visibility,
+                                    contentDescription = if (revealed) "Hide value" else "Show value",
+                                )
+                            }
+                        }
+                    }
+
+                    field.type == FieldType.DATE -> {
+                        {
+                            IconButton(onClick = { datePickerOpen = true }) {
+                                Icon(Icons.Rounded.CalendarMonth, contentDescription = "Pick a date")
+                            }
+                        }
+                    }
+
+                    else -> null
+                },
+            )
+        }
     }
 
     if (datePickerOpen) {
@@ -853,6 +1263,214 @@ private fun FieldInput(
             },
         )
     }
+}
+
+/** Everything a long-press on a field can do, as a bottom sheet of big rows. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FieldActionsSheet(
+    field: FieldDraft,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onDismiss: () -> Unit,
+    onDuplicate: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onRename: () -> Unit,
+    onClear: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
+            Text(
+                text = field.label.ifBlank { "Field" },
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = field.type.displayName(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(14.dp))
+
+            // Move up / down stay in the sheet so a field can be nudged several places in a row
+            // while watching the form shift behind it.
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ActionTile(
+                    icon = Icons.Rounded.KeyboardArrowUp,
+                    label = "Move up",
+                    enabled = canMoveUp,
+                    onClick = onMoveUp,
+                    modifier = Modifier.weight(1f),
+                )
+                ActionTile(
+                    icon = Icons.Rounded.KeyboardArrowDown,
+                    label = "Move down",
+                    enabled = canMoveDown,
+                    onClick = onMoveDown,
+                    modifier = Modifier.weight(1f),
+                )
+                ActionTile(
+                    icon = Icons.Rounded.ContentCopy,
+                    label = "Duplicate",
+                    onClick = onDuplicate,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            ActionRow(icon = Icons.Rounded.Edit, label = "Rename or change kind", onClick = onRename)
+            if (field.value.isNotBlank()) {
+                ActionRow(icon = Icons.Rounded.Close, label = "Clear what's typed", onClick = onClear)
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 6.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            ActionRow(
+                icon = Icons.Rounded.DeleteOutline,
+                label = "Delete field",
+                onClick = onDelete,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionTile(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (enabled) MaterialTheme.colorScheme.onSurface
+        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(icon, contentDescription = null)
+            Spacer(Modifier.height(6.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun ActionRow(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = tint)
+        Spacer(Modifier.width(14.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = tint)
+    }
+}
+
+/**
+ * The end of the form: a big dashed-feeling "add a field" button for anything custom, and a row
+ * of one-tap chips for the fields people add most, so the common case never opens a dialog.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AddFieldPanel(
+    onCustom: () -> Unit,
+    onQuickAdd: (String, FieldType) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(
+            onClick = onCustom,
+            shape = MaterialTheme.shapes.large,
+            color = Color.Transparent,
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                MaterialTheme.colorScheme.outlineVariant,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Add a field",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            QUICK_FIELDS.forEach { (label, type) ->
+                Surface(
+                    onClick = { onQuickAdd(label, type) },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = type.icon(),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(text = label, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text("Note (optional)") },
+        leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Notes, contentDescription = null) },
+        minLines = 3,
+        shape = MaterialTheme.shapes.large,
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            unfocusedBorderColor = Color.Transparent,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -874,7 +1492,11 @@ private fun DatePickerSheet(onDismiss: () -> Unit, onPicked: (Long) -> Unit) {
     }
 }
 
-/** Naming comes first: a field is created with a name and a kind, then it holds data. */
+/**
+ * Naming comes first: a field is created with a name and a kind, then it holds data. The kind
+ * is picked from chips with icons rather than a drop-down list, so all eight are visible at once.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FieldNameDialog(
     title: String,
@@ -885,7 +1507,6 @@ private fun FieldNameDialog(
 ) {
     var label by remember { mutableStateOf(initialLabel) }
     var type by remember { mutableStateOf(initialType) }
-    var typeMenuOpen by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -898,34 +1519,39 @@ private fun FieldNameDialog(
                     label = { Text("Field name") },
                     placeholder = { Text("e.g. Branch code") },
                     singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(12.dp))
-                Box {
-                    OutlinedButton(
-                        onClick = { typeMenuOpen = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(type.displayName(), modifier = Modifier.weight(1f))
-                        Icon(Icons.Rounded.ExpandMore, contentDescription = null)
-                    }
-                    DropdownMenu(
-                        expanded = typeMenuOpen,
-                        onDismissRequest = { typeMenuOpen = false },
-                    ) {
-                        FieldType.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option.displayName()) },
-                                onClick = {
-                                    type = option
-                                    typeMenuOpen = false
-                                },
-                                trailingIcon = {
-                                    if (option == type) {
-                                        Icon(Icons.Rounded.Check, contentDescription = null)
-                                    }
-                                },
-                            )
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "Kind",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FieldType.entries.forEach { option ->
+                        val selected = option == type
+                        Surface(
+                            onClick = { type = option },
+                            shape = CircleShape,
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(option.icon(), contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(option.displayName(), style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
                 }
@@ -943,146 +1569,71 @@ private fun FieldNameDialog(
     )
 }
 
-/** Shared row for the two things an entry is filed under: its section and its type. */
-/**
- * The entry's own avatar, with a small camera badge to change it. Nothing chosen here shows the
- * section's own icon exactly as it does everywhere else — picking a photo is what makes this
- * entry stand out from the rest of its section, not a requirement to fill in.
- */
+/** Picking a section or a type: a sheet of big icon tiles instead of a long drop-down list. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EntryIconPicker(
-    photoStoredName: String?,
-    fallbackIconKey: String?,
-    fallbackColorKey: String?,
-    onPick: () -> Unit,
-    onRemove: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box {
-            IconAvatar(
-                iconKey = fallbackIconKey,
-                colorKey = fallbackColorKey,
-                photoStoredName = photoStoredName,
-                size = 72.dp,
-                iconSize = 34.dp,
-            )
-            Surface(
-                onClick = onPick,
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 2.dp,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(26.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        imageVector = Icons.Rounded.PhotoCamera,
-                        contentDescription = "Change entry icon",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = if (photoStoredName != null) "Custom icon" else "Section icon",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = if (photoStoredName != null) {
-                    "Shown everywhere this entry appears"
-                } else {
-                    "Add a picture to use instead of the section's icon"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onPick, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Text(if (photoStoredName != null) "Change" else "Add photo")
-                }
-                if (photoStoredName != null) {
-                    TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                        Text("Remove")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChooserRow(
-    caption: String,
-    value: String,
-    iconKey: String?,
-    colorKey: String?,
-    options: List<Triple<String, String, String>>,
+private fun ChooserSheet(
+    title: String,
+    options: List<ChooserOption>,
     selectedId: String,
+    onDismiss: () -> Unit,
     onSelect: (String) -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
-
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth(),
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Box {
-            Row(
-                modifier = Modifier
-                    .clickable { open = true }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconAvatar(
-                    iconKey = iconKey,
-                    colorKey = colorKey,
-                    size = 36.dp,
-                    iconSize = 18.dp,
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = caption,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(text = value, style = MaterialTheme.typography.bodyLarge)
-                }
-                Icon(
-                    imageVector = Icons.Rounded.ExpandMore,
-                    contentDescription = "Change $caption",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                options.forEach { (id, name, icon) ->
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = {
-                            onSelect(id)
-                            open = false
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = IconCatalog.image(icon),
-                                contentDescription = null,
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        Spacer(Modifier.height(12.dp))
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(options, key = { it.id }) { option ->
+                val selected = option.id == selectedId
+                Surface(
+                    onClick = { onSelect(option.id) },
+                    shape = MaterialTheme.shapes.large,
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurface,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(vertical = 14.dp, horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        if (option.colorKey != null) {
+                            IconAvatar(
+                                iconKey = option.iconKey,
+                                colorKey = option.colorKey,
+                                size = 40.dp,
+                                iconSize = 20.dp,
                             )
-                        },
-                        trailingIcon = {
-                            if (id == selectedId) {
-                                Icon(Icons.Rounded.Check, contentDescription = null)
-                            }
-                        },
-                    )
+                        } else {
+                            Icon(
+                                imageVector = IconCatalog.image(option.iconKey),
+                                contentDescription = null,
+                                modifier = Modifier.size(26.dp).padding(top = 2.dp),
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = option.name,
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            minLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -1097,135 +1648,76 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
     var cropping by remember { mutableStateOf<String?>(null) }
 
     val resolveName = rememberAttachmentNamer()
-
-    val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
-
-    val filePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
-
-    // A recorded voice note is one thing; a clip or a track already sitting on the phone is
-    // another — the "File" button's own list deliberately leaves both out, so each gets its
-    // own picker instead of getting lost in a document chooser that wasn't built for them.
-    val videoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
-
-    val audioPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+    val pickers = rememberAttachPickers(viewModel, resolveName)
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AttachButton(
-                    icon = Icons.Rounded.AddPhotoAlternate,
-                    label = "Photo",
-                    enabled = !state.importing,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        runCatching {
-                            photoPicker.launch(
-                                PickVisualMediaRequest(
-                                    ActivityResultContracts.PickVisualMedia.ImageOnly
-                                )
-                            )
-                        }
-                    },
-                )
-                AttachButton(
-                    icon = Icons.Rounded.AttachFile,
-                    label = "File",
-                    enabled = !state.importing,
-                    modifier = Modifier.weight(1f),
-                    onClick = { runCatching { filePicker.launch(DOCUMENT_MIME_TYPES) } },
-                )
-                AttachButton(
-                    icon = Icons.Rounded.Mic,
-                    label = "Voice",
-                    enabled = !state.importing,
-                    modifier = Modifier.weight(1f),
-                    onClick = { recording = true },
-                )
-            }
-        }
-
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AttachButton(
-                    icon = Icons.Rounded.Videocam,
-                    label = "Video",
-                    enabled = !state.importing,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        runCatching {
-                            videoPicker.launch(
-                                PickVisualMediaRequest(
-                                    ActivityResultContracts.PickVisualMedia.VideoOnly
-                                )
-                            )
-                        }
-                    },
-                )
-                AttachButton(
-                    icon = Icons.Rounded.AudioFile,
-                    label = "Audio",
-                    enabled = !state.importing,
-                    modifier = Modifier.weight(1f),
-                    onClick = { runCatching { audioPicker.launch(arrayOf("audio/*")) } },
-                )
-                Spacer(Modifier.weight(1f))
-            }
-        }
-
-        item {
+        item(key = "files-title") {
             Text(
-                text = "Files are encrypted with a key held in this phone's secure hardware and " +
-                    "stored inside the app — never in your gallery.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "Add proof or pictures",
+                style = MaterialTheme.typography.headlineSmall,
             )
         }
 
+        item(key = "attach-tiles") {
+            AttachTiles(
+                enabled = !state.importing,
+                pickers = pickers,
+                onRecord = { recording = true },
+            )
+        }
+
+        item(key = "files-safety") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Encrypted on this phone. Never added to your gallery.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         if (state.draft.attachments.isNotEmpty()) {
-            item { SectionHeader("Attached (${state.draft.attachments.size})") }
+            item(key = "attached-header") {
+                FormHeader(title = "Attached", trailing = "${state.draft.attachments.size}")
+            }
             items(state.draft.attachments, key = { it.id }) { attachment ->
-                if (attachment.isAudio) {
-                    VoiceNoteRow(
-                        storedName = attachment.storedName,
-                        displayName = attachment.displayName,
-                        trailing = {
-                            DeleteAttachmentButton { viewModel.removeAttachment(attachment.id) }
-                        },
-                    )
-                } else {
-                    AttachmentEditorRow(
-                        attachment = attachment,
-                        onCaptionChange = { viewModel.setAttachmentCaption(attachment.id, it) },
-                        canCrop = attachment.isImage,
-                        onCrop = { cropping = attachment.id },
-                        onRemove = { viewModel.removeAttachment(attachment.id) },
-                        onToggleWatermark = {
-                            viewModel.setAttachmentWatermark(attachment.id, it)
-                        },
-                    )
+                Box(Modifier.animateItem()) {
+                    if (attachment.isAudio) {
+                        VoiceNoteRow(
+                            storedName = attachment.storedName,
+                            displayName = attachment.displayName,
+                            trailing = {
+                                DeleteAttachmentButton { viewModel.removeAttachment(attachment.id) }
+                            },
+                        )
+                    } else {
+                        AttachmentEditorRow(
+                            attachment = attachment,
+                            onCaptionChange = { viewModel.setAttachmentCaption(attachment.id, it) },
+                            canCrop = attachment.isImage,
+                            onCrop = { cropping = attachment.id },
+                            onRemove = { viewModel.removeAttachment(attachment.id) },
+                            onToggleWatermark = {
+                                viewModel.setAttachmentWatermark(attachment.id, it)
+                            },
+                        )
+                    }
                 }
             }
         }
 
-        item {
-            OutlinedTextField(
-                value = state.draft.note,
-                onValueChange = viewModel::setNote,
-                label = { Text("Note (optional)") },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth(),
-            )
+        item(key = "note") {
+            NoteField(value = state.draft.note, onValueChange = viewModel::setNote)
         }
     }
 
@@ -1254,27 +1746,90 @@ private fun FilesStep(viewModel: EditorViewModel, state: EditorUiState) {
 
 // ---- Attachment pieces shared by both steps ---------------------------------
 
-/**
- * Equal-width action button. The label is kept to one word and one line: three buttons across a
- * phone leaves little room, and "Photos" was wrapping its final letter onto a second line.
- */
+/** The four system pickers both steps attach through, created once per screen. */
+private class AttachPickers(
+    val photo: () -> Unit,
+    val file: () -> Unit,
+    val video: () -> Unit,
+    val audio: () -> Unit,
+)
+
 @Composable
-private fun AttachButton(
+private fun rememberAttachPickers(
+    viewModel: EditorViewModel,
+    resolveName: (Uri) -> Pair<String, String>,
+): AttachPickers {
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    val filePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    // A clip or a track already sitting on the phone each get their own picker instead of
+    // getting lost in a document chooser that wasn't built for them.
+    val videoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    val audioPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> viewModel.addAttachments(listOfNotNull(uri), resolveName) }
+
+    return AttachPickers(
+        photo = {
+            runCatching {
+                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+        },
+        file = { runCatching { filePicker.launch(DOCUMENT_MIME_TYPES) } },
+        video = {
+            runCatching {
+                videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+            }
+        },
+        audio = { runCatching { audioPicker.launch(arrayOf("audio/*")) } },
+    )
+}
+
+/** Five square tiles in one row — every kind of attachment, one tap each. */
+@Composable
+private fun AttachTiles(enabled: Boolean, pickers: AttachPickers, onRecord: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AttachTile(Icons.Rounded.AddPhotoAlternate, "Photo", enabled, pickers.photo, Modifier.weight(1f), highlight = true)
+        AttachTile(Icons.Rounded.AttachFile, "File", enabled, pickers.file, Modifier.weight(1f))
+        AttachTile(Icons.Rounded.Mic, "Voice", enabled, onRecord, Modifier.weight(1f))
+        AttachTile(Icons.Rounded.Videocam, "Video", enabled, pickers.video, Modifier.weight(1f))
+        AttachTile(Icons.Rounded.AudioFile, "Audio", enabled, pickers.audio, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun AttachTile(
     icon: ImageVector,
     label: String,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    highlight: Boolean = false,
 ) {
-    FilledTonalButton(
+    Surface(
         onClick = onClick,
         enabled = enabled,
+        shape = MaterialTheme.shapes.large,
+        color = if (highlight) EzzyLime else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (highlight) EzzyOnLime else MaterialTheme.colorScheme.onSurface,
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
     ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(text = label, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+        Column(
+            modifier = Modifier.padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(6.dp))
+            Text(text = label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+        }
     }
 }
 
@@ -1479,6 +2034,49 @@ private fun FieldType.displayName(): String = when (this) {
     FieldType.URL -> "Website"
     FieldType.DATE -> "Date"
 }
+
+private fun FieldType.icon(): ImageVector = when (this) {
+    FieldType.TEXT -> Icons.Rounded.TextFields
+    FieldType.MULTILINE -> Icons.AutoMirrored.Rounded.Notes
+    FieldType.SECRET -> Icons.Rounded.Lock
+    FieldType.NUMBER -> Icons.Rounded.Numbers
+    FieldType.PHONE -> Icons.Rounded.Phone
+    FieldType.EMAIL -> Icons.Rounded.AlternateEmail
+    FieldType.URL -> Icons.Rounded.Language
+    FieldType.DATE -> Icons.Rounded.CalendarMonth
+}
+
+private fun FieldType.placeholder(): String = when (this) {
+    FieldType.TEXT -> "Type here"
+    FieldType.MULTILINE -> "Write as much as you like"
+    FieldType.SECRET -> "Hidden as you type"
+    FieldType.NUMBER -> "0000 0000 0000"
+    FieldType.PHONE -> "03xx xxxxxxx"
+    FieldType.EMAIL -> "name@example.com"
+    FieldType.URL -> "example.com"
+    FieldType.DATE -> "Tap to pick a date"
+}
+
+/** Digits read better in the monospaced style, where they line up like on the card itself. */
+private fun FieldType.isNumeric(): Boolean =
+    this == FieldType.NUMBER || this == FieldType.PHONE || this == FieldType.SECRET
+
+private fun FieldType.capitalization(): KeyboardCapitalization = when (this) {
+    FieldType.TEXT -> KeyboardCapitalization.Words
+    FieldType.MULTILINE -> KeyboardCapitalization.Sentences
+    else -> KeyboardCapitalization.None
+}
+
+/** The fields people add by hand most often, one tap each under the form. */
+private val QUICK_FIELDS: List<Pair<String, FieldType>> = listOf(
+    "Phone" to FieldType.PHONE,
+    "Email" to FieldType.EMAIL,
+    "Number" to FieldType.NUMBER,
+    "PIN" to FieldType.SECRET,
+    "Date" to FieldType.DATE,
+    "Website" to FieldType.URL,
+    "Note" to FieldType.MULTILINE,
+)
 
 private fun FieldType.keyboardType(): KeyboardType = when (this) {
     FieldType.NUMBER -> KeyboardType.Number

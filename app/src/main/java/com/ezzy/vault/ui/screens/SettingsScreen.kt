@@ -248,7 +248,7 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
                     Icon(
                         imageVector = EzzyMark.Bolt,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = EzzyMark.Spark,
                         modifier = Modifier.size(15.dp),
                     )
                 }

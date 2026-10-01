@@ -143,7 +143,7 @@ fun OverlayBubble(ring: BubbleRing? = null) {
                 Icon(
                     imageVector = EzzyMark.Bolt,
                     contentDescription = "Open EZZY",
-                    tint = Color.White,
+                    tint = EzzyMark.Spark,
                     modifier = Modifier.size(38.dp),
                 )
             }

@@ -25,7 +25,7 @@ object Seed {
      * number rewrites the built-in rows once, on the next launch; types the user made are left
      * exactly as they are.
      */
-    const val REVISION = 2
+    const val REVISION = 3
 
     /**
      * Entry types the floating bar re-checks with a fingerprint before showing, even when the
@@ -58,8 +58,10 @@ object Seed {
             spec = TemplateSpec(
                 fields = listOf(
                     TemplateField("Account Title", FieldType.TEXT, "Name on the account", required = true),
-                    TemplateField("Account Number", FieldType.SECRET, "Hidden until you tap it"),
-                    TemplateField("IBAN", FieldType.SECRET, "PK00 ABCD 0000 0000 0000 0000"),
+                    // An account number and an IBAN are given out to be paid — they are not a
+                    // password, so they show in full and take the number keyboard.
+                    TemplateField("Account Number", FieldType.NUMBER, "Digits only"),
+                    TemplateField("IBAN", FieldType.TEXT, "PK00 ABCD 0000 0000 0000 0000"),
                     TemplateField("Bank Name", FieldType.TEXT, "e.g. Meezan Bank"),
                     TemplateField("Branch / Code", FieldType.TEXT, "Branch name or code"),
                 ),
@@ -74,7 +76,7 @@ object Seed {
                 fields = listOf(
                     TemplateField("Card Holder", FieldType.TEXT, "Name printed on the card", required = true),
                     TemplateField("Card Number", FieldType.SECRET, "16 digits"),
-                    TemplateField("Expiry", FieldType.DATE, "MM / YY"),
+                    TemplateField("Expiry", FieldType.DATE, "Last day the card works"),
                     TemplateField("CVV", FieldType.SECRET, "3 digits on the back"),
                     TemplateField("Issuing Bank", FieldType.TEXT, ""),
                 ),

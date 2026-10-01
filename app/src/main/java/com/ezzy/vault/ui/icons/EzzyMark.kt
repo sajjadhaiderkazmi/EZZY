@@ -15,7 +15,10 @@ import androidx.compose.ui.unit.dp
 object EzzyMark {
 
     /** The brand ground the mark sits on — the launcher icon's background colour. */
-    val Brand = Color(0xFF3A26B4)
+    val Brand = Color(0xFF14170F)
+
+    /** The bolt itself — the same lime as the launcher icon and the app's primary buttons. */
+    val Spark = Color(0xFFC8F25A)
 
     val Bolt: ImageVector by lazy {
         ImageVector.Builder(

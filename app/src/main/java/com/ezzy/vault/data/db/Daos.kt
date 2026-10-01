@@ -192,6 +192,18 @@ interface FieldDao {
 
     @Query("DELETE FROM fields WHERE itemId = :itemId")
     suspend fun deleteForItem(itemId: String)
+
+    /**
+     * Older versions stored a bank account's number and IBAN as hidden, password-style values.
+     * They are details people hand out to get paid, so saved accounts are switched to plain
+     * values once — only those two built-in fields on Bank Account entries, nothing else.
+     */
+    @Query(
+        "UPDATE fields SET type = CASE label WHEN 'IBAN' THEN 'TEXT' ELSE 'NUMBER' END " +
+            "WHERE type = 'SECRET' AND label IN ('Account Number', 'IBAN') " +
+            "AND itemId IN (SELECT id FROM items WHERE templateId = 'tpl_bank_account')"
+    )
+    suspend fun unmaskBankAccountNumbers()
 }
 
 @Dao
