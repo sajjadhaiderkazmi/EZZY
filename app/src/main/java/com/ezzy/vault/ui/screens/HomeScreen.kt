@@ -264,6 +264,7 @@ fun HomeScreen(
                         append(greeting)
                         if (settings.displayName.isNotBlank()) append(", ${settings.displayName}")
                     },
+                    onAdd = onAddItem,
                 )
             }
 
@@ -394,26 +395,26 @@ fun HomeScreen(
     }
 }
 
-/**
- * The top of Home: the greeting over "My Vault". Search and Add live in the bottom bar, so
- * they aren't repeated up here.
- */
+/** The top of Home: the greeting over "My Vault", with a square Add button on the right. */
 @Composable
-private fun HomeHeader(greeting: String) {
-    Column(modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
-        Text(
-            text = greeting,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "My Vault",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+private fun HomeHeader(greeting: String, onAdd: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = greeting,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "My Vault",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        SquareIconButton(Icons.Rounded.Add, "Add entry", onAdd)
     }
 }
 
