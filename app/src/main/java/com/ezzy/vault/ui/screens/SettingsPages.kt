@@ -245,7 +245,7 @@ fun FloatingBarSettingsScreen(onBack: () -> Unit, onOpenBarSections: () -> Unit)
 
         item {
             Text(
-                text = "Bar keeps disappearing? Allow EZZY to autostart and turn off battery " +
+                text = "Bar keeps vanishing? Let EZZY autostart and switch off battery " +
                     "optimisation for it in your phone's settings.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
