@@ -103,6 +103,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.rounded.ContentCopy
+import com.ezzy.vault.ui.rememberCopier
+import kotlinx.coroutines.flow.first
 
 class CategoryViewModel(
     private val container: AppContainer,
@@ -149,6 +152,21 @@ class CategoryViewModel(
         viewModelScope.launch { container.repository.deleteItemGroupAndContents(id) }
     }
 
+    /**
+     * Builds the text for copying a whole group: each entry's title, then its details one per
+     * line, with a blank line between entries.
+     */
+    fun copyGroup(id: String, onText: (String) -> Unit) {
+        viewModelScope.launch {
+            val text = container.repository.observeGroupItems(id).first()
+                .joinToString("\n\n") { entry ->
+                    (listOf(entry.item.title) + entry.sortedFields.map { "${it.label}: ${it.value}" })
+                        .joinToString("\n")
+                }
+            onText(text)
+        }
+    }
+
     fun addToGroup(itemId: String, groupId: String) {
         viewModelScope.launch { container.repository.setItemGroup(itemId, groupId) }
     }
@@ -171,6 +189,7 @@ fun CategoryScreen(
     val items by viewModel.items.collectAsStateWithLifecycle()
     val ungroupedItems by viewModel.ungroupedItems.collectAsStateWithLifecycle()
     val groups by viewModel.groups.collectAsStateWithLifecycle()
+    val copy = rememberCopier()
     var confirmDelete by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -324,6 +343,11 @@ fun CategoryScreen(
                         onRename = { renamingGroup = row },
                         onUngroup = { viewModel.ungroup(row.group.id) },
                         onDelete = { confirmDeleteGroup = row },
+                        onCopy = {
+                            viewModel.copyGroup(row.group.id) { text ->
+                                copy(row.group.name, text, true)
+                            }
+                        },
                     )
                 }
 
@@ -474,6 +498,7 @@ private fun ItemGroupRow(
     onRename: () -> Unit,
     onUngroup: () -> Unit,
     onDelete: () -> Unit,
+    onCopy: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -551,6 +576,13 @@ private fun ItemGroupRow(
             }
 
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                if (row.itemCount > 0) {
+                    DropdownMenuItem(
+                        text = { Text("Copy") },
+                        leadingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = null) },
+                        onClick = { menuOpen = false; onCopy() },
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Edit") },
                     leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
