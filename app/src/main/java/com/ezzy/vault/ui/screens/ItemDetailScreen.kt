@@ -111,7 +111,11 @@ import com.ezzy.vault.ui.components.VoiceNoteRow
 import com.ezzy.vault.ui.ezzyViewModel
 import com.ezzy.vault.ui.icons.IconCatalog
 import com.ezzy.vault.ui.rememberAttachmentActions
-import com.ezzy.vault.ui.theme.brandBannerColors
+import com.ezzy.vault.ui.components.LimeButton
+import com.ezzy.vault.ui.components.IconAvatar
+import com.ezzy.vault.ui.theme.accentWash
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.rounded.VerifiedUser
 import com.ezzy.vault.ui.rememberCopier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -259,10 +263,11 @@ fun ItemDetailScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            LimeButton(
+                text = "Edit",
+                icon = Icons.Rounded.Edit,
                 onClick = onEdit,
-                icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                text = { Text("Edit") },
+                modifier = Modifier.navigationBarsPadding(),
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -280,50 +285,32 @@ fun ItemDetailScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                // A consistent brand banner rather than a per-category tint: ten accent colours
-                // as full-bleed backgrounds would fight each other entry to entry, and this is
-                // the one screen worth spending the app's identity on.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.large)
-                        .background(Brush.linearGradient(brandBannerColors())),
+                // The section's own colour as a soft wash: pastel on the light theme, a deep
+                // tint on the dark one, with the normal text colour on top — so the entry looks
+                // at home in either theme instead of a fixed dark slab.
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = accentWash(category?.colorKey),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 26.dp, horizontal = 20.dp),
+                            .padding(vertical = 24.dp, horizontal = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        if (details.item.iconPhoto != null) {
-                            EncryptedImage(
-                                storedName = details.item.iconPhoto,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .clip(CircleShape),
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.22f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = IconCatalog.image(category?.iconKey),
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(30.dp),
-                                )
-                            }
-                        }
+                        IconAvatar(
+                            iconKey = category?.iconKey,
+                            colorKey = category?.colorKey,
+                            photoStoredName = details.item.iconPhoto,
+                            size = 72.dp,
+                            iconSize = 34.dp,
+                        )
                         Spacer(Modifier.height(12.dp))
                         Text(
                             text = details.item.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -332,7 +319,7 @@ fun ItemDetailScreen(
                             Text(
                                 text = details.item.subtitle,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.85f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -353,25 +340,20 @@ fun ItemDetailScreen(
 
             if (details.fields.isNotEmpty()) {
                 item {
-                    Button(
+                    LimeButton(
+                        text = "Copy all details",
+                        icon = Icons.Rounded.ContentCopy,
                         onClick = {
                             val all = details.sortedFields.joinToString("\n") {
                                 "${it.label}: ${it.value}"
                             }
                             copy("All details", all, sensitive = true)
                         },
+                        height = 52.dp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 4.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Copy all")
-                    }
+                    )
                 }
                 item {
                     SectionHeader(
@@ -625,12 +607,12 @@ private fun FileSelectionBar(
 private fun HeroChip(text: String) {
     Surface(
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.2f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
@@ -1218,21 +1200,41 @@ private fun AttachmentActionRow(
         // Only a picture can carry the pattern — a switch here that did nothing for a PDF or a
         // video would just be confusing.
         if (isImage) {
-            Row(
+            Surface(
+                onClick = { onToggleWatermark(!attachment.watermark) },
+                shape = MaterialTheme.shapes.large,
+                color = if (attachment.watermark) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(bottom = 10.dp),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Watermark", style = MaterialTheme.typography.labelLarge)
-                    Text(
-                        text = "\"FOR VERIFICATION PURPOSE ONLY\" on Copy and Share",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
+                    modifier = Modifier.padding(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.VerifiedUser,
+                        contentDescription = null,
+                        tint = if (attachment.watermark) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp),
                     )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Watermark on Copy & Share",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            text = "Stamps \"FOR VERIFICATION PURPOSE ONLY\"",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(checked = attachment.watermark, onCheckedChange = onToggleWatermark)
                 }
-                Switch(checked = attachment.watermark, onCheckedChange = onToggleWatermark)
             }
 
             if (attachment.watermark) {
@@ -1472,15 +1474,13 @@ private fun AttachmentAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FilledTonalButton(
+    LimeButton(
+        text = label,
+        icon = icon,
         onClick = onClick,
+        height = 50.dp,
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
-    ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(17.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, maxLines = 1, style = MaterialTheme.typography.labelLarge)
-    }
+    )
 }
 
 // ---- Expiry ------------------------------------------------------------------

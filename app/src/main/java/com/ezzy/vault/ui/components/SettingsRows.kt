@@ -41,6 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -67,9 +69,13 @@ fun SettingsPage(
             LargeTopAppBar(
                 title = { Text(title) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                    }
+                    CircleIconButton(
+                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back",
+                        onClick = onBack,
+                        size = 42.dp,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
                 },
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -175,6 +181,8 @@ fun NavigationRow(
     subtitle: String? = null,
     icon: ImageVector? = null,
     destructive: Boolean = false,
+    /** A colour of its own for the icon tile — the main Settings menu gives each row one. */
+    accent: Color? = null,
 ) {
     SettingsSurface(modifier = modifier) {
         Row(
@@ -184,20 +192,23 @@ fun NavigationRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
-                val tint = if (destructive) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.primary
+                val tint = when {
+                    destructive -> MaterialTheme.colorScheme.error
+                    accent != null -> accent
+                    else -> MaterialTheme.colorScheme.primary
+                }
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(tint.copy(alpha = 0.12f)),
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(tint.copy(alpha = if (accent != null) 0.2f else 0.12f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = tint,
-                        modifier = Modifier.size(19.dp),
+                        modifier = Modifier.size(22.dp),
                     )
                 }
                 Spacer(Modifier.width(14.dp))
@@ -205,7 +216,7 @@ fun NavigationRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleSmall,
                     color = if (destructive) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.onSurface,
                 )
@@ -218,12 +229,20 @@ fun NavigationRow(
                     )
                 }
             }
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

@@ -1,5 +1,14 @@
 package com.ezzy.vault.ui.screens
 
+import com.ezzy.vault.ui.theme.Accents
+import com.ezzy.vault.ui.theme.LocalIsDarkTheme
+import com.ezzy.vault.ui.theme.EzzyLime
+import com.ezzy.vault.ui.theme.EzzyOnLime
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -138,6 +147,7 @@ fun SettingsScreen(
                     "Off"
                 },
                 icon = Icons.Rounded.Bolt,
+                accent = Accents.color("lime", LocalIsDarkTheme.current),
                 onClick = onOpenFloatingBar,
             )
         }
@@ -147,6 +157,7 @@ fun SettingsScreen(
                 title = "Security",
                 subtitle = if (settings.biometricLock) "Fingerprint lock on" else "Fingerprint lock off",
                 icon = Icons.Rounded.Shield,
+                accent = Accents.color("teal", LocalIsDarkTheme.current),
                 onClick = onOpenSecurity,
             )
         }
@@ -160,6 +171,7 @@ fun SettingsScreen(
                     ThemeMode.DARK -> "Dark"
                 },
                 icon = Icons.Rounded.Palette,
+                accent = Accents.color("purple", LocalIsDarkTheme.current),
                 onClick = onOpenAppearance,
             )
         }
@@ -169,18 +181,12 @@ fun SettingsScreen(
                 title = "Data",
                 subtitle = "Entry types and erasing",
                 icon = Icons.Rounded.Storage,
+                accent = Accents.color("amber", LocalIsDarkTheme.current),
                 onClick = onOpenData,
             )
         }
 
-        item {
-            Text(
-                text = "Everything stays on this phone. No account, no cloud.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 14.dp),
-            )
-        }
+        item { Spacer(Modifier.height(10.dp)) }
 
         item { BuiltByFooter() }
     }
@@ -196,9 +202,12 @@ fun SettingsScreen(
 
 @Composable
 private fun ProfileCard(name: String, onEdit: () -> Unit) {
+    // Same dark-ink card as Home's hero, so "you" looks the same in both places.
     Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        onClick = onEdit,
+        shape = MaterialTheme.shapes.extraLarge,
+        color = ProfileInk,
+        contentColor = Color.White,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -208,9 +217,9 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
             Box(contentAlignment = Alignment.BottomEnd) {
                 Box(
                     modifier = Modifier
-                        .size(54.dp)
+                        .size(58.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                        .background(EzzyLime),
                     contentAlignment = Alignment.Center,
                 ) {
                     val initial = name.trim().firstOrNull()
@@ -218,14 +227,14 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
                         Icon(
                             imageVector = Icons.Rounded.Person,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = EzzyOnLime,
                             modifier = Modifier.size(26.dp),
                         )
                     } else {
                         Text(
                             text = initial.uppercase(),
                             style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = EzzyOnLime,
                         )
                     }
                 }
@@ -240,7 +249,7 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
                         .background(EzzyMark.Brand)
                         .border(
                             width = 2.dp,
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            color = ProfileInk,
                             shape = CircleShape,
                         ),
                     contentAlignment = Alignment.Center,
@@ -259,20 +268,26 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
                     text = name.ifBlank { "Add your name" },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "Shown in your home greeting",
+                    text = "Your vault · offline & encrypted",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.7f),
                 )
             }
-            IconButton(onClick = onEdit) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Edit,
                     contentDescription = "Edit name",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = EzzyLime,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -288,39 +303,77 @@ private fun ProfileCard(name: String, onEdit: () -> Unit) {
 @Composable
 private fun BuiltByFooter() {
     val uriHandler = LocalUriHandler.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 22.dp, horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(EzzyMark.Brand),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = EzzyMark.Bolt,
+                    contentDescription = null,
+                    tint = EzzyMark.Spark,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
             Text(
-                text = "Built By ",
+                text = "EZZY",
+                style = MaterialTheme.typography.titleLarge,
+                letterSpacing = 3.sp,
+            )
+            Text(
+                text = "Everything stays on this phone. No account, no cloud.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(14.dp))
+            // The developer credit as a lime pill — tapping it opens the phone's own email app.
+            Surface(
+                onClick = { runCatching { uriHandler.openUri("mailto:$DEVELOPER_EMAIL") } },
+                shape = CircleShape,
+                color = EzzyLime,
+                contentColor = EzzyOnLime,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(text = "Built with ", style = MaterialTheme.typography.labelLarge)
+                    Text(text = "\u2764\uFE0F", style = MaterialTheme.typography.labelLarge)
+                    Text(text = " by ", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = "Sajjad",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
             Text(
-                text = "Sajjad",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable {
-                    runCatching {
-                        uriHandler.openUri("mailto:$DEVELOPER_EMAIL")
-                    }
-                },
+                text = "From \uD83C\uDDF5\uD83C\uDDF0 For \uD83C\uDF0D",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = "From \uD83C\uDDF5\uD83C\uDDF0 For \uD83C\uDF0D",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
+
+/** The profile card's ground — the same ink as Home's hero card. */
+private val ProfileInk = Color(0xFF1C2213)
 
 private const val DEVELOPER_EMAIL = "sajjadhaiderconnect@gmail.com"
 

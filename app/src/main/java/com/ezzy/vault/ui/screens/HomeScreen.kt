@@ -444,9 +444,9 @@ fun HomeScreen(
 }
 
 /**
- * Home's own bottom bar: a lime bar with a rounded hump in the middle, and the Add button
- * sitting raised inside that hump — the same shape as the wallet reference. Home, Pinned,
- * Search and Settings sit either side of it.
+ * Home's own bottom bar: a solid lime bar that runs edge to edge and all the way down behind
+ * the system navigation, with a round hump in the middle that wraps the raised Add button —
+ * the same shape as the wallet reference. Home, Pinned, Search and Settings sit either side.
  */
 @Composable
 private fun HomeBottomBar(
@@ -455,53 +455,45 @@ private fun HomeBottomBar(
     onSearch: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    val barHeight = 72.dp
-    val hump = 22.dp
-    val addSize = 64.dp
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
-            .height(barHeight + hump),
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         Surface(
-            shape = HumpBarShape(humpHeight = hump, humpRadius = 44.dp, corner = 30.dp),
+            shape = HumpBarShape,
             color = EzzyLime,
             contentColor = EzzyOnLime,
-            shadowElevation = 8.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(barHeight + hump)
-                .align(Alignment.BottomCenter),
+            shadowElevation = 12.dp,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = hump, start = 8.dp, end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BottomBarAction(Icons.Rounded.Home, "Home", selected = true, onClick = {}, modifier = Modifier.weight(1f))
-                BottomBarAction(Icons.Rounded.PushPin, "Pinned", selected = false, onClick = onPinned, modifier = Modifier.weight(1f))
-                Spacer(Modifier.width(addSize + 8.dp))
-                BottomBarAction(Icons.Rounded.Search, "Search", selected = false, onClick = onSearch, modifier = Modifier.weight(1f))
-                BottomBarAction(Icons.Rounded.Settings, "Settings", selected = false, onClick = onSettings, modifier = Modifier.weight(1f))
+            Column {
+                Spacer(Modifier.height(HUMP_TOP))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(BAR_BODY)
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BottomBarAction(Icons.Rounded.Home, "Home", selected = true, onClick = {}, modifier = Modifier.weight(1f))
+                    BottomBarAction(Icons.Rounded.PushPin, "Pinned", selected = false, onClick = onPinned, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(ADD_SIZE + 16.dp))
+                    BottomBarAction(Icons.Rounded.Search, "Search", selected = false, onClick = onSearch, modifier = Modifier.weight(1f))
+                    BottomBarAction(Icons.Rounded.Settings, "Settings", selected = false, onClick = onSettings, modifier = Modifier.weight(1f))
+                }
+                // The lime carries on under the gesture bar instead of stopping short of it.
+                Spacer(Modifier.fillMaxWidth().navigationBarsPadding())
             }
         }
 
-        // The raised button: a dark disc with a soft lime ring, centred in the hump.
+        // The raised button: a dark disc centred in the hump, with a little lime gap around it.
         Surface(
             onClick = onAdd,
             shape = CircleShape,
             color = EzzyOnLime,
             contentColor = EzzyLime,
-            shadowElevation = 10.dp,
-            border = androidx.compose.foundation.BorderStroke(4.dp, EzzyLime),
+            shadowElevation = 6.dp,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 2.dp)
-                .size(addSize),
+                .padding(top = ADD_TOP)
+                .size(ADD_SIZE),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Icon(
@@ -514,40 +506,65 @@ private fun HomeBottomBar(
     }
 }
 
+private val HUMP_TOP = 30.dp
+private val BAR_BODY = 68.dp
+private val ADD_SIZE = 62.dp
+private val ADD_TOP = 9.dp
+private val HUMP_RADIUS = 40.dp
+private val BAR_CORNER = 28.dp
+
 /**
- * A rounded bar whose top edge rises into a smooth hump in the middle. Drawn with cubic curves
- * so the shoulders of the hump blend into the bar instead of meeting it at a corner.
+ * Flat bottom, rounded top corners, and a round hump in the middle of the top edge that is
+ * concentric with the Add button. The hump meets the bar through two small curves whose ends
+ * run along the bar and along the circle, so there is no corner where they join.
  */
-private class HumpBarShape(
-    private val humpHeight: androidx.compose.ui.unit.Dp,
-    private val humpRadius: androidx.compose.ui.unit.Dp,
-    private val corner: androidx.compose.ui.unit.Dp,
-) : androidx.compose.ui.graphics.Shape {
+private object HumpBarShape : androidx.compose.ui.graphics.Shape {
     override fun createOutline(
         size: androidx.compose.ui.geometry.Size,
         layoutDirection: androidx.compose.ui.unit.LayoutDirection,
         density: androidx.compose.ui.unit.Density,
-    ): androidx.compose.ui.graphics.Outline {
-        val h = with(density) { humpHeight.toPx() }
-        val r = with(density) { humpRadius.toPx() }
-        val c = with(density) { corner.toPx() }
+    ): androidx.compose.ui.graphics.Outline = with(density) {
+        val top = HUMP_TOP.toPx()
+        val corner = BAR_CORNER.toPx()
+        val r = HUMP_RADIUS.toPx()
         val mid = size.width / 2f
-        val shoulder = r * 0.9f
+        // Centre of the hump circle = centre of the Add button.
+        val cy = (ADD_TOP + ADD_SIZE / 2).toPx()
+
+        // Where each blend curve meets the circle: a little above the bar's top edge.
+        val joinY = top - 10.dp.toPx()
+        val dy = joinY - cy
+        val dx = kotlin.math.sqrt((r * r - dy * dy).coerceAtLeast(0f))
+        // Follow the circle's tangent at that point back down to the bar's edge; that is
+        // where the curve's control point goes, so both ends of the blend are smooth.
+        val tx = -dy / r
+        val ty = dx / r
+        val back = (top - joinY) / ty
+        val controlX = dx + tx * back
+        val startX = controlX + 18.dp.toPx()
+
+        val startAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), (-dx).toDouble())).toFloat()
+        val endAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
+
         val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(0f, h + c)
-            quadraticTo(0f, h, c, h)
-            lineTo(mid - r - shoulder, h)
-            cubicTo(mid - r, h, mid - r, 0f, mid, 0f)
-            cubicTo(mid + r, 0f, mid + r, h, mid + r + shoulder, h)
-            lineTo(size.width - c, h)
-            quadraticTo(size.width, h, size.width, h + c)
-            lineTo(size.width, size.height - c)
-            quadraticTo(size.width, size.height, size.width - c, size.height)
-            lineTo(c, size.height)
-            quadraticTo(0f, size.height, 0f, size.height - c)
+            moveTo(0f, size.height)
+            lineTo(0f, top + corner)
+            quadraticTo(0f, top, corner, top)
+            lineTo(mid - startX, top)
+            quadraticTo(mid - controlX, top, mid - dx, joinY)
+            arcTo(
+                rect = androidx.compose.ui.geometry.Rect(mid - r, cy - r, mid + r, cy + r),
+                startAngleDegrees = startAngle,
+                sweepAngleDegrees = endAngle - startAngle + 360f * (if (endAngle < startAngle) 1 else 0),
+                forceMoveTo = false,
+            )
+            quadraticTo(mid + controlX, top, mid + startX, top)
+            lineTo(size.width - corner, top)
+            quadraticTo(size.width, top, size.width, top + corner)
+            lineTo(size.width, size.height)
             close()
         }
-        return androidx.compose.ui.graphics.Outline.Generic(path)
+        androidx.compose.ui.graphics.Outline.Generic(path)
     }
 }
 

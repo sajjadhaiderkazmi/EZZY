@@ -224,7 +224,7 @@ fun FieldValueRow(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
+        shape = if (compact) MaterialTheme.shapes.medium else MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
     ) {
@@ -235,22 +235,22 @@ fun FieldValueRow(
                     justCopied = true
                 }
                 .padding(
-                    start = 14.dp,
-                    end = 4.dp,
-                    top = if (compact) 8.dp else 10.dp,
-                    bottom = if (compact) 8.dp else 10.dp,
+                    start = 16.dp,
+                    end = 10.dp,
+                    top = if (compact) 8.dp else 14.dp,
+                    bottom = if (compact) 8.dp else 14.dp,
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = shown.ifEmpty { "—" },
                     style = if (monospaced) {
@@ -274,19 +274,28 @@ fun FieldValueRow(
                 }
             }
 
-            IconButton(
+            // The copy button is a filled disc so it reads as the row's main action, and it
+            // turns lime with a tick for a moment once the value is on the clipboard.
+            Surface(
                 onClick = {
                     onCopy()
                     justCopied = true
-                }
+                },
+                shape = CircleShape,
+                color = if (justCopied) com.ezzy.vault.ui.theme.EzzyLime
+                else MaterialTheme.colorScheme.primaryContainer,
+                contentColor = if (justCopied) com.ezzy.vault.ui.theme.EzzyOnLime
+                else MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(if (compact) 36.dp else 42.dp),
             ) {
-                Crossfade(targetState = justCopied, label = "copy-feedback") { copied ->
-                    Icon(
-                        imageVector = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
-                        contentDescription = if (copied) "Copied" else "Copy $label",
-                        tint = if (copied) MaterialTheme.colorScheme.tertiary
-                        else MaterialTheme.colorScheme.primary,
-                    )
+                Box(contentAlignment = Alignment.Center) {
+                    Crossfade(targetState = justCopied, label = "copy-feedback") { copied ->
+                        Icon(
+                            imageVector = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
+                            contentDescription = if (copied) "Copied" else "Copy $label",
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
