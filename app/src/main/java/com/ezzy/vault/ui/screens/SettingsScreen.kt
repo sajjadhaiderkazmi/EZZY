@@ -4,7 +4,6 @@ import com.ezzy.vault.ui.theme.Accents
 import com.ezzy.vault.ui.theme.LocalIsDarkTheme
 import com.ezzy.vault.ui.theme.EzzyLime
 import com.ezzy.vault.ui.theme.EzzyOnLime
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
