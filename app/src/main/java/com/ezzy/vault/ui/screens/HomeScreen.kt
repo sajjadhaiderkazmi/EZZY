@@ -90,6 +90,7 @@ import com.ezzy.vault.data.db.CategoryWithCount
 import com.ezzy.vault.data.db.ItemGroupEntity
 import com.ezzy.vault.data.db.ItemWithDetails
 import com.ezzy.vault.security.AppLock
+import com.ezzy.vault.ui.components.CircleIconButton
 import com.ezzy.vault.ui.components.EmptyState
 import com.ezzy.vault.ui.components.GROUP_ICON_KEY
 import com.ezzy.vault.ui.components.IconAvatar
@@ -414,7 +415,12 @@ private fun HomeHeader(greeting: String, onAdd: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
-        SquareIconButton(Icons.Rounded.Add, "Add entry", onAdd)
+        CircleIconButton(
+            Icons.Rounded.Add, "Add entry", onAdd,
+            size = 44.dp,
+            container = MaterialTheme.colorScheme.primaryContainer,
+            content = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
