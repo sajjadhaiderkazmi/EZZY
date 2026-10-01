@@ -72,6 +72,7 @@ class BrowserLink(private val context: Context, private val container: AppContai
     private var pendingPin: String? = null
     private val seenRequests = LinkedHashMap<String, Long>()
     private val notifyScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val syncsInFlight = java.util.concurrent.atomic.AtomicInteger(0)
 
     private val _state = MutableStateFlow<LinkState>(LinkState.Off)
     val state: StateFlow<LinkState> = _state.asStateFlow()
@@ -279,14 +280,18 @@ class BrowserLink(private val context: Context, private val container: AppContai
         // Only real data moves get the "Syncing… → Done" notification; status polls stay silent.
         val announce = browser.active && request.op in DATA_OPS
         val startedAt = System.currentTimeMillis()
-        if (announce) SyncNotifier.syncing(context)
+        if (announce && syncsInFlight.getAndIncrement() == 0) SyncNotifier.syncing(context)
         val outcome = runCatching { dispatch(request, browser) }
         if (announce) {
             notifyScope.launch {
                 // Android drops notification updates that land too close together, so "Syncing…"
                 // stays up a moment before it turns into "Done".
                 delay((MIN_SYNCING_MS - (System.currentTimeMillis() - startedAt)).coerceAtLeast(0))
-                if (outcome.isSuccess) SyncNotifier.syncDone(context) else SyncNotifier.clearSync(context)
+                // A save is usually followed straight away by a snapshot pull: only the last of
+                // overlapping syncs may turn "Syncing…" into "Done".
+                if (syncsInFlight.decrementAndGet() == 0) {
+                    if (outcome.isSuccess) SyncNotifier.syncDone(context) else SyncNotifier.clearSync(context)
+                }
             }
         }
         val response = ApiResponse(
