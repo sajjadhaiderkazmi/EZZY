@@ -122,6 +122,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import com.ezzy.vault.ui.components.bleedHorizontally
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
@@ -190,6 +192,18 @@ fun EditorScreen(
     val templates by viewModel.templates.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbar.current
     var confirmDiscard by remember { mutableStateOf(false) }
+    // Bumped each time Continue or Save is tapped without a title: the title box takes the
+    // focus and turns red, and a small message says what is missing.
+    var titleNudge by remember { mutableStateOf(0) }
+    val nudgeScope = rememberCoroutineScope()
+    val askForTitle: () -> Unit = {
+        if (state.step != EditorStep.DETAILS) viewModel.goTo(EditorStep.DETAILS)
+        titleNudge++
+        nudgeScope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar("Please add a title to continue")
+        }
+    }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -225,8 +239,13 @@ fun EditorScreen(
                 state = state,
                 isLastStep = state.step == state.steps.last(),
                 onBack = { viewModel.back() },
-                onNext = { viewModel.next() },
-                onSave = { viewModel.save(onSaved) },
+                onNext = {
+                    if (state.step != EditorStep.SECTION && state.draft.title.isBlank()) askForTitle()
+                    else viewModel.next()
+                },
+                onSave = {
+                    if (state.draft.title.isBlank()) askForTitle() else viewModel.save(onSaved)
+                },
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -264,6 +283,7 @@ fun EditorScreen(
                 EditorStep.DETAILS -> DetailsStep(
                     viewModel = viewModel,
                     state = state,
+                    titleNudge = titleNudge,
                     categories = categories,
                     templates = templates,
                 )
@@ -381,18 +401,6 @@ private fun EditorBottomBar(
             .navigationBarsPadding()
             .imePadding(),
     ) {
-        // A greyed-out button on its own doesn't say why — this line does.
-        AnimatedVisibility(visible = state.step == EditorStep.DETAILS && state.draft.title.isBlank()) {
-            Text(
-                text = "Give the entry a name to continue",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-            )
-        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -424,7 +432,8 @@ private fun EditorBottomBar(
                     text = if (state.draft.isNew) "Save entry" else "Save changes",
                     icon = Icons.Rounded.Check,
                     onClick = onSave,
-                    enabled = state.canSave,
+                    // Tappable without a title too: the tap points at the title box instead.
+                    enabled = state.draft.categoryId.isNotBlank(),
                     modifier = Modifier.weight(1f),
                 )
             } else {
@@ -432,7 +441,7 @@ private fun EditorBottomBar(
                     text = "Continue",
                     trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
                     onClick = onNext,
-                    enabled = state.canContinue,
+                    enabled = state.canContinue || state.step != EditorStep.SECTION,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -509,6 +518,7 @@ private fun SectionStep(
 private fun DetailsStep(
     viewModel: EditorViewModel,
     state: EditorUiState,
+    titleNudge: Int,
     categories: List<CategoryEntity>,
     templates: List<TemplateEntity>,
 ) {
@@ -564,6 +574,7 @@ private fun DetailsStep(
             TitleCard(
                 title = draft.title,
                 titleHint = state.titleHint,
+                nudge = titleNudge,
                 onTitleChange = viewModel::setTitle,
                 photoStoredName = draft.iconPhoto,
                 category = selectedCategory,
@@ -869,7 +880,8 @@ private data class ChooserOption(
 @Composable
 private fun TitleCard(
     title: String,
-    titleHint: String,
+    @Suppress("UNUSED_PARAMETER") titleHint: String,
+    nudge: Int,
     onTitleChange: (String) -> Unit,
     photoStoredName: String?,
     category: CategoryEntity?,
@@ -879,10 +891,18 @@ private fun TitleCard(
     onChooseSection: () -> Unit,
     onChooseType: () -> Unit,
 ) {
+    val titleFocus = remember { FocusRequester() }
+    LaunchedEffect(nudge) {
+        if (nudge > 0) runCatching { titleFocus.requestFocus() }
+    }
+    val missing = nudge > 0 && title.isBlank()
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = accentCard(category?.colorKey),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = androidx.compose.foundation.BorderStroke(
+            if (missing) 2.dp else 1.dp,
+            if (missing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant,
+        ),
         contentColor = accentOnCard(),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -928,9 +948,10 @@ private fun TitleCard(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Name",
+                        text = if (missing) "Title is required" else "Title",
                         style = MaterialTheme.typography.labelMedium,
-                        color = accentOnCard().copy(alpha = 0.65f),
+                        color = if (missing) MaterialTheme.colorScheme.error
+                        else accentOnCard().copy(alpha = 0.65f),
                         modifier = Modifier.padding(start = 2.dp),
                     )
                     TextField(
@@ -938,7 +959,7 @@ private fun TitleCard(
                         onValueChange = onTitleChange,
                         placeholder = {
                             Text(
-                                text = titleHint,
+                                text = "Put Title Here",
                                 style = MaterialTheme.typography.titleLarge,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -963,7 +984,7 @@ private fun TitleCard(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 0.dp),
+                            .focusRequester(titleFocus),
                     )
                 }
             }

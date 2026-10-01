@@ -55,6 +55,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
 import com.ezzy.vault.ui.theme.EzzyGreen
 import com.ezzy.vault.ui.theme.EzzyGreenBright
 import com.ezzy.vault.ui.components.ItemRow
@@ -243,13 +246,13 @@ fun HomeScreen(
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
+      Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .statusBarsPadding(),
+                .padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -260,8 +263,6 @@ fun HomeScreen(
                         append(greeting)
                         if (settings.displayName.isNotBlank()) append(", ${settings.displayName}")
                     },
-                    onSearch = onOpenSearch,
-                    onAdd = onAddItem,
                 )
             }
 
@@ -364,7 +365,7 @@ fun HomeScreen(
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     HomeLabel(
                         text = "Recently opened",
-                        action = "Search",
+                        action = "See all",
                         onAction = onOpenSearch,
                         modifier = Modifier.padding(top = 10.dp),
                     )
@@ -380,47 +381,38 @@ fun HomeScreen(
                 }
             }
         }
+        // A solid strip behind the clock, so tiles scrolling up pass under it instead of
+        // showing through the status bar.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(MaterialTheme.colorScheme.background),
+        )
+      }
     }
 }
 
-/** The top of Home: the greeting over "My Vault", with square Search and Add buttons. */
+/**
+ * The top of Home: the greeting over "My Vault". Search and Add live in the bottom bar, so
+ * they aren't repeated up here.
+ */
 @Composable
-private fun HomeHeader(greeting: String, onSearch: () -> Unit, onAdd: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = greeting,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "My Vault",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        SquareIconButton(Icons.Rounded.Search, "Search", onSearch)
-        Spacer(Modifier.width(8.dp))
-        SquareIconButton(Icons.Rounded.Add, "Add entry", onAdd)
-    }
-}
-
-@Composable
-private fun SquareIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.size(44.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp))
-        }
+private fun HomeHeader(greeting: String) {
+    Column(modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
+        Text(
+            text = greeting,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "My Vault",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -481,13 +473,25 @@ private fun BentoTop(
                 .weight(1.15f)
                 .fillMaxHeight(),
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Icon(
-                    imageVector = Icons.Rounded.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Encrypted",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "$itemCount",
