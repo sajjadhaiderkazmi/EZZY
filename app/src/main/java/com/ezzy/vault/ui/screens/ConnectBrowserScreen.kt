@@ -170,6 +170,8 @@ fun ConnectBrowserScreen(onBack: () -> Unit) {
     val snackbar = LocalSnackbar.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { viewModel.loadExtension(context) }
+    // The "connected" and "Syncing… / Done" notices need this on Android 13+; sync works without it.
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     val midPairing = state is LinkState.Pairing || state is LinkState.SetPin
     val leave: () -> Unit = {
@@ -254,6 +256,9 @@ fun ConnectBrowserScreen(onBack: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     askInstalled = false
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        runCatching { notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
+                    }
                     viewModel.startPairing()
                 }) { Text("Confirm") }
             },
