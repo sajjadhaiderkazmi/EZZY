@@ -6,11 +6,16 @@ import com.ezzy.vault.AppContainer
 import com.ezzy.vault.data.model.FieldDraft
 import com.ezzy.vault.data.model.FieldType
 import com.ezzy.vault.data.model.ItemDraft
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -66,6 +71,7 @@ class BrowserLink(private val context: Context, private val container: AppContai
     /** The PIN the user just chose, held in memory only until the extension collects it. */
     private var pendingPin: String? = null
     private val seenRequests = LinkedHashMap<String, Long>()
+    private val notifyScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val _state = MutableStateFlow<LinkState>(LinkState.Off)
     val state: StateFlow<LinkState> = _state.asStateFlow()
@@ -270,7 +276,19 @@ class BrowserLink(private val context: Context, private val container: AppContai
             seenRequests[request.rid] = now
         }
 
+        // Only real data moves get the "Syncing… → Done" notification; status polls stay silent.
+        val announce = browser.active && request.op in DATA_OPS
+        val startedAt = System.currentTimeMillis()
+        if (announce) SyncNotifier.syncing(context)
         val outcome = runCatching { dispatch(request, browser) }
+        if (announce) {
+            notifyScope.launch {
+                // Android drops notification updates that land too close together, so "Syncing…"
+                // stays up a moment before it turns into "Done".
+                delay((MIN_SYNCING_MS - (System.currentTimeMillis() - startedAt)).coerceAtLeast(0))
+                if (outcome.isSuccess) SyncNotifier.syncDone(context) else SyncNotifier.clearSync(context)
+            }
+        }
         val response = ApiResponse(
             rid = request.rid,
             ok = outcome.isSuccess,
@@ -340,6 +358,7 @@ class BrowserLink(private val context: Context, private val container: AppContai
             pendingPin = null
             store.markActive()
             _state.value = LinkState.Linked(store.browser()!!, localAddress(), server?.port ?: -1)
+            SyncNotifier.connected(context, browser.name)
             return@withLock StatusResult(revision = revision(), pin = pin)
         }
         StatusResult(revision = revision())
@@ -475,6 +494,9 @@ class BrowserLink(private val context: Context, private val container: AppContai
         private const val REPLAY_WINDOW_MS = 10 * 60_000L
         private const val MAX_ATTACHMENT_BYTES = 12L * 1024 * 1024
         private const val KEY_INFO = "ezzy-sync-key-v1"
+        private const val MIN_SYNCING_MS = 900L
+        /** Requests that actually move vault data, as opposed to polls and housekeeping. */
+        private val DATA_OPS = setOf("snapshot", "saveItem", "deleteItem", "setPinned", "setSectionLock")
 
         fun normalizeCode(code: String): String =
             code.uppercase().filter { it.isLetterOrDigit() }

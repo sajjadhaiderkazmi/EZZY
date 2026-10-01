@@ -16,6 +16,12 @@ import com.ezzy.vault.MainActivity
 import com.ezzy.vault.R
 import com.ezzy.vault.appContainer
 import com.ezzy.vault.ui.nav.Routes
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Keeps the browser link reachable while EZZY is in the background. Android puts a backgrounded
@@ -24,7 +30,15 @@ import com.ezzy.vault.ui.nav.Routes
  */
 class SyncService : Service() {
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var watching: Job? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val link = appContainer.browserLink
@@ -33,15 +47,27 @@ class SyncService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        startInForeground()
+        startInForeground(link.state.value)
         if (!link.needsServer || !link.ensureServerRunning()) {
             stopSelf()
             return START_NOT_STICKY
         }
+        // Keep the notification's wording true to where the link stands.
+        if (watching == null) {
+            watching = scope.launch {
+                link.state.collect { state ->
+                    if (state != LinkState.Off) {
+                        runCatching {
+                            getSystemService<NotificationManager>()?.notify(NOTIFICATION_ID, buildNotification(state))
+                        }
+                    }
+                }
+            }
+        }
         return START_STICKY
     }
 
-    private fun startInForeground() {
+    private fun startInForeground(state: LinkState) {
         val manager = getSystemService<NotificationManager>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager?.createNotificationChannel(
@@ -55,6 +81,16 @@ class SyncService : Service() {
                 }
             )
         }
+        val notification = buildNotification(state)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun buildNotification(state: LinkState): Notification {
         val open = PendingIntent.getActivity(
             this,
             10,
@@ -67,21 +103,21 @@ class SyncService : Service() {
             Intent(this, SyncService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val (title, text) = when (state) {
+            is LinkState.Linked -> "EZZY is connected with Chrome" to "Syncs automatically while both are on the same Wi-Fi."
+            is LinkState.SetPin, is LinkState.WaitingForBrowser -> "Finishing Chrome setup" to "Set your PIN in EZZY to finish connecting."
+            else -> "Waiting for Chrome to connect…" to "Type the address and code from EZZY into the Chrome extension."
+        }
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.sync_notification_title))
-            .setContentText(getString(R.string.sync_notification_text))
+            .setContentTitle(title)
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
             .setContentIntent(open)
             .addAction(0, getString(R.string.sync_action_pause), stop)
+            .setOnlyAlertOnce(true)
             .build()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
     }
 
     companion object {
