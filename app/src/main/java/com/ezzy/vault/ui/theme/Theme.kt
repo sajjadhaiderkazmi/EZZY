@@ -19,11 +19,12 @@ import androidx.compose.ui.unit.dp
 import com.ezzy.vault.util.ThemeMode
 
 val EzzyShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(26.dp),
-    extraLarge = RoundedCornerShape(32.dp),
+    // Softly rounded, not pill-like: big cards at 16-20dp read as clean boxes.
+    extraSmall = RoundedCornerShape(6.dp),
+    small = RoundedCornerShape(9.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(20.dp),
 )
 
 /** True when the resolved scheme is dark — accents read this to pick their variant. */

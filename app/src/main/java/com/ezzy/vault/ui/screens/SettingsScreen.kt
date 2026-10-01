@@ -317,7 +317,7 @@ private fun BuiltByFooter() {
             Box(
                 modifier = Modifier
                     .size(52.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(EzzyMark.Brand),
                 contentAlignment = Alignment.Center,
             ) {

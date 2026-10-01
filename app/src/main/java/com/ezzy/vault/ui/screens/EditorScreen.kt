@@ -122,6 +122,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import com.ezzy.vault.ui.components.bleedHorizontally
@@ -400,30 +403,42 @@ private fun EditorBottomBar(
     ) {
         // A small popup right above the buttons, which ride above the keyboard, so it is never
         // hidden behind it the way a snackbar at the bottom of the screen was.
-        var showTitlePopup by remember { mutableStateOf(false) }
+        var popup by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(titleNudge) {
             if (titleNudge > 0) {
-                showTitlePopup = true
+                popup = "Please add a title to continue"
                 kotlinx.coroutines.delay(2200)
-                showTitlePopup = false
+                popup = null
+            }
+        }
+        LaunchedEffect(state.autoSaves) {
+            if (state.autoSaves > 0) {
+                popup = "✓ Saved"
+                kotlinx.coroutines.delay(1400)
+                if (popup == "✓ Saved") popup = null
             }
         }
         AnimatedVisibility(
-            visible = showTitlePopup && state.draft.title.isBlank(),
+            visible = popup != null,
             enter = fadeIn() + scaleIn(initialScale = 0.9f),
             exit = fadeOut() + scaleOut(targetScale = 0.9f),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 10.dp),
         ) {
+            // Holds the last message while it fades out, so the pill never empties mid-fade.
+            var shown by remember { mutableStateOf("") }
+            popup?.let { shown = it }
             Box(contentAlignment = Alignment.Center) {
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.inverseSurface,
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    color = if (shown.startsWith("✓")) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.inverseSurface,
+                    contentColor = if (shown.startsWith("✓")) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.inverseOnSurface,
                 ) {
                     Text(
-                        text = "Please add a title to continue",
+                        text = shown,
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
                     )
@@ -595,7 +610,13 @@ private fun DetailsStep(
         }
     }
 
+    val focusManager = LocalFocusManager.current
     LazyColumn(
+        // A tap on any empty part of the form closes the keyboard, which also saves the field
+        // that was being typed in.
+        modifier = Modifier.pointerInput(Unit) {
+            detectTapGestures(onTap = { focusManager.clearFocus() })
+        },
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -604,6 +625,7 @@ private fun DetailsStep(
                 title = draft.title,
                 titleHint = state.titleHint,
                 nudge = titleNudge,
+                onTitleDone = viewModel::autoSave,
                 onTitleChange = viewModel::setTitle,
                 photoStoredName = draft.iconPhoto,
                 category = selectedCategory,
@@ -761,6 +783,7 @@ private fun DetailsStep(
                 isLast = index == draft.fields.lastIndex,
                 onValueChange = { text -> viewModel.updateField(field.id) { it.copy(value = text) } },
                 onLongPress = { actionsFor = field },
+                onFocusLost = viewModel::autoSave,
                 modifier = Modifier.animateItem(),
             )
         }
@@ -911,6 +934,7 @@ private fun TitleCard(
     title: String,
     @Suppress("UNUSED_PARAMETER") titleHint: String,
     nudge: Int,
+    onTitleDone: () -> Unit,
     onTitleChange: (String) -> Unit,
     photoStoredName: String?,
     category: CategoryEntity?,
@@ -921,6 +945,7 @@ private fun TitleCard(
     onChooseType: () -> Unit,
 ) {
     val titleFocus = remember { FocusRequester() }
+    var titleFocused by remember { mutableStateOf(false) }
     LaunchedEffect(nudge) {
         if (nudge > 0) runCatching { titleFocus.requestFocus() }
     }
@@ -1013,7 +1038,8 @@ private fun TitleCard(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(titleFocus),
+                            .focusRequester(titleFocus)
+                            .onFocusChanged { if (titleFocused && !it.isFocused) onTitleDone(); titleFocused = it.isFocused },
                     )
                 }
             }
@@ -1178,6 +1204,7 @@ private fun FieldCard(
     onValueChange: (String) -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
+    onFocusLost: () -> Unit = {},
 ) {
     var revealed by remember { mutableStateOf(false) }
     var datePickerOpen by remember { mutableStateOf(false) }
@@ -1282,7 +1309,11 @@ private fun FieldCard(
                 onValueChange = onValueChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .onFocusChanged { focused = it.isFocused },
+                    .onFocusChanged {
+                        // Leaving the field saves it — no hunting for a Save button.
+                        if (focused && !it.isFocused) onFocusLost()
+                        focused = it.isFocused
+                    },
                 // Kept faint so an example like "0000 0000 0000" never passes for a real value.
                 placeholder = {
                     Text(
@@ -1951,7 +1982,7 @@ private fun AttachmentEditorRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(190.dp)
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 ) {
                     EncryptedImage(
@@ -2011,7 +2042,7 @@ private fun AttachmentEditorRow(
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .background(
                                 if (attachment.isPdf) MaterialTheme.colorScheme.errorContainer
                                 else MaterialTheme.colorScheme.surfaceContainerHigh

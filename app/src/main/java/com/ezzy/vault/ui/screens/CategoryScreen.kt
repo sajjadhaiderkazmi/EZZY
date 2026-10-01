@@ -502,7 +502,7 @@ private fun ItemGroupRow(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(EzzyLime),
                     contentAlignment = Alignment.Center,
                 ) {

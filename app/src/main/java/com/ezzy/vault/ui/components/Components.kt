@@ -350,7 +350,7 @@ fun IconPickerGrid(
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(
                         if (selected) accent.copy(alpha = 0.18f)
                         else MaterialTheme.colorScheme.surfaceContainerHigh
@@ -358,7 +358,7 @@ fun IconPickerGrid(
                     .border(
                         width = if (selected) 2.dp else 0.dp,
                         color = if (selected) accent else Color.Transparent,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                     )
                     .clickable { onSelect(icon.key) },
                 contentAlignment = Alignment.Center,

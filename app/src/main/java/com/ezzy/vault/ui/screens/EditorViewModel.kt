@@ -48,6 +48,8 @@ data class EditorUiState(
     val message: String? = null,
     /** The draft exactly as the editor opened it — anything different is unsaved work. */
     val pristine: ItemDraft? = null,
+    /** Bumped each time an auto-save lands, so the screen can flash a small "Saved". */
+    val autoSaves: Int = 0,
 ) {
     /** True once the user has typed, picked or attached anything worth asking about on exit. */
     val isDirty: Boolean
@@ -471,6 +473,21 @@ class EditorViewModel(
     }
 
     // ---- Persistence ------------------------------------------------------
+
+    /**
+     * Writes the entry as it stands whenever the user steps out of a field, so a typed value
+     * is never lost for want of finding the Save button. Only once the entry has a section and
+     * a title — before that there is nothing to file it under — and only if something changed.
+     */
+    fun autoSave() {
+        val current = _state.value
+        if (!current.canSave || !current.isDirty) return
+        val snapshot = current.draft
+        viewModelScope.launch {
+            repository.saveItem(snapshot, sweepFiles = false)
+            update { it.copy(pristine = snapshot, autoSaves = it.autoSaves + 1) }
+        }
+    }
 
     fun save(onSaved: (String) -> Unit) {
         val draft = _state.value.draft

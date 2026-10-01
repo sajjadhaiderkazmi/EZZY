@@ -155,7 +155,7 @@ class VaultRepository(
 
     suspend fun item(id: String): ItemWithDetails? = db.itemDao().getById(id)
 
-    suspend fun saveItem(draft: ItemDraft): String = withContext(Dispatchers.IO) {
+    suspend fun saveItem(draft: ItemDraft, sweepFiles: Boolean = true): String = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         val existing = db.itemDao().getById(draft.id)?.item
 
@@ -220,7 +220,9 @@ class VaultRepository(
             )
         }
 
-        sweepOrphanFiles()
+        // An auto-save mid-edit skips the sweep: a picture still waiting on its crop isn't in
+        // the draft yet, and sweeping would delete it from under the editor.
+        if (sweepFiles) sweepOrphanFiles()
         draft.id
     }
 

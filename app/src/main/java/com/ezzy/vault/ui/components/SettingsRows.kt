@@ -200,7 +200,7 @@ fun NavigationRow(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(tint.copy(alpha = if (accent != null) 0.2f else 0.12f)),
                     contentAlignment = Alignment.Center,
                 ) {
