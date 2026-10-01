@@ -55,6 +55,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.ezzy.vault.ui.theme.LocalIsDarkTheme
+import com.ezzy.vault.ui.components.bleedHorizontally
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
@@ -228,13 +230,15 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(30.dp)
                                 .clip(RoundedCornerShape(9.dp))
-                                .background(EzzyMark.Brand),
+                                // The ink tile vanishes into the dark theme's background, so
+                                // there it turns lime with an ink bolt instead.
+                                .background(if (LocalIsDarkTheme.current) EzzyLime else EzzyMark.Brand),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 imageVector = EzzyMark.Bolt,
                                 contentDescription = null,
-                                tint = EzzyMark.Spark,
+                                tint = if (LocalIsDarkTheme.current) EzzyOnLime else EzzyMark.Spark,
                                 modifier = Modifier.size(22.dp),
                             )
                         }
@@ -335,6 +339,7 @@ fun HomeScreen(
                             TextButton(
                                 onClick = onOpenQuickAccess,
                                 contentPadding = PaddingValues(horizontal = 8.dp),
+                                modifier = Modifier.height(32.dp),
                             ) {
                                 Text("See all", style = MaterialTheme.typography.labelMedium)
                             }
@@ -343,9 +348,13 @@ fun HomeScreen(
                 }
                 if (quickAccess.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
+                        // Runs edge to edge, past the grid's side padding, so the last card
+                        // slides off the screen edge and reads as "scroll for more" rather
+                        // than being sliced off mid-page.
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(vertical = 2.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
+                            modifier = Modifier.bleedHorizontally(16.dp),
                         ) {
                             items(quickAccess, key = { it.key }) { target ->
                                 QuickAccessCard(
@@ -381,6 +390,7 @@ fun HomeScreen(
                         TextButton(
                             onClick = onAddCategory,
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp),
                         ) {
                             Text(
                                 text = "Create Section",

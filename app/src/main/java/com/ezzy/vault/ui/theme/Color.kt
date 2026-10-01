@@ -127,7 +127,7 @@ object Accents {
         AccentColor("blue", "Blue", Color(0xFF2C6FDD), Color(0xFF89B7FF), Color(0xFFD2E3FF), Color(0xFF1F4F98)),
         AccentColor("teal", "Teal", Color(0xFF0E8F81), Color(0xFF54D3C2), Color(0xFFC6F1EA), Color(0xFF0F6B62)),
         AccentColor("green", "Green", Color(0xFF2A8A4E), Color(0xFF74D69A), Color(0xFFCDF1D9), Color(0xFF1C6B41)),
-        AccentColor("amber", "Amber", Color(0xFFB07C08), Color(0xFFF0C24B), Color(0xFFFFEAB0), Color(0xFF7A5A0E)),
+        AccentColor("amber", "Amber", Color(0xFFB07C08), Color(0xFFF0C24B), Color(0xFFFFEAB0), Color(0xFF9C6410)),
         AccentColor("orange", "Orange", Color(0xFFC4581B), Color(0xFFFFA26B), Color(0xFFFFDCC6), Color(0xFF8A4018)),
         AccentColor("red", "Red", Color(0xFFC4342F), Color(0xFFFF9490), Color(0xFFFFD7D4), Color(0xFF8C2E2E)),
         AccentColor("pink", "Pink", Color(0xFFBE3A73), Color(0xFFF991BA), Color(0xFFFFD6E8), Color(0xFF8A2D5C)),

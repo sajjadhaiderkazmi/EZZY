@@ -122,6 +122,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.ezzy.vault.ui.components.bleedHorizontally
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -590,7 +591,11 @@ private fun DetailsStep(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Spacer(Modifier.height(10.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        modifier = Modifier.bleedHorizontally(16.dp),
+                    ) {
                         items(templates, key = { it.id }) { template ->
                             TypeTile(
                                 name = template.name,
@@ -994,6 +999,9 @@ private fun PillChooser(
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        // Set outright: a see-through surface has no matching content colour, and the values
+        // came out as dark grey on the dark pill.
+        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = modifier,
     ) {
         Row(
@@ -1062,8 +1070,8 @@ private fun TypeTile(name: String, iconKey: String, onClick: () -> Unit) {
                 text = name,
                 style = MaterialTheme.typography.labelMedium,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
                 minLines = 2,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -1224,7 +1232,13 @@ private fun FieldCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { focused = it.isFocused },
-                placeholder = { Text(field.type.placeholder()) },
+                // Kept faint so an example like "0000 0000 0000" never passes for a real value.
+                placeholder = {
+                    Text(
+                        text = field.type.placeholder(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    )
+                },
                 textStyle = if (field.type.isNumeric()) {
                     ValueMonoStyle.copy(color = MaterialTheme.colorScheme.onSurface)
                 } else {
@@ -1824,7 +1838,7 @@ private fun rememberAttachPickers(
 @Composable
 private fun AttachTiles(enabled: Boolean, pickers: AttachPickers, onRecord: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AttachTile(Icons.Rounded.AddPhotoAlternate, "Photo", enabled, pickers.photo, Modifier.weight(1f), highlight = true)
+        AttachTile(Icons.Rounded.AddPhotoAlternate, "Photo", enabled, pickers.photo, Modifier.weight(1f))
         AttachTile(Icons.Rounded.AttachFile, "File", enabled, pickers.file, Modifier.weight(1f))
         AttachTile(Icons.Rounded.Mic, "Voice", enabled, onRecord, Modifier.weight(1f))
         AttachTile(Icons.Rounded.Videocam, "Video", enabled, pickers.video, Modifier.weight(1f))

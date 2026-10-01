@@ -1,5 +1,9 @@
 package com.ezzy.vault.ui.theme
 
+import androidx.core.view.WindowCompat
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.SideEffect
+import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +47,19 @@ fun EzzyTheme(
 
         dark -> EzzyDarkColors
         else -> EzzyLightColors
+    }
+
+    // The status and navigation bar icons follow the app's own theme, not the phone's: with the
+    // app set to dark on a light phone they would otherwise stay dark on a near-black screen.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
+        }
     }
 
     CompositionLocalProvider(LocalIsDarkTheme provides dark) {

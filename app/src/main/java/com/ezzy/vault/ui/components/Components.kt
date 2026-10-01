@@ -241,8 +241,8 @@ fun FieldValueRow(
         // With a section colour the row picks up a faint tint of it, so the details read as part
         // of the entry's card instead of flat grey slabs on the dark theme.
         color = if (accent != null) {
-            accent.copy(alpha = if (LocalIsDarkTheme.current) 0.10f else 0.07f)
-                .compositeOver(MaterialTheme.colorScheme.surfaceContainer)
+            accent.copy(alpha = if (LocalIsDarkTheme.current) 0.09f else 0.07f)
+                .compositeOver(MaterialTheme.colorScheme.surfaceContainerLow)
         } else {
             MaterialTheme.colorScheme.surfaceContainerLow
         },

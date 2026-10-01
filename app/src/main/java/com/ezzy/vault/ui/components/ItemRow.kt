@@ -21,6 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.ezzy.vault.ui.theme.LocalIsDarkTheme
+import com.ezzy.vault.ui.theme.Accents
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,8 +64,12 @@ fun ItemRow(
             .fillMaxWidth()
             .scale(if (dragging) 1.03f else 1f),
         shape = MaterialTheme.shapes.large,
+        // A faint tint of the section's colour, so a list of entries carries the colour of the
+        // section card it came from instead of a column of flat grey slabs.
         color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest
-        else MaterialTheme.colorScheme.surfaceContainerLow,
+        else Accents.color(colorKey, LocalIsDarkTheme.current)
+            .copy(alpha = if (LocalIsDarkTheme.current) 0.09f else 0.07f)
+            .compositeOver(MaterialTheme.colorScheme.surfaceContainerLow),
         shadowElevation = if (dragging) 12.dp else 0.dp,
     ) {
         Row(

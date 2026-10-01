@@ -26,7 +26,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -66,7 +66,7 @@ fun SettingsPage(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
+            MediumTopAppBar(
                 title = { Text(title) },
                 navigationIcon = {
                     CircleIconButton(
@@ -77,7 +77,7 @@ fun SettingsPage(
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
+                colors = TopAppBarDefaults.mediumTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     scrolledContainerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -216,7 +216,10 @@ fun NavigationRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
+                    // Bold only for the icon-led rows of the main menu; a plain row inside a
+                    // settings page matches the switch and choice rows around it.
+                    style = if (icon != null) MaterialTheme.typography.titleSmall
+                    else MaterialTheme.typography.bodyLarge,
                     color = if (destructive) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.onSurface,
                 )

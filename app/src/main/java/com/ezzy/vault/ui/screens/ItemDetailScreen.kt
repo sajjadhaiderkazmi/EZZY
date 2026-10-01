@@ -77,6 +77,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.ezzy.vault.ui.theme.EzzyOnLime
+import com.ezzy.vault.ui.theme.EzzyLime
+import com.ezzy.vault.ui.components.CircleIconButton
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -237,28 +240,37 @@ fun ItemDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(details?.item?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                // The name already sits large in the card below, so the bar keeps to the
+                // same round buttons as the section page instead of repeating it.
+                title = {},
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                    }
+                    CircleIconButton(
+                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back",
+                        onClick = onBack,
+                        size = 42.dp,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.togglePin() }) {
-                        Icon(
-                            imageVector = Icons.Rounded.PushPin,
-                            contentDescription = if (details?.item?.isPinned == true) "Unpin" else "Pin",
-                            tint = if (details?.item?.isPinned == true) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    IconButton(onClick = { confirmDelete = true }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Delete,
-                            contentDescription = "Delete entry",
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    }
+                    val pinned = details?.item?.isPinned == true
+                    CircleIconButton(
+                        icon = Icons.Rounded.PushPin,
+                        contentDescription = if (pinned) "Unpin" else "Pin",
+                        onClick = { viewModel.togglePin() },
+                        size = 42.dp,
+                        container = if (pinned) EzzyLime else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        content = if (pinned) EzzyOnLime else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    CircleIconButton(
+                        icon = Icons.Rounded.Delete,
+                        contentDescription = "Delete entry",
+                        onClick = { confirmDelete = true },
+                        size = 42.dp,
+                        content = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(12.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -1275,6 +1287,7 @@ private fun AttachmentActionRow(
             AttachmentAction(
                 icon = Icons.Rounded.Share,
                 label = "Share",
+                primary = false,
                 modifier = Modifier.weight(1f),
                 onClick = {
                     actions.share(
@@ -1291,6 +1304,7 @@ private fun AttachmentActionRow(
                 AttachmentAction(
                     icon = Icons.Rounded.OpenInNew,
                     label = "Open",
+                    primary = false,
                     modifier = Modifier.weight(1f),
                     onClick = {
                         actions.open(attachment.storedName, label, attachment.mimeType) { ok ->
@@ -1480,14 +1494,26 @@ private fun AttachmentAction(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    primary: Boolean = true,
 ) {
-    LimeButton(
-        text = label,
-        icon = icon,
-        onClick = onClick,
-        height = 50.dp,
-        modifier = modifier,
-    )
+    // Only the first action is the lime one, so the row has one clear main button.
+    if (primary) {
+        LimeButton(
+            text = label,
+            icon = icon,
+            onClick = onClick,
+            height = 50.dp,
+            modifier = modifier,
+        )
+    } else {
+        com.ezzy.vault.ui.components.SoftPillButton(
+            text = label,
+            icon = icon,
+            onClick = onClick,
+            height = 50.dp,
+            modifier = modifier,
+        )
+    }
 }
 
 // ---- Expiry ------------------------------------------------------------------
