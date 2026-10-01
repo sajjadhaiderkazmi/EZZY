@@ -86,6 +86,7 @@ import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.TextFields
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -322,22 +323,12 @@ private fun EditorHeader(
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    text = if (stepCount > 1) "Step ${stepIndex + 1} of $stepCount · $stepCaption"
+                    text = if (stepCount > 1) "Step ${stepIndex + 1} of $stepCount · $stepTitle"
                     else stepCaption,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Text(
-                    text = stepTitle,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
         }
@@ -379,51 +370,68 @@ private fun EditorBottomBar(
     onNext: () -> Unit,
     onSave: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
-            .imePadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .imePadding(),
     ) {
-        if (state.step != state.steps.first()) {
-            CircleIconButton(
-                icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Previous step",
-                onClick = onBack,
-                size = 56.dp,
+        // A greyed-out button on its own doesn't say why — this line does.
+        AnimatedVisibility(visible = state.step == EditorStep.DETAILS && state.draft.title.isBlank()) {
+            Text(
+                text = "Give the entry a name to continue",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
             )
         }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (state.step != state.steps.first()) {
+                CircleIconButton(
+                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Previous step",
+                    onClick = onBack,
+                    size = 56.dp,
+                )
+            }
 
-        // Once the entry has a name it can be saved from any step — no need to walk
-        // through files just to store a phone number.
-        if (!isLastStep && state.canSave) {
-            SoftPillButton(
-                text = "Save",
-                icon = Icons.Rounded.Check,
-                onClick = onSave,
-            )
-        }
+            // Once the entry has a name it can be saved from any step — no need to walk
+            // through files just to store a phone number.
+            if (!isLastStep && state.canSave) {
+                SoftPillButton(
+                    text = "Save",
+                    icon = Icons.Rounded.Check,
+                    onClick = onSave,
+                )
+            }
 
-        if (isLastStep) {
-            LimeButton(
-                text = if (state.draft.isNew) "Save entry" else "Save changes",
-                icon = Icons.Rounded.Check,
-                onClick = onSave,
-                enabled = state.canSave,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            LimeButton(
-                text = "Continue",
-                trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
-                onClick = onNext,
-                enabled = state.canContinue,
-                modifier = Modifier.weight(1f),
-            )
+            if (isLastStep) {
+                LimeButton(
+                    text = if (state.draft.isNew) "Save entry" else "Save changes",
+                    icon = Icons.Rounded.Check,
+                    onClick = onSave,
+                    enabled = state.canSave,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                LimeButton(
+                    text = "Continue",
+                    trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
+                    onClick = onNext,
+                    enabled = state.canContinue,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
@@ -1455,19 +1463,18 @@ private fun AddFieldPanel(
 
 @Composable
 private fun NoteField(value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
+    TextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text("Note (optional)") },
-        leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Notes, contentDescription = null) },
+        placeholder = { Text("Add a note (optional)") },
         minLines = 3,
         shape = MaterialTheme.shapes.large,
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            unfocusedBorderColor = Color.Transparent,
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
         ),
         modifier = Modifier.fillMaxWidth(),
     )
@@ -1833,7 +1840,12 @@ private fun AttachTile(
     }
 }
 
-/** A stored file with the remark that says what it is, plus crop and remove. */
+/**
+ * A stored file. A picture is shown big, edge to edge, with round Crop and Delete buttons
+ * floating on it; any other file gets a tidy row with its kind's icon. Under it, the remark is
+ * a soft one-line box, and a picture's watermark is a single tappable chip rather than a whole
+ * switch row with two lines of explanation.
+ */
 @Composable
 private fun AttachmentEditorRow(
     attachment: AttachmentDraft,
@@ -1844,24 +1856,83 @@ private fun AttachmentEditorRow(
     onToggleWatermark: (Boolean) -> Unit,
 ) {
     Surface(
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (attachment.isImage) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            if (attachment.isImage) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(190.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                ) {
                     EncryptedImage(
                         storedName = attachment.storedName,
                         contentDescription = attachment.displayName,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(10.dp)),
+                        modifier = Modifier.fillMaxSize(),
                         watermark = attachment.watermark,
                         watermarkStyle = attachment.watermarkStyle,
                     )
-                } else {
-                    Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (canCrop) {
+                            CircleIconButton(
+                                icon = Icons.Rounded.Crop,
+                                contentDescription = "Crop ${attachment.displayName}",
+                                onClick = onCrop,
+                                size = 40.dp,
+                                container = Color.Black.copy(alpha = 0.55f),
+                                content = Color.White,
+                            )
+                        }
+                        CircleIconButton(
+                            icon = Icons.Rounded.DeleteOutline,
+                            contentDescription = "Remove ${attachment.displayName}",
+                            onClick = onRemove,
+                            size = 40.dp,
+                            container = Color.Black.copy(alpha = 0.55f),
+                            content = Color.White,
+                        )
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.55f),
+                        contentColor = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp),
+                    ) {
+                        Text(
+                            text = "${attachment.displayName} · ${attachment.sizeLabel()}",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.padding(start = 6.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (attachment.isPdf) MaterialTheme.colorScheme.errorContainer
+                                else MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Icon(
                             imageVector = when {
                                 attachment.isPdf -> Icons.Rounded.PictureAsPdf
@@ -1869,69 +1940,88 @@ private fun AttachmentEditorRow(
                                 else -> Icons.Rounded.Description
                             },
                             contentDescription = null,
-                            tint = if (attachment.isPdf) MaterialTheme.colorScheme.error
+                            tint = if (attachment.isPdf) MaterialTheme.colorScheme.onErrorContainer
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = attachment.displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "${attachment.sizeBytes / 1024} KB",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (canCrop) {
-                    IconButton(onClick = onCrop) {
-                        Icon(
-                            imageVector = Icons.Rounded.Crop,
-                            contentDescription = "Crop ${attachment.displayName}",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                DeleteAttachmentButton(onRemove)
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = attachment.caption,
-                onValueChange = onCaptionChange,
-                label = { Text("Remarks") },
-                placeholder = { Text("What this shows") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            // Only a picture can carry a visible stamp — hidden here so the switch never sits
-            // beside a PDF, video or audio row where it would silently do nothing.
-            if (attachment.isImage) {
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Watermark", style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = "\"FOR VERIFICATION PURPOSE ONLY\" on Copy and Share",
+                            text = attachment.displayName,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = attachment.sizeLabel(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = attachment.watermark, onCheckedChange = onToggleWatermark)
+                    DeleteAttachmentButton(onRemove)
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            TextField(
+                value = attachment.caption,
+                onValueChange = onCaptionChange,
+                placeholder = { Text("Add a remark — what this shows") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                singleLine = true,
+                shape = CircleShape,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // Only a picture can carry a visible stamp — the chip never sits beside a PDF,
+            // video or audio row where it would silently do nothing.
+            if (attachment.isImage) {
+                Spacer(Modifier.height(8.dp))
+                val on = attachment.watermark
+                Surface(
+                    onClick = { onToggleWatermark(!on) },
+                    shape = CircleShape,
+                    color = if (on) EzzyLime else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = if (on) EzzyOnLime else MaterialTheme.colorScheme.onSurface,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 12.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = if (on) Icons.Rounded.Check else Icons.Rounded.VerifiedUser,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (on) "Watermark on when shared" else "Add watermark when shared",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private fun AttachmentDraft.sizeLabel(): String = when {
+    sizeBytes >= 1024 * 1024 -> String.format(Locale.US, "%.1f MB", sizeBytes / 1024f / 1024f)
+    else -> "${(sizeBytes / 1024).coerceAtLeast(1)} KB"
 }
 
 /** Opens the cropper for whichever attachment is currently selected, if any. */

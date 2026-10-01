@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -259,7 +260,12 @@ fun HomeScreen(
             )
         },
         bottomBar = {
-            HomeBottomBar(onAdd = onAddItem, onSettings = onOpenSettings)
+            HomeBottomBar(
+                onAdd = onAddItem,
+                onPinned = onOpenQuickAccess,
+                onSearch = onOpenSearch,
+                onSettings = onOpenSettings,
+            )
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
@@ -282,8 +288,6 @@ fun HomeScreen(
                     itemCount = itemCount,
                     pinnedCount = pinned.size,
                     sectionCount = categories.size,
-                    onSearch = onOpenSearch,
-                    onAdd = onAddItem,
                 )
             }
 
@@ -440,74 +444,110 @@ fun HomeScreen(
 }
 
 /**
- * Home's own bottom bar: Home (already here), a raised Add button for the single most common
- * action, and Settings. Sub-screens keep the back-arrow top bar they already had — this bar is
- * Home-only, not a persistent app-wide shell.
- *
- * There is deliberately no panel behind the actions. A filled bar drew a lighter band with a
- * hard top edge running out either side of the round Add button, which read as a strip stuck
- * across the bottom of the page. The actions now sit straight on the page background; the
- * Scaffold still reserves this whole height, so the grid never scrolls underneath them.
+ * Home's own bottom bar: a lime bar with a rounded hump in the middle, and the Add button
+ * sitting raised inside that hump — the same shape as the wallet reference. Home, Pinned,
+ * Search and Settings sit either side of it.
  */
 @Composable
-private fun HomeBottomBar(onAdd: () -> Unit, onSettings: () -> Unit) {
-    val barHeight = 66.dp
-    val addSize = 58.dp
-    // How far the button stands proud of the action row, and the extra room the Box needs.
-    val lift = 24.dp
-    // Headroom above the button so its drop shadow has somewhere to land.
-    val headroom = 8.dp
+private fun HomeBottomBar(
+    onAdd: () -> Unit,
+    onPinned: () -> Unit,
+    onSearch: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    val barHeight = 72.dp
+    val hump = 22.dp
+    val addSize = 64.dp
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .height(barHeight + lift + headroom),
+            .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+            .height(barHeight + hump),
     ) {
-        Row(
+        Surface(
+            shape = HumpBarShape(humpHeight = hump, humpRadius = 44.dp, corner = 30.dp),
+            color = EzzyLime,
+            contentColor = EzzyOnLime,
+            shadowElevation = 8.dp,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(barHeight)
-                .padding(horizontal = 28.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+                .height(barHeight + hump)
+                .align(Alignment.BottomCenter),
         ) {
-            BottomBarAction(
-                icon = Icons.Rounded.Home,
-                label = "Home",
-                selected = true,
-                onClick = {},
-            )
-            // Keeps the two labels clear of the raised button sitting between them.
-            Spacer(Modifier.width(addSize))
-            BottomBarAction(
-                icon = Icons.Rounded.Settings,
-                label = "Settings",
-                selected = false,
-                onClick = onSettings,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = hump, start = 8.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BottomBarAction(Icons.Rounded.Home, "Home", selected = true, onClick = {}, modifier = Modifier.weight(1f))
+                BottomBarAction(Icons.Rounded.PushPin, "Pinned", selected = false, onClick = onPinned, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(addSize + 8.dp))
+                BottomBarAction(Icons.Rounded.Search, "Search", selected = false, onClick = onSearch, modifier = Modifier.weight(1f))
+                BottomBarAction(Icons.Rounded.Settings, "Settings", selected = false, onClick = onSettings, modifier = Modifier.weight(1f))
+            }
         }
 
+        // The raised button: a dark disc with a soft lime ring, centred in the hump.
         Surface(
             onClick = onAdd,
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            shadowElevation = 6.dp,
+            color = EzzyOnLime,
+            contentColor = EzzyLime,
+            shadowElevation = 10.dp,
+            border = androidx.compose.foundation.BorderStroke(4.dp, EzzyLime),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headroom)
+                .padding(top = 2.dp)
                 .size(addSize),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Icon(
                     imageVector = Icons.Rounded.Add,
                     contentDescription = "Add entry",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(30.dp),
                 )
             }
         }
+    }
+}
+
+/**
+ * A rounded bar whose top edge rises into a smooth hump in the middle. Drawn with cubic curves
+ * so the shoulders of the hump blend into the bar instead of meeting it at a corner.
+ */
+private class HumpBarShape(
+    private val humpHeight: androidx.compose.ui.unit.Dp,
+    private val humpRadius: androidx.compose.ui.unit.Dp,
+    private val corner: androidx.compose.ui.unit.Dp,
+) : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density,
+    ): androidx.compose.ui.graphics.Outline {
+        val h = with(density) { humpHeight.toPx() }
+        val r = with(density) { humpRadius.toPx() }
+        val c = with(density) { corner.toPx() }
+        val mid = size.width / 2f
+        val shoulder = r * 0.9f
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(0f, h + c)
+            quadraticTo(0f, h, c, h)
+            lineTo(mid - r - shoulder, h)
+            cubicTo(mid - r, h, mid - r, 0f, mid, 0f)
+            cubicTo(mid + r, 0f, mid + r, h, mid + r + shoulder, h)
+            lineTo(size.width - c, h)
+            quadraticTo(size.width, h, size.width, h + c)
+            lineTo(size.width, size.height - c)
+            quadraticTo(size.width, size.height, size.width - c, size.height)
+            lineTo(c, size.height)
+            quadraticTo(0f, size.height, 0f, size.height - c)
+            close()
+        }
+        return androidx.compose.ui.graphics.Outline.Generic(path)
     }
 }
 
@@ -517,18 +557,30 @@ private fun BottomBarAction(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val tint = if (selected) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.onSurfaceVariant
     Column(
-        modifier = Modifier
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(imageVector = icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
+        Box(
+            modifier = Modifier
+                .size(width = 40.dp, height = 28.dp)
+                .clip(CircleShape)
+                .background(if (selected) EzzyOnLime.copy(alpha = 0.12f) else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        }
         Spacer(Modifier.height(2.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = tint)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+        )
     }
 }
 
@@ -589,8 +641,8 @@ private fun CategoryCard(
 }
 
 /**
- * The top of Home: a big lime card with the greeting, how much the vault holds, a search bar
- * and the add button — the one place the app's colour is spent in full.
+ * The top of Home: a big lime card with the greeting and how much the vault holds — the one
+ * place besides the bottom bar where the app's colour is spent in full.
  */
 @Composable
 private fun HomeHero(
@@ -598,13 +650,12 @@ private fun HomeHero(
     itemCount: Int,
     pinnedCount: Int,
     sectionCount: Int,
-    onSearch: () -> Unit,
-    onAdd: () -> Unit,
 ) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
-        color = EzzyLime,
-        contentColor = EzzyOnLime,
+        // Dark ink with lime writing, so it stands apart from the lime bar at the bottom.
+        color = HeroInk,
+        contentColor = Color.White,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -620,6 +671,7 @@ private fun HomeHero(
                     text = "$itemCount",
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Bold,
+                    color = EzzyLime,
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -633,49 +685,13 @@ private fun HomeHero(
                 HeroChip("$sectionCount sections")
                 HeroChip("$pinnedCount pinned")
             }
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    onClick = onSearch,
-                    shape = CircleShape,
-                    color = EzzyOnLime.copy(alpha = 0.08f),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = "Search your vault",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = EzzyOnLime.copy(alpha = 0.7f),
-                        )
-                    }
-                }
-                Spacer(Modifier.width(10.dp))
-                Surface(
-                    onClick = onAdd,
-                    shape = CircleShape,
-                    color = EzzyOnLime,
-                    contentColor = EzzyLime,
-                    modifier = Modifier.size(50.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.Rounded.Add, contentDescription = "Add entry")
-                    }
-                }
-            }
         }
     }
 }
 
 @Composable
 private fun HeroChip(text: String) {
-    Surface(shape = CircleShape, color = EzzyOnLime.copy(alpha = 0.1f)) {
+    Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f)) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
@@ -803,3 +819,6 @@ private fun cardIndexUnder(
     } ?: return -1
     return order.indexOfFirst { it.category.id == hit.key }
 }
+
+/** The hero card's ground: the launcher icon's ink, a touch lifted so it reads as a card. */
+private val HeroInk = Color(0xFF1C2213)

@@ -57,8 +57,9 @@ fun LimeButton(
         onClick = onClick,
         enabled = enabled,
         shape = CircleShape,
-        color = if (enabled) EzzyLime else MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = if (enabled) EzzyOnLime else MaterialTheme.colorScheme.onSurfaceVariant,
+        // Disabled stays lime, only faded — it still reads as "the button", just not ready yet.
+        color = if (enabled) EzzyLime else EzzyLime.copy(alpha = 0.35f),
+        contentColor = if (enabled) EzzyOnLime else EzzyOnLime.copy(alpha = 0.45f),
         interactionSource = interaction,
         modifier = modifier
             .height(height)

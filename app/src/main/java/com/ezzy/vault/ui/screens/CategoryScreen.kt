@@ -14,6 +14,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.ui.draw.scale
+import com.ezzy.vault.ui.components.CircleIconButton
+import com.ezzy.vault.ui.components.LimeButton
+import com.ezzy.vault.ui.theme.EzzyLime
+import com.ezzy.vault.ui.theme.EzzyOnLime
+import com.ezzy.vault.ui.theme.accentWash
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -196,71 +207,67 @@ fun CategoryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = category?.name ?: "Section",
-                            style = MaterialTheme.typography.titleMedium,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircleIconButton(
+                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    onClick = onBack,
+                )
+                Spacer(Modifier.weight(1f))
+                CircleIconButton(
+                    icon = Icons.Rounded.CreateNewFolder,
+                    contentDescription = "New group",
+                    onClick = { creatingGroup = true },
+                )
+                Spacer(Modifier.width(8.dp))
+                Box {
+                    CircleIconButton(
+                        icon = Icons.Rounded.MoreVert,
+                        contentDescription = "Section options",
+                        onClick = { menuOpen = true },
+                    )
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Edit section") },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.Edit, contentDescription = null)
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onEditCategory()
+                            },
                         )
-                        Text(
-                            text = if (items.size == 1) "1 item" else "${items.size} items",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        DropdownMenuItem(
+                            text = { Text("Delete section", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                confirmDelete = true
+                            },
                         )
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { creatingGroup = true }) {
-                        Icon(Icons.Rounded.CreateNewFolder, contentDescription = "New group")
-                    }
-                    Box {
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "Section options")
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Edit section") },
-                                leadingIcon = {
-                                    Icon(Icons.Rounded.Edit, contentDescription = null)
-                                },
-                                onClick = {
-                                    menuOpen = false
-                                    onEditCategory()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete section", color = MaterialTheme.colorScheme.error) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                },
-                                onClick = {
-                                    menuOpen = false
-                                    confirmDelete = true
-                                },
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
+                }
+            }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            LimeButton(
+                text = "Add entry",
+                icon = Icons.Rounded.Add,
                 onClick = onAddItem,
-                icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                text = { Text("Add") },
+                modifier = Modifier.navigationBarsPadding(),
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -284,14 +291,23 @@ fun CategoryScreen(
                     .fillMaxSize()
                     .padding(padding),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                item(key = "banner") {
+                    SectionBanner(
+                        category = category,
+                        entryCount = items.size,
+                        groupCount = groups.size,
+                    )
+                }
+
                 if (groups.isNotEmpty()) {
                     item(key = "hint") {
                         Text(
-                            text = "Hold an entry to drag it onto a group and file it there",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "Tip: hold an entry and drag it onto a folder to file it there.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         )
                     }
                 }
@@ -457,40 +473,43 @@ private fun ItemGroupRow(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
+    // A real folder: a lime tile with a folder glyph, the count as a pill, and a lime outline
+    // that lights up (and the card grows a touch) while a dragged entry hovers over it.
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        // Switches to the accent tint while a dragged entry hovers over it — the same cue a
-        // chat head's dismiss target gives, so "this is about to accept it" reads clearly.
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(if (highlighted) 1.03f else 1f),
+        shape = MaterialTheme.shapes.large,
         color = if (highlighted) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceContainerLow,
+        border = if (highlighted) {
+            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
     ) {
         Box {
             Row(
                 modifier = Modifier
                     .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .padding(start = 14.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(
-                            (if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.12f)
-                        ),
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(EzzyLime),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Folder,
+                        imageVector = if (highlighted) Icons.Rounded.FolderOpen else Icons.Rounded.Folder,
                         contentDescription = null,
-                        tint = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
+                        tint = EzzyOnLime,
+                        modifier = Modifier.size(24.dp),
                     )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = row.group.name,
@@ -500,17 +519,31 @@ private fun ItemGroupRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = if (highlighted) "Drop to file it here" else "Folder",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                     Text(
                         text = when (row.itemCount) {
                             0 -> "Empty"
                             1 -> "1 entry"
                             else -> "${row.itemCount} entries"
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = (if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp),
+                )
             }
 
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -709,3 +742,52 @@ private fun keyUnder(state: LazyListState, point: Offset): Any? =
 
 /** Prefixes a group's list key so it can never collide with an entry id (a plain UUID). */
 private const val GROUP_KEY_PREFIX = "group:"
+
+/** The top of a section: its icon, name and what it holds, on a wash of its own colour. */
+@Composable
+private fun SectionBanner(category: CategoryEntity?, entryCount: Int, groupCount: Int) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = accentWash(category?.colorKey),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconAvatar(
+                iconKey = category?.iconKey,
+                colorKey = category?.colorKey,
+                size = 60.dp,
+                iconSize = 30.dp,
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = category?.name ?: "Section",
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    BannerChip(if (entryCount == 1) "1 entry" else "$entryCount entries")
+                    if (groupCount > 0) {
+                        BannerChip(if (groupCount == 1) "1 folder" else "$groupCount folders")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BannerChip(text: String) {
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
