@@ -15,6 +15,7 @@ object Routes {
     const val SETTINGS_SECTION_LOCKS = "settings/security/locks"
     const val SETTINGS_APPEARANCE = "settings/appearance"
     const val SETTINGS_DATA = "settings/data"
+    const val SETTINGS_CONNECT_BROWSER = "settings/connectBrowser"
 
     const val CATEGORY = "category/{categoryId}"
     fun category(categoryId: String) = "category/$categoryId"

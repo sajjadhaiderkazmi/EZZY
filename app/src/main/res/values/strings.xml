@@ -13,4 +13,11 @@
     <string name="overlay_permission_missing">EZZY needs the \"Display over other apps\" permission to show the floating bar.</string>
 
     <string name="fgs_special_use">Draws the user\'s own floating shortcut bar over other apps so saved details can be copied without leaving the current app.</string>
+
+    <string name="sync_channel_name">Browser sync</string>
+    <string name="sync_channel_description">Keeps your paired Chrome browser in sync over your own Wi-Fi.</string>
+    <string name="sync_notification_title">EZZY browser sync is on</string>
+    <string name="sync_notification_text">Your paired Chrome syncs while both are on the same Wi-Fi.</string>
+    <string name="sync_action_pause">Pause</string>
+    <string name="fgs_special_use_sync">Keeps an end-to-end encrypted link on the local Wi-Fi open so the user\'s own paired Chrome extension can view and edit their vault.</string>
 </resources>

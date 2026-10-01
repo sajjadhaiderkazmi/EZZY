@@ -27,6 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.security.AppLock
+import com.ezzy.vault.sync.SyncService
 import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.LocalSnackbar
 import com.ezzy.vault.ui.nav.EzzyNavHost
@@ -179,6 +180,9 @@ class MainActivity : FragmentActivity() {
             val grace = if (minutes < 0) Long.MAX_VALUE else minutes * 60_000L
             AppLock.onForegrounded(grace)
         }
+        // A linked browser keeps syncing in the background. Started from here, while the app
+        // is in front, since Android refuses to start a foreground service from the background.
+        if (appContainer.browserLink.hasLinkedBrowser) SyncService.start(this)
     }
 
     /** [uris] plus a value unique to this one share, even if the exact same picture is shared

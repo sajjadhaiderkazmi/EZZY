@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Shield
@@ -47,7 +48,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ezzy.vault.appContainer
+import com.ezzy.vault.sync.LinkState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.ImeAction
@@ -123,6 +128,7 @@ fun SettingsScreen(
     onOpenSecurity: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenData: () -> Unit,
+    onOpenConnectBrowser: () -> Unit,
 ) {
     val settings = LocalSettings.current
     var editName by remember { mutableStateOf(false) }
@@ -182,6 +188,21 @@ fun SettingsScreen(
                 icon = Icons.Rounded.Storage,
                 accent = Accents.color("amber", LocalIsDarkTheme.current),
                 onClick = onOpenData,
+            )
+        }
+
+        item {
+            val link by LocalContext.current.appContainer.browserLink.state.collectAsStateWithLifecycle()
+            NavigationRow(
+                title = "Connect Browser",
+                subtitle = when (val current = link) {
+                    is LinkState.Linked -> "Linked to ${current.browser.name}"
+                    LinkState.Off -> "Use your vault in Chrome"
+                    else -> "Pairing in progress"
+                },
+                icon = Icons.Rounded.Language,
+                accent = Accents.color("blue", LocalIsDarkTheme.current),
+                onClick = onOpenConnectBrowser,
             )
         }
 
@@ -335,7 +356,7 @@ private fun BuiltByFooter() {
                 letterSpacing = 3.sp,
             )
             Text(
-                text = "Everything stays on this phone. No account, no cloud.",
+                text = "No account, no cloud. A paired browser syncs only over your own Wi-Fi.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

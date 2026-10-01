@@ -12,6 +12,7 @@ import com.ezzy.vault.data.model.Seed
 import com.ezzy.vault.data.repo.VaultRepository
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.security.SecureShare
+import com.ezzy.vault.sync.BrowserLink
 import com.ezzy.vault.util.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,9 +36,12 @@ class AppContainer(context: Context) {
     val database: EzzyDatabase by lazy { EzzyDatabase.open(appContext, databaseKey.passphrase()) }
     val repository: VaultRepository by lazy { VaultRepository(database, attachmentStore) }
     val backupManager: BackupManager by lazy { BackupManager(repository) }
+    val browserLink: BrowserLink by lazy { BrowserLink(appContext, this) }
 
     /** Drops the key first: without it the remaining database bytes are just noise. */
     suspend fun eraseEverything() {
+        // A linked browser would otherwise keep its copy; refusing it makes the extension wipe too.
+        runCatching { browserLink.disconnect() }
         runCatching { database.clearAllTables() }
         attachmentStore.deleteAll()
         SecureShare.clear(appContext)

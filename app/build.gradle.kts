@@ -95,3 +95,20 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.kotlinx.serialization.json)
 }
+
+// The Chrome extension lives in /browser-extension and ships inside the APK as one zip, so the
+// phone can hand it to the user's computer (Settings › Connect Browser › Download / Share).
+// Rebuilt from source on every build, so the copy in the app can never fall behind.
+val extensionAssetsDir = layout.buildDirectory.dir("generated/extensionAssets")
+val packageChromeExtension by tasks.registering(Zip::class) {
+    from(rootProject.layout.projectDirectory.dir("browser-extension")) {
+        into("ezzy-chrome-extension")
+        exclude("**/.DS_Store", "**/*.md", "test/**")
+    }
+    archiveFileName.set("ezzy-chrome-extension.zip")
+    destinationDirectory.set(extensionAssetsDir)
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+android.sourceSets["main"].assets.srcDir(extensionAssetsDir)
+tasks.named("preBuild") { dependsOn(packageChromeExtension) }

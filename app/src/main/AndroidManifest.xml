@@ -17,8 +17,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
-    <!-- Deliberately absent: android.permission.INTERNET. EZZY has no way to send your
-         data anywhere, and that is enforced by the manifest rather than by promise. -->
+    <!-- Only for "Connect Browser": the phone opens a small server on the local Wi-Fi so the
+         user's own paired Chrome extension can reach it. EZZY never connects out to the
+         internet and has no server or account anywhere; nothing listens at all until the
+         user pairs a browser, and every message on the Wi-Fi is end-to-end encrypted with a
+         key only this phone and that browser hold. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".EzzyApp"
@@ -88,6 +92,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="@string/fgs_special_use" />
+        </service>
+
+        <!-- Keeps the paired browser's sync reachable while EZZY is in the background. -->
+        <service
+            android:name=".sync.SyncService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="@string/fgs_special_use_sync" />
         </service>
 
         <!--

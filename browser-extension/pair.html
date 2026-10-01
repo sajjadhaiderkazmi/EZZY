@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connect your phone · EZZY</title>
+    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="pair.css" />
+  </head>
+  <body class="tab pair-page">
+    <main class="pair-shell">
+      <div class="pair-brand"><span class="brand big" id="brand"></span><div><h1>Connect your phone</h1><p>Link EZZY in Chrome to EZZY on your phone</p></div></div>
+
+      <ol class="pair-steps" id="steps">
+        <li class="on"><span>1</span>Address &amp; code</li>
+        <li><span>2</span>PIN on phone</li>
+        <li><span>3</span>Done</li>
+      </ol>
+
+      <section class="pair-card" id="step-enter">
+        <p class="lead">On your phone open <b>EZZY › Settings › Connect Browser</b>, tap <b>Proceed</b> and <b>Confirm</b>. Then type what your phone shows:</p>
+        <form id="form" autocomplete="off" novalidate>
+          <label class="input-label" for="address">Phone address</label>
+          <input id="address" class="input big-input" placeholder="192.168.1.5:47821" inputmode="decimal" spellcheck="false" />
+          <label class="input-label" for="code" style="margin-top:14px">Pairing code</label>
+          <input id="code" class="input big-input code-input" placeholder="ABCD-EFGH" maxlength="9" spellcheck="false" />
+          <div class="error-text hidden" id="error"></div>
+          <button class="btn primary block" id="connect" type="submit" style="margin-top:18px">Connect</button>
+        </form>
+        <p class="hint">Your phone and this computer must be on the same Wi-Fi. The code works once and expires after 5 minutes.</p>
+      </section>
+
+      <section class="pair-card hidden" id="step-pin">
+        <div class="center">
+          <div class="pulse"><span class="disc large" id="phone-icon"></span></div>
+          <h2>Now set a PIN on your phone</h2>
+          <p class="lead">Your phone is asking you to choose a <b>6-digit PIN</b>. You'll type that PIN to open EZZY here in Chrome.</p>
+          <p class="muted" id="pin-wait">Waiting for your phone…</p>
+        </div>
+      </section>
+
+      <section class="pair-card hidden" id="step-done">
+        <div class="center">
+          <span class="disc large done" id="done-icon"></span>
+          <h2>You're all set</h2>
+          <p class="lead">EZZY is connected to <b id="phone-name">your phone</b>. Click the EZZY icon in Chrome's toolbar any time — pin it from the puzzle-piece menu so it's always one click away.</p>
+          <button class="btn primary" id="open-vault">Open my vault</button>
+        </div>
+      </section>
+
+      <p class="foot">End-to-end encrypted · No account · No cloud</p>
+    </main>
+    <script type="module" src="pair.js"></script>
+  </body>
+</html>

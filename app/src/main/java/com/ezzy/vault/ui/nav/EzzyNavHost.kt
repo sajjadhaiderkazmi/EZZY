@@ -15,6 +15,7 @@ import com.ezzy.vault.ui.screens.AppearanceSettingsScreen
 import com.ezzy.vault.ui.screens.BarSectionsSettingsScreen
 import com.ezzy.vault.ui.screens.CategoryEditorScreen
 import com.ezzy.vault.ui.screens.CategoryScreen
+import com.ezzy.vault.ui.screens.ConnectBrowserScreen
 import com.ezzy.vault.ui.screens.DataSettingsScreen
 import com.ezzy.vault.ui.screens.EditorScreen
 import com.ezzy.vault.ui.screens.EntryGroupScreen
@@ -165,7 +166,12 @@ fun EzzyNavHost(
                 onOpenSecurity = { navController.navigate(Routes.SETTINGS_SECURITY) },
                 onOpenAppearance = { navController.navigate(Routes.SETTINGS_APPEARANCE) },
                 onOpenData = { navController.navigate(Routes.SETTINGS_DATA) },
+                onOpenConnectBrowser = { navController.navigate(Routes.SETTINGS_CONNECT_BROWSER) },
             )
+        }
+
+        composable(Routes.SETTINGS_CONNECT_BROWSER) {
+            ConnectBrowserScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.SETTINGS_FLOATING_BAR) {

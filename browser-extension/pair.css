@@ -1,0 +1,23 @@
+body.pair-page { display: flex; justify-content: center; align-items: flex-start; padding: 40px 16px; min-height: 100vh; }
+.pair-shell { width: 100%; max-width: 480px; }
+.pair-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+.pair-brand h1 { margin: 0; font-size: 26px; letter-spacing: -0.3px; }
+.pair-brand p { margin: 2px 0 0; color: var(--muted); }
+
+.pair-steps { list-style: none; display: flex; gap: 8px; padding: 0; margin: 0 0 16px; }
+.pair-steps li { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-size: 12.5px; font-weight: 600; transition: all 0.2s; }
+.pair-steps li span { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: none; }
+.pair-steps li.on { color: var(--text); border-color: var(--primary); }
+.pair-steps li.on span, .pair-steps li.done span { background: var(--button); color: var(--on-button); }
+
+.pair-card { border-radius: 26px; background: var(--surface); border: 1px solid var(--border); padding: 24px; animation: page-in 0.25s ease-out; }
+.pair-card .lead { margin: 0 0 18px; color: var(--text); }
+.pair-card .hint { margin: 16px 0 0; color: var(--muted); font-size: 12.5px; }
+.big-input { height: 54px; font-size: 20px; font-weight: 600; letter-spacing: 0.5px; font-variant-numeric: tabular-nums; }
+.code-input { text-transform: uppercase; letter-spacing: 6px; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.center { text-align: center; }
+.center h2 { margin: 18px 0 8px; font-size: 21px; }
+.pulse { display: inline-block; border-radius: 50%; animation: pulse 1.6s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(123, 211, 126, 0.45); } 100% { box-shadow: 0 0 0 22px rgba(123, 211, 126, 0); } }
+.disc.done { background: var(--button); color: var(--on-button); }
+.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 18px; }
