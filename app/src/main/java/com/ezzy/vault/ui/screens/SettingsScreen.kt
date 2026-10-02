@@ -394,7 +394,7 @@ private fun BuiltByFooter() {
 }
 
 /** The profile card's ground — the same ink as Home's hero card. */
-private val ProfileInk = Color(0xFF1C2213)
+private val ProfileInk = Color(0xFF0B1A3A)
 
 private const val DEVELOPER_EMAIL = "sajjadhaiderconnect@gmail.com"
 

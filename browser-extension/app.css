@@ -1,18 +1,18 @@
 /* EZZY for Chrome — the same white / black / green as the phone app. */
 
 :root {
-  --bg: #0e100d;
-  --surface: #1a1d18;
-  --surface-2: #222620;
-  --surface-3: #2e332a;
-  --border: #2a2f26;
-  --text: #eceee6;
-  --muted: #9ea496;
-  --primary: #7bd37e;
-  --button: #2f8a3b;
+  --bg: #0d1017;
+  --surface: #161b25;
+  --surface-2: #1b212c;
+  --surface-3: #2a3240;
+  --border: #252d3b;
+  --text: #edf0f6;
+  --muted: #939bad;
+  --primary: #7ea6ff;
+  --button: #2563eb;
   --on-button: #ffffff;
-  --primary-container: #1e2e1c;
-  --on-primary-container: #cfefcb;
+  --primary-container: #1b2842;
+  --on-primary-container: #d6e3ff;
   --danger: #ff8a80;
   --danger-container: #3d1714;
   --on-danger-container: #ffdad6;
@@ -25,18 +25,18 @@
 }
 
 :root[data-theme='light'] {
-  --bg: #f4f5f1;
+  --bg: #f3f5f9;
   --surface: #ffffff;
-  --surface-2: #eff0eb;
-  --surface-3: #e2e5dc;
-  --border: #e3e6dd;
-  --text: #121410;
-  --muted: #5f6558;
-  --primary: #2f8a3b;
-  --button: #2f8a3b;
+  --surface-2: #eef1f6;
+  --surface-3: #e1e6ee;
+  --border: #e1e6ef;
+  --text: #141821;
+  --muted: #5f6779;
+  --primary: #2563eb;
+  --button: #2563eb;
   --on-button: #ffffff;
-  --primary-container: #e4f3df;
-  --on-primary-container: #0f3317;
+  --primary-container: #e2ebff;
+  --on-primary-container: #0a2a6b;
   --danger: #ba1a1a;
   --danger-container: #ffdad6;
   --on-danger-container: #410002;
@@ -90,8 +90,8 @@ input, textarea, select { font: inherit; color: var(--text); }
 .circle-btn:active { transform: scale(0.94); }
 .circle-btn.green { background: var(--button); color: var(--on-button); }
 
-.brand { width: 38px; height: 38px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: #141812; color: #7bd37e; flex: none; }
-:root[data-theme='light'] .brand { background: #121410; }
+.brand { width: 38px; height: 38px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: #0b1a3a; color: #7ea6ff; flex: none; }
+:root[data-theme='light'] .brand { background: #0b1a3a; }
 .brand.big { width: 72px; height: 72px; border-radius: 22px; }
 
 /* ---- Buttons ------------------------------------------------------------------------------- */

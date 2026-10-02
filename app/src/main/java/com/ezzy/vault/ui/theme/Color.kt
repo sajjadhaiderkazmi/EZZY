@@ -6,37 +6,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// EZZY's own palette: "lime noir". A near-black olive ink with an electric lime accent and soft
-// pastel companions (mint, lavender, butter) — bold enough that the primary action on every
-// screen is unmistakable, and calm enough around it that a vault full of numbers stays easy to
-// read. The light scheme keeps the same hues on a warm off-white.
-
-/** The app's green: icons, links and the main buttons in both themes. */
-val EzzyGreen = Color(0xFF2F8A3B)
-
-/** A lighter green for green-on-dark: icons and text on the dark theme's surfaces. */
-val EzzyGreenBright = Color(0xFF7BD37E)
+// EZZY's own palette: "Ocean Blue". White cards and near-black text on a cool off-white, with
+// one calm blue for icons, links and the main buttons. The dark theme is a deep navy-black with a
+// softer, brighter blue so it stays easy on the eyes at night.
 
 /**
- * The fill of the main call-to-action buttons. Once a lime, now the app's green — the name is
- * kept so every button across the app follows the one palette.
+ * The app's accent blue: icons, links and the main buttons in both themes. The name is kept
+ * from the earlier green palette so every screen follows the one accent without a rename.
+ */
+val EzzyGreen = Color(0xFF2563EB)
+
+/** A lighter blue for accent-on-dark: icons and text on the dark theme's surfaces. */
+val EzzyGreenBright = Color(0xFF7EA6FF)
+
+/**
+ * The fill of the main call-to-action buttons. The name is kept so every button across the app
+ * follows the one palette.
  */
 val EzzyLime = EzzyGreen
 
-/** What is written on top of [EzzyLime]: white on the green. */
+/** What is written on top of [EzzyLime]: white on the blue. */
 val EzzyOnLime = Color(0xFFFFFFFF)
 
 internal val EzzyLightColors = lightColorScheme(
-    primary = Color(0xFF2F8A3B),
+    primary = Color(0xFF2563EB),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE4F3DF),
-    onPrimaryContainer = Color(0xFF0F3317),
-    inversePrimary = Color(0xFF7BD37E),
+    primaryContainer = Color(0xFFE2EBFF),
+    onPrimaryContainer = Color(0xFF0A2A6B),
+    inversePrimary = Color(0xFF7EA6FF),
 
-    secondary = Color(0xFF52604E),
+    secondary = Color(0xFF4F5B70),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFE3EADD),
-    onSecondaryContainer = Color(0xFF161E13),
+    secondaryContainer = Color(0xFFE1E7F1),
+    onSecondaryContainer = Color(0xFF141B27),
 
     tertiary = Color(0xFF5C4DB0),
     onTertiary = Color(0xFFFFFFFF),
@@ -48,40 +50,40 @@ internal val EzzyLightColors = lightColorScheme(
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
 
-    background = Color(0xFFF4F5F1),
-    onBackground = Color(0xFF121410),
-    surface = Color(0xFFF4F5F1),
-    onSurface = Color(0xFF121410),
-    surfaceVariant = Color(0xFFE6E8E1),
-    onSurfaceVariant = Color(0xFF5F6558),
-    surfaceTint = Color(0xFF2F8A3B),
-    inverseSurface = Color(0xFF1C1F17),
-    inverseOnSurface = Color(0xFFF0F2E6),
+    background = Color(0xFFF3F5F9),
+    onBackground = Color(0xFF141821),
+    surface = Color(0xFFF3F5F9),
+    onSurface = Color(0xFF141821),
+    surfaceVariant = Color(0xFFE3E8F0),
+    onSurfaceVariant = Color(0xFF5F6779),
+    surfaceTint = Color(0xFF2563EB),
+    inverseSurface = Color(0xFF1C2230),
+    inverseOnSurface = Color(0xFFEEF2F8),
 
-    outline = Color(0xFF8A9082),
-    outlineVariant = Color(0xFFE3E6DD),
+    outline = Color(0xFF858DA0),
+    outlineVariant = Color(0xFFE1E6EF),
     scrim = Color(0xFF000000),
 
-    surfaceBright = Color(0xFFF4F5F1),
-    surfaceDim = Color(0xFFDCDED6),
+    surfaceBright = Color(0xFFF3F5F9),
+    surfaceDim = Color(0xFFD9DEE7),
     surfaceContainerLowest = Color(0xFFFFFFFF),
     surfaceContainerLow = Color(0xFFFFFFFF),
-    surfaceContainer = Color(0xFFEFF0EB),
-    surfaceContainerHigh = Color(0xFFE9EBE4),
-    surfaceContainerHighest = Color(0xFFE2E5DC),
+    surfaceContainer = Color(0xFFEEF1F6),
+    surfaceContainerHigh = Color(0xFFE8ECF3),
+    surfaceContainerHighest = Color(0xFFE1E6EE),
 )
 
 internal val EzzyDarkColors = darkColorScheme(
-    primary = Color(0xFF7BD37E),
-    onPrimary = Color(0xFF0E100D),
-    primaryContainer = Color(0xFF1E2E1C),
-    onPrimaryContainer = Color(0xFFCFEFCB),
-    inversePrimary = Color(0xFF2F8A3B),
+    primary = Color(0xFF7EA6FF),
+    onPrimary = Color(0xFF0A1A3D),
+    primaryContainer = Color(0xFF1B2842),
+    onPrimaryContainer = Color(0xFFD6E3FF),
+    inversePrimary = Color(0xFF2563EB),
 
-    secondary = Color(0xFFBCC8B4),
-    onSecondary = Color(0xFF29341D),
-    secondaryContainer = Color(0xFF262C22),
-    onSecondaryContainer = Color(0xFFDDE6D6),
+    secondary = Color(0xFFB9C3D6),
+    onSecondary = Color(0xFF243044),
+    secondaryContainer = Color(0xFF222A38),
+    onSecondaryContainer = Color(0xFFDCE3F0),
 
     tertiary = Color(0xFFC9BCFF),
     onTertiary = Color(0xFF2B1C7C),
@@ -93,27 +95,27 @@ internal val EzzyDarkColors = darkColorScheme(
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
 
-    background = Color(0xFF0E100D),
-    onBackground = Color(0xFFF1F3EC),
-    surface = Color(0xFF0E100D),
-    onSurface = Color(0xFFF1F3EC),
-    surfaceVariant = Color(0xFF2A2E26),
-    onSurfaceVariant = Color(0xFF9EA496),
-    surfaceTint = Color(0xFF7BD37E),
-    inverseSurface = Color(0xFFE7EADD),
-    inverseOnSurface = Color(0xFF1C1F17),
+    background = Color(0xFF0D1017),
+    onBackground = Color(0xFFEDF0F6),
+    surface = Color(0xFF0D1017),
+    onSurface = Color(0xFFEDF0F6),
+    surfaceVariant = Color(0xFF262D3A),
+    onSurfaceVariant = Color(0xFF939BAD),
+    surfaceTint = Color(0xFF7EA6FF),
+    inverseSurface = Color(0xFFE3E8F1),
+    inverseOnSurface = Color(0xFF1A202B),
 
-    outline = Color(0xFF7E8476),
-    outlineVariant = Color(0xFF272B23),
+    outline = Color(0xFF788197),
+    outlineVariant = Color(0xFF252D3B),
     scrim = Color(0xFF000000),
 
-    surfaceBright = Color(0xFF30352C),
-    surfaceDim = Color(0xFF0E100D),
-    surfaceContainerLowest = Color(0xFF090A08),
-    surfaceContainerLow = Color(0xFF1A1D18),
-    surfaceContainer = Color(0xFF1F221C),
-    surfaceContainerHigh = Color(0xFF262A23),
-    surfaceContainerHighest = Color(0xFF2E332A),
+    surfaceBright = Color(0xFF2D3443),
+    surfaceDim = Color(0xFF0D1017),
+    surfaceContainerLowest = Color(0xFF090B10),
+    surfaceContainerLow = Color(0xFF161B25),
+    surfaceContainer = Color(0xFF1B212C),
+    surfaceContainerHigh = Color(0xFF222935),
+    surfaceContainerHighest = Color(0xFF2A3240),
 )
 
 /** A category accent, with a variant for each theme so contrast holds either way. */
