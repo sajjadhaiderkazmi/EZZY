@@ -40,8 +40,8 @@
   --danger: #ba1a1a;
   --danger-container: #ffdad6;
   --on-danger-container: #410002;
-  --scrim: rgba(18, 20, 16, 0.4);
-  --shadow: 0 10px 30px rgba(18, 20, 16, 0.14);
+  --scrim: rgba(13, 20, 38, 0.4);
+  --shadow: 0 10px 30px rgba(13, 20, 38, 0.14);
   color-scheme: light;
 }
 

@@ -154,21 +154,6 @@ object Accents {
 }
 
 /**
- * The two hues for the entry banner — a deep olive ink running into a darker green, so the
- * lime writing and white text on it read at well over 7:1 in either theme, and the banner
- * matches the hero card on Home.
- */
-@Composable
-fun brandBannerColors(): List<Color> = if (LocalIsDarkTheme.current) {
-    listOf(Color(0xFF2A3510), Color(0xFF14170F))
-} else {
-    listOf(Color(0xFF3D5600), Color(0xFF1E2A05))
-}
-
-/** The dark ink written on accent cards on the light theme. */
-val AccentInk = Color(0xFF15170F)
-
-/**
  * The fill of a section's big card. Every card in the app is now the same plain white card
  * (dark grey on the dark theme) with black writing and a green icon, so this is the card
  * surface whatever the section's colour.
