@@ -11,6 +11,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- To Do reminders and alarms: ring on the minute like a clock app, over the lock screen
+         if need be, and come back after the phone restarts. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Lets Settings > Floating bar ask, in one tap, for EZZY to be left out of battery
+         optimisation, so the floating bar is not killed in the background. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- Only for voice notes, and only requested when the user taps record. -->
@@ -93,6 +105,37 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="@string/fgs_special_use" />
         </service>
+
+        <!-- A reminder or alarm going off, full screen and over the lock screen. -->
+        <activity
+            android:name=".tasks.TaskAlarmActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Ezzy"
+            android:turnScreenOn="true" />
+
+        <!-- Rings reminders and takes Done / Snooze / "+ Task" from notifications. -->
+        <receiver
+            android:name=".tasks.TaskReceiver"
+            android:exported="false" />
+
+        <!-- Brings reminders and the floating bar back after a restart, an update or a
+             clock change, and runs the floating bar's watchdog. -->
+        <receiver
+            android:name=".overlay.KeepAliveReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <!-- Keeps the paired browser's sync reachable while EZZY is in the background. -->
         <service

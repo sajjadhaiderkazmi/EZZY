@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.ezzy.vault.data.model.Seed
+import com.ezzy.vault.overlay.KeepAlive
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.sync.SyncService
 import com.ezzy.vault.ui.LocalSettings
@@ -120,7 +121,7 @@ class MainActivity : FragmentActivity() {
 
                                 LaunchedEffect(pendingRoute) {
                                     pendingRoute?.let {
-                                        navController.navigate(it)
+                                        navController.navigate(it) { launchSingleTop = true }
                                         pendingRoute = null
                                     }
                                 }
@@ -183,6 +184,9 @@ class MainActivity : FragmentActivity() {
         // A linked browser keeps syncing in the background. Started from here, while the app
         // is in front, since Android refuses to start a foreground service from the background.
         if (appContainer.browserLink.hasLinkedBrowser) SyncService.start(this)
+        // Same for the floating bar: if a battery saver took it down while the app was away,
+        // opening EZZY puts it straight back — the user never has to find the switch again.
+        KeepAlive.ensureRunningAsync(this)
     }
 
     /** [uris] plus a value unique to this one share, even if the exact same picture is shared

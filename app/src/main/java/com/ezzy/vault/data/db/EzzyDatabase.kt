@@ -27,8 +27,10 @@ class Converters {
         FieldEntity::class,
         AttachmentEntity::class,
         ItemGroupEntity::class,
+        TaskEntity::class,
+        TaskCompletionEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -40,6 +42,7 @@ abstract class EzzyDatabase : RoomDatabase() {
     abstract fun fieldDao(): FieldDao
     abstract fun attachmentDao(): AttachmentDao
     abstract fun itemGroupDao(): ItemGroupDao
+    abstract fun taskDao(): TaskDao
 
     companion object {
         const val NAME = "ezzy.db"
@@ -272,6 +275,49 @@ abstract class EzzyDatabase : RoomDatabase() {
         }
 
         /**
+         * v9 brings To Do: the tasks themselves, and a log of each time one was ticked off. Both
+         * are new tables with nothing pointing at them, so this only creates them. The column
+         * list has to match [TaskEntity] and [TaskCompletionEntity] exactly — same types, same
+         * NOT NULLs, no defaults — or Room refuses to open the database.
+         */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS tasks (
+                        id TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        kind TEXT NOT NULL,
+                        priority INTEGER NOT NULL,
+                        dueAt INTEGER,
+                        hasTime INTEGER NOT NULL,
+                        remind INTEGER NOT NULL,
+                        repeat TEXT NOT NULL,
+                        isDone INTEGER NOT NULL,
+                        doneAt INTEGER,
+                        snoozeCount INTEGER NOT NULL,
+                        snoozedUntil INTEGER,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS task_completions (
+                        id TEXT NOT NULL,
+                        taskId TEXT NOT NULL,
+                        doneAt INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /**
          * Opens the encrypted database. [passphrase] is consumed (and zeroed) by SQLCipher,
          * so callers must hand over a copy they no longer need.
          */
@@ -291,6 +337,7 @@ abstract class EzzyDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 )
                 .build()
         }

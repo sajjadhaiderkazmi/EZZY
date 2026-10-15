@@ -5,7 +5,7 @@
     <string name="overlay_channel_name">Floating bar</string>
     <string name="overlay_channel_description">Keeps the EZZY bar reachable from other apps.</string>
     <string name="overlay_notification_title">EZZY bar is on</string>
-    <string name="overlay_notification_text">Tap the floating bubble, or the EZZY tile in Quick Settings.</string>
+    <string name="overlay_notification_text">Tap the bubble for your vault and To Do, or add a task right here.</string>
     <string name="action_turn_off">Turn off</string>
     <string name="overlay_turned_off">Floating bar turned off</string>
     <string name="tile_subtitle_on">Tap for the button</string>
@@ -20,4 +20,14 @@
     <string name="sync_notification_text">Your paired Chrome syncs while both are on the same Wi-Fi.</string>
     <string name="sync_action_pause">Pause</string>
     <string name="fgs_special_use_sync">Keeps an end-to-end encrypted link on the local Wi-Fi open so the user\'s own paired Chrome extension can view and edit their vault.</string>
+
+    <string name="action_add_task">+ Task</string>
+    <string name="quick_add_hint">e.g. Gas bill tomorrow 5pm</string>
+    <string name="task_channel_name">To Do reminders</string>
+    <string name="task_channel_description">Reminders for tasks you set a time on, with Done and Snooze.</string>
+    <string name="alarm_channel_name">Alarms</string>
+    <string name="alarm_channel_description">Alarms you set in EZZY. Rings with sound until you answer it.</string>
+    <string name="task_action_done">Done</string>
+    <string name="task_action_snooze_10">10 min</string>
+    <string name="task_action_snooze_60">1 hour</string>
 </resources>

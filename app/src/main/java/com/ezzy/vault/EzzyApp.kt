@@ -9,6 +9,7 @@ import com.ezzy.vault.data.crypto.AttachmentStore
 import com.ezzy.vault.data.crypto.DatabaseKey
 import com.ezzy.vault.data.db.EzzyDatabase
 import com.ezzy.vault.data.model.Seed
+import com.ezzy.vault.data.repo.TaskRepository
 import com.ezzy.vault.data.repo.VaultRepository
 import com.ezzy.vault.security.AppLock
 import com.ezzy.vault.security.SecureShare
@@ -35,6 +36,7 @@ class AppContainer(context: Context) {
 
     val database: EzzyDatabase by lazy { EzzyDatabase.open(appContext, databaseKey.passphrase()) }
     val repository: VaultRepository by lazy { VaultRepository(database, attachmentStore) }
+    val taskRepository: TaskRepository by lazy { TaskRepository(appContext, database.taskDao()) }
     val backupManager: BackupManager by lazy { BackupManager(repository) }
     val browserLink: BrowserLink by lazy { BrowserLink(appContext, this) }
 
@@ -67,6 +69,9 @@ class EzzyApp : Application() {
                     container.settings.setSeedRevision(Seed.REVISION)
                 }
             }
+            // Some phones never deliver "boot completed" to apps they have not whitelisted, so
+            // every start of the app also hands Android its task reminders again.
+            runCatching { container.taskRepository.rescheduleAll() }
         }
         // A copy or share staged in the previous run is plain bytes sitting in the cache. The
         // receiving app has long since read it, so the first thing this run does is wipe it.

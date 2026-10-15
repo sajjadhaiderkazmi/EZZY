@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BatteryAlert
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -47,11 +50,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.withResumed
 import com.ezzy.vault.R
+import com.ezzy.vault.appContainer
 import com.ezzy.vault.overlay.EzzyTileService
+import com.ezzy.vault.overlay.KeepAlive
 import com.ezzy.vault.overlay.OverlayService
 import com.ezzy.vault.ui.LocalSettings
 import com.ezzy.vault.ui.LocalSnackbar
@@ -90,6 +97,11 @@ fun FloatingBarSettingsScreen(onBack: () -> Unit, onOpenBarSections: () -> Unit)
     // service in that window is refused, so the start is deferred to the next resume.
     var startWhenResumed by remember { mutableStateOf(false) }
     var askMode by remember { mutableStateOf(false) }
+    var batteryOk by remember { mutableStateOf(KeepAlive.isIgnoringBatteryOptimizations(context)) }
+    // Coming back from the battery screen is the moment the answer can have changed.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        batteryOk = KeepAlive.isIgnoringBatteryOptimizations(context)
+    }
 
     fun turnOn() {
         if (!settings.triggerModeChosen) askMode = true
@@ -243,10 +255,45 @@ fun FloatingBarSettingsScreen(onBack: () -> Unit, onOpenBarSections: () -> Unit)
             )
         }
 
+        // The bar is a foreground service with a watchdog, but phone makers' own battery
+        // savers still kill it unless EZZY is let off them. These open the exact screens.
+        item { SettingsGroup("Keep it running") }
+
+        item {
+            NavigationRow(
+                title = "Battery: unrestricted",
+                subtitle = if (batteryOk) {
+                    "Done. Android will not pause EZZY to save battery"
+                } else {
+                    "Tap, then choose Allow or Unrestricted"
+                },
+                icon = if (batteryOk) Icons.Rounded.CheckCircle else Icons.Rounded.BatteryAlert,
+                onClick = {
+                    if (!KeepAlive.openBatterySettings(context)) {
+                        scope.launch { snackbar.showSnackbar("Open Settings › Apps › EZZY › Battery and choose Unrestricted.") }
+                    }
+                },
+            )
+        }
+
+        item {
+            NavigationRow(
+                title = "Auto-start",
+                subtitle = "Xiaomi, Oppo, Realme, Vivo, Infinix, Tecno: switch EZZY on in this list",
+                icon = Icons.Rounded.RestartAlt,
+                onClick = {
+                    if (!KeepAlive.openAutostartSettings(context)) {
+                        scope.launch { snackbar.showSnackbar("Look for Auto-start or Background launch in your phone's settings.") }
+                    }
+                },
+            )
+        }
+
         item {
             Text(
-                text = "Bar keeps vanishing? Let EZZY autostart and switch off battery " +
-                    "optimisation for it in your phone's settings.",
+                text = "Also lock EZZY in Recent apps (press and hold its card, then tap the lock) " +
+                    "so clearing Recents does not close it. If the bar is ever closed anyway, it " +
+                    "comes back on its own within a few minutes, or as soon as you open EZZY.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
@@ -802,6 +849,11 @@ fun DataSettingsScreen(
                     onClick = {
                         confirmErase = false
                         viewModel.eraseEverything {
+                            // Off for good, so the bar's own watchdog does not bring it back
+                            // over an empty vault.
+                            context.appContainer.scope.launch {
+                                context.appContainer.settings.setOverlayEnabled(false)
+                            }
                             OverlayService.stop(context)
                             onErased()
                         }

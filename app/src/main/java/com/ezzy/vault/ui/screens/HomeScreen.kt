@@ -111,6 +111,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import com.ezzy.vault.data.db.TaskEntity
+import com.ezzy.vault.tasks.TaskKind
+import com.ezzy.vault.ui.todo.AddMenuSheet
+import com.ezzy.vault.ui.todo.ProgressRing
+import com.ezzy.vault.ui.todo.TaskActions
+import com.ezzy.vault.ui.todo.TaskEditorSheet
+import com.ezzy.vault.ui.todo.TaskRow
+import com.ezzy.vault.ui.todo.overdueColor
+import com.ezzy.vault.ui.todo.rememberCompleteWithUndo
+import com.ezzy.vault.ui.todo.rememberNotificationAsker
+import com.ezzy.vault.ui.todo.rememberNow
+import com.ezzy.vault.ui.todo.topThree
 
 class HomeViewModel(container: AppContainer) : ViewModel() {
 
@@ -137,6 +154,15 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 
     private val settings = container.settings
 
+    private val tasks = container.taskRepository
+    val taskActions = TaskActions(viewModelScope, tasks)
+
+    val openTasks: StateFlow<List<TaskEntity>> = tasks.observeOpen()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val completions: StateFlow<List<Long>> = tasks.observeRecentCompletions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun enableBiometricLock() {
         viewModelScope.launch { settings.setBiometricLock(true) }
     }
@@ -158,6 +184,7 @@ fun HomeScreen(
     onAddCategory: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTodo: () -> Unit,
 ) {
     val viewModel: HomeViewModel = ezzyViewModel { HomeViewModel(it) }
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -166,6 +193,16 @@ fun HomeScreen(
     val pinnedGroups by viewModel.pinnedGroups.collectAsStateWithLifecycle()
     val itemCount by viewModel.itemCount.collectAsStateWithLifecycle()
     val recent by viewModel.recent.collectAsStateWithLifecycle()
+    val openTasks by viewModel.openTasks.collectAsStateWithLifecycle()
+    val completions by viewModel.completions.collectAsStateWithLifecycle()
+    val now = rememberNow()
+    val progress = todayProgress(openTasks, completions, now)
+    val top = topThree(openTasks, now)
+    val completeTask = rememberCompleteWithUndo(viewModel.taskActions)
+    val askNotifications = rememberNotificationAsker()
+    var showAddMenu by remember { mutableStateOf(false) }
+    var creatingKind by remember { mutableStateOf<TaskKind?>(null) }
+    var editingTask by remember { mutableStateOf<TaskEntity?>(null) }
     val context = LocalContext.current
     val canUseBiometrics = remember { AppLock.canAuthenticate(context) }
 
@@ -240,9 +277,10 @@ fun HomeScreen(
     Scaffold(
         bottomBar = {
             HomeBottomBar(
-                onAdd = onAddItem,
-                onPinned = onOpenQuickAccess,
+                todoBadge = (progress.total - progress.done).coerceAtLeast(0),
+                onTodo = onOpenTodo,
                 onSearch = onOpenSearch,
+                onAdd = { showAddMenu = true },
                 onSettings = onOpenSettings,
             )
         },
@@ -265,7 +303,7 @@ fun HomeScreen(
                         append(greeting)
                         if (settings.displayName.isNotBlank()) append(", ${settings.displayName}")
                     },
-                    onAdd = onAddItem,
+                    onAdd = { showAddMenu = true },
                 )
             }
 
@@ -273,10 +311,33 @@ fun HomeScreen(
                 BentoTop(
                     itemCount = itemCount,
                     sectionCount = categories.size,
-                    pinnedCount = quickAccess.size,
-                    onPinned = onOpenQuickAccess,
-                    onAddSection = onAddCategory,
+                    progress = progress,
+                    onVault = onOpenSearch,
+                    onTodo = onOpenTodo,
                 )
+            }
+
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                HomeLabel(
+                    text = "Today's top 3",
+                    action = "Open To Do",
+                    onAction = onOpenTodo,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            if (top.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    TopThreeEmpty(onAdd = { creatingKind = TaskKind.TASK })
+                }
+            } else {
+                items(top, key = { "top-" + it.id }, span = { GridItemSpan(maxLineSpan) }) { task ->
+                    TaskRow(
+                        task = task,
+                        now = now,
+                        onToggle = { completeTask(task) },
+                        onClick = { editingTask = task },
+                    )
+                }
             }
 
             if (!settings.overlayEnabled) {
@@ -362,6 +423,9 @@ fun HomeScreen(
                         },
                     )
                 }
+                item(key = "pinned-card") {
+                    PinnedCard(count = quickAccess.size, onClick = onOpenQuickAccess)
+                }
             }
 
             if (recent.isNotEmpty()) {
@@ -394,9 +458,49 @@ fun HomeScreen(
         )
       }
     }
+
+    if (showAddMenu) {
+        AddMenuSheet(
+            onDismiss = { showAddMenu = false },
+            onTask = { showAddMenu = false; creatingKind = TaskKind.TASK },
+            onAlarm = { showAddMenu = false; creatingKind = TaskKind.ALARM },
+            onEntry = { showAddMenu = false; onAddItem() },
+            onSection = { showAddMenu = false; onAddCategory() },
+        )
+    }
+
+    creatingKind?.let { kind ->
+        TaskEditorSheet(
+            initial = null,
+            kind = kind,
+            onDismiss = { creatingKind = null },
+            onSave = { draft ->
+                viewModel.taskActions.save(null, draft)
+                if (draft.remind && draft.hasTime) askNotifications()
+                creatingKind = null
+            },
+        )
+    }
+
+    editingTask?.let { task ->
+        TaskEditorSheet(
+            initial = task,
+            kind = TaskKind.from(task.kind),
+            onDismiss = { editingTask = null },
+            onSave = { draft ->
+                viewModel.taskActions.save(task, draft)
+                if (draft.remind && draft.hasTime) askNotifications()
+                editingTask = null
+            },
+            onDelete = {
+                viewModel.taskActions.delete(task.id)
+                editingTask = null
+            },
+        )
+    }
 }
 
-/** The top of Home: the greeting over "My Vault", with a square Add button on the right. */
+/** The top of Home: the greeting over "EZZY", with a round Add button on the right. */
 @Composable
 private fun HomeHeader(greeting: String, onAdd: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
@@ -409,14 +513,14 @@ private fun HomeHeader(greeting: String, onAdd: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "My Vault",
+                text = "EZZY",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
         CircleIconButton(
-            Icons.Rounded.Add, "Add entry", onAdd,
+            Icons.Rounded.Add, "Add", onAdd,
             size = 44.dp,
             container = MaterialTheme.colorScheme.primaryContainer,
             content = MaterialTheme.colorScheme.primary,
@@ -456,16 +560,16 @@ private fun HomeLabel(
 }
 
 /**
- * The bento block: one tall green tile with the vault total on the left, and two smaller
- * tiles stacked beside it — Pinned and a new section.
+ * The bento block: the vault on the left and To Do on the right, each one tap from its page.
+ * Same white-and-blue ground as the rest of Home — only the numbers change.
  */
 @Composable
 private fun BentoTop(
     itemCount: Int,
     sectionCount: Int,
-    pinnedCount: Int,
-    onPinned: () -> Unit,
-    onAddSection: () -> Unit,
+    progress: TodayProgress,
+    onVault: () -> Unit,
+    onTodo: () -> Unit,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -474,32 +578,31 @@ private fun BentoTop(
             .height(IntrinsicSize.Min),
     ) {
         Surface(
+            onClick = onVault,
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier
-                .weight(1.15f)
+                .weight(1f)
                 .fillMaxHeight(),
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Rounded.Lock,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "Encrypted",
-                        style = MaterialTheme.typography.labelMedium,
+                        text = "Vault",
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+                Spacer(Modifier.height(18.dp))
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "$itemCount",
@@ -517,28 +620,125 @@ private fun BentoTop(
                 )
             }
         }
-        Column(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.weight(1f),
+        Surface(
+            onClick = onTodo,
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
         ) {
-            BentoTile(
-                icon = Icons.Rounded.PushPin,
-                title = "Pinned",
-                caption = if (pinnedCount == 1) "1 item" else "$pinnedCount items",
-                onClick = onPinned,
-            )
-            BentoTile(
-                icon = Icons.Rounded.CreateNewFolder,
-                title = "New section",
-                caption = "Banks, IDs, bills…",
-                onClick = onAddSection,
-            )
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.TaskAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "To Do",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (progress.overdue > 0) {
+                        Text(
+                            text = "${progress.overdue} late",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = overdueColor(),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(overdueColor().copy(alpha = 0.12f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ProgressRing(
+                        fraction = progress.fraction,
+                        modifier = Modifier.size(46.dp),
+                        stroke = 5.dp,
+                    ) {
+                        Text(
+                            "${progress.done}/${progress.total}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = when {
+                                progress.total == 0 -> "Free day"
+                                progress.done >= progress.total -> "All done"
+                                else -> "${progress.total - progress.done} left"
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "today",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.LocalFireDepartment,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        text = if (progress.streak == 1) "1-day streak" else "${progress.streak}-day streak",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
 
+/** Shown in place of the top three when nothing is due: one tap to add the first. */
 @Composable
-private fun BentoTile(icon: ImageVector, title: String, caption: String, onClick: () -> Unit) {
+private fun TopThreeEmpty(onAdd: () -> Unit) {
+    Surface(
+        onClick = onAdd,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(14.dp)) {
+            Icon(Icons.Rounded.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Nothing due today", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    "Add a task — \"Call Ali tomorrow 5pm\" works",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** The last tile in the sections grid: everything pinned for quick access. */
+@Composable
+private fun PinnedCard(count: Int, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.large,
@@ -547,10 +747,22 @@ private fun BentoTile(icon: ImageVector, title: String, caption: String, onClick
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.height(14.dp))
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-            Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.PushPin, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp))
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Pinned", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = if (count == 1) "1 item" else "$count items",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -603,14 +815,15 @@ private fun CategoryCard(
 
 /**
  * Home's bottom bar: a plain card-coloured bar running down behind the gesture area, five
- * equal items with Home in the middle. Pinned and Search sit to its left, Add and Settings to
- * its right.
+ * equal items with Home in the middle. To Do and Search sit to its left, Add and Settings to
+ * its right; To Do carries how many are left today.
  */
 @Composable
 private fun HomeBottomBar(
-    onAdd: () -> Unit,
-    onPinned: () -> Unit,
+    todoBadge: Int,
+    onTodo: () -> Unit,
     onSearch: () -> Unit,
+    onAdd: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Surface(
@@ -628,7 +841,7 @@ private fun HomeBottomBar(
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BottomBarAction(Icons.Rounded.PushPin, "Pinned", onPinned, Modifier.weight(1f))
+                BottomBarAction(Icons.Rounded.Checklist, "To Do", onTodo, Modifier.weight(1f), badge = todoBadge)
                 BottomBarAction(Icons.Rounded.Search, "Search", onSearch, Modifier.weight(1f))
                 BottomBarAction(Icons.Rounded.Home, "Home", {}, Modifier.weight(1f), selected = true)
                 BottomBarAction(Icons.Rounded.Add, "Add", onAdd, Modifier.weight(1f))
@@ -646,6 +859,7 @@ private fun BottomBarAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    badge: Int = 0,
 ) {
     // Every item has the same icon and label size; the current one (Home) only gets a green
     // pill behind its icon and a bold green label.
@@ -663,12 +877,23 @@ private fun BottomBarAction(
                 .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                modifier = Modifier.size(24.dp),
-            )
+            BadgedBox(
+                badge = {
+                    if (badge > 0) {
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ) { Text(if (badge > 9) "9+" else "$badge") }
+                    }
+                },
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
         Spacer(Modifier.height(3.dp))
         Text(

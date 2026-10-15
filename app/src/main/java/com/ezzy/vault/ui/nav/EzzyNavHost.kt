@@ -28,6 +28,7 @@ import com.ezzy.vault.ui.screens.SecuritySettingsScreen
 import com.ezzy.vault.ui.screens.SectionLocksSettingsScreen
 import com.ezzy.vault.ui.screens.SettingsScreen
 import com.ezzy.vault.ui.screens.TemplatesScreen
+import com.ezzy.vault.ui.screens.TodoScreen
 import com.ezzy.vault.util.EzzySettings
 
 @Composable
@@ -65,7 +66,12 @@ fun EzzyNavHost(
                 onAddCategory = { navController.navigate(Routes.categoryEditor()) },
                 onOpenSearch = { navController.navigate(Routes.SEARCH) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenTodo = { navController.navigate(Routes.TODO) },
             )
+        }
+
+        composable(Routes.TODO) {
+            TodoScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

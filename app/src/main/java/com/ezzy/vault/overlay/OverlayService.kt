@@ -1,5 +1,7 @@
 package com.ezzy.vault.overlay
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,6 +9,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
@@ -21,11 +24,15 @@ import android.widget.FrameLayout
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.RemoteInput
+import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.ezzy.vault.MainActivity
 import com.ezzy.vault.R
 import com.ezzy.vault.UnlockActivity
 import com.ezzy.vault.security.AppLock
+import com.ezzy.vault.tasks.TaskReceiver
 import com.ezzy.vault.appContainer
 import com.ezzy.vault.util.EzzySettings
 import com.ezzy.vault.util.TriggerMode
@@ -86,6 +93,9 @@ class OverlayService : Service() {
     /** Bumped on every restart so the ring starts its arc over rather than carrying on. */
     private var countdownToken = 0
 
+    /** Set when the bubble could not be put on screen, so teardown does not retry at once. */
+    private var bubbleFailed = false
+
     private var panelHost: OverlayViewHost? = null
     private var panelView: View? = null
 
@@ -95,11 +105,33 @@ class OverlayService : Service() {
         super.onCreate()
         windowManager = getSystemService<WindowManager>() ?: error("WindowManager unavailable")
         startInForeground()
+        isRunning = true
+        // From here on a quiet check runs every quarter hour, so if a battery saver takes the
+        // bar down while it is meant to be up, it comes back on its own.
+        KeepAlive.scheduleWatchdog(this)
+    }
+
+    /**
+     * Swiping EZZY out of Recents takes this service with it on several phones (Xiaomi, Oppo,
+     * Vivo, Infinix) even though it is a foreground service. Ask for a check a moment later;
+     * it puts the bar back only if the user still has it switched on.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        KeepAlive.scheduleWatchdog(this, delayMs = 2_000L)
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+
+            // "Turn off" on the notification means off, not "until the next check brings it
+            // back" — so the setting is written before the service steps aside.
+            ACTION_TURN_OFF -> {
+                appContainer.scope.launch { appContainer.settings.setOverlayEnabled(false) }
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -140,6 +172,10 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
+        // Whatever took the service down, a check shortly after decides whether it should be
+        // up again — it reads the user's setting, so a deliberate "off" stays off.
+        if (!bubbleFailed) KeepAlive.scheduleWatchdog(this, delayMs = 3_000L)
         hidePanel(fromOnDestroy = true)
         hideDismissTarget()
         removeTriggers()
@@ -150,43 +186,7 @@ class OverlayService : Service() {
     // ---- Foreground notification -----------------------------------------
 
     private fun startInForeground() {
-        val manager = getSystemService<NotificationManager>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager?.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    getString(R.string.overlay_channel_name),
-                    NotificationManager.IMPORTANCE_MIN,
-                ).apply {
-                    description = getString(R.string.overlay_channel_description)
-                    setShowBadge(false)
-                }
-            )
-        }
-
-        val openApp = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val stop = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, OverlayService::class.java).setAction(ACTION_STOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.overlay_notification_title))
-            .setContentText(getString(R.string.overlay_notification_text))
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setOngoing(true)
-            .setContentIntent(openApp)
-            .addAction(0, getString(R.string.action_turn_off), stop)
-            .build()
-
+        val notification = buildNotification(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
@@ -215,9 +215,21 @@ class OverlayService : Service() {
                 // bubble could actually be placed.
                 addBubble()
                 if (bubbleView == null) {
-                    Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG)
-                        .show()
+                    // Said once, not on every retry the watchdog makes in the background. Three
+                    // failures in a row means the permission really is gone, so the switch goes
+                    // off rather than the bar trying forever.
+                    bubbleFailed = true
+                    failedStarts++
+                    if (failedStarts == 1) {
+                        Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG)
+                            .show()
+                    }
+                    if (failedStarts >= 3) {
+                        appContainer.scope.launch { appContainer.settings.setOverlayEnabled(false) }
+                    }
                     stopSelf()
+                } else {
+                    failedStarts = 0
                 }
             }
 
@@ -504,6 +516,11 @@ class OverlayService : Service() {
             flags,
             PixelFormat.TRANSLUCENT,
         ).apply {
+            // To Do's quick add types into this window, so the keyboard has to push the bar up
+            // rather than cover the box being typed in.
+            @Suppress("DEPRECATION")
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -596,9 +613,98 @@ class OverlayService : Service() {
         const val ACTION_OPEN_PANEL = "com.ezzy.vault.overlay.OPEN_PANEL"
         const val ACTION_SHOW_TRIGGER = "com.ezzy.vault.overlay.SHOW_TRIGGER"
         const val ACTION_REFRESH = "com.ezzy.vault.overlay.REFRESH"
+        const val ACTION_TURN_OFF = "com.ezzy.vault.overlay.TURN_OFF"
 
         private const val CHANNEL_ID = "ezzy_overlay"
         private const val NOTIFICATION_ID = 4211
+
+        /** True while the service is alive in this process — what the watchdog checks. */
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
+        /** Bubble placements that failed in a row, across restarts within this process. */
+        private var failedStarts = 0
+
+        /**
+         * The ongoing notice the bar runs under. Besides keeping the service alive it carries a
+         * "+ Task" box, so a to-do can be typed straight from the notification shade.
+         */
+        fun buildNotification(context: Context): Notification {
+            val manager = context.getSystemService<NotificationManager>()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager?.createNotificationChannel(
+                    NotificationChannel(
+                        CHANNEL_ID,
+                        context.getString(R.string.overlay_channel_name),
+                        NotificationManager.IMPORTANCE_MIN,
+                    ).apply {
+                        description = context.getString(R.string.overlay_channel_description)
+                        setShowBadge(false)
+                    }
+                )
+            }
+
+            val openApp = PendingIntent.getActivity(
+                context,
+                0,
+                Intent(context, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val turnOff = PendingIntent.getService(
+                context,
+                1,
+                Intent(context, OverlayService::class.java).setAction(ACTION_TURN_OFF),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            // The reply box writes its text into this intent, so it has to stay mutable.
+            val quickAdd = PendingIntent.getBroadcast(
+                context,
+                2,
+                Intent(context, TaskReceiver::class.java).setAction(TaskReceiver.ACTION_QUICK_ADD),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                },
+            )
+            val reply = RemoteInput.Builder(TaskReceiver.KEY_QUICK_ADD)
+                .setLabel(context.getString(R.string.quick_add_hint))
+                .build()
+            val addTask = NotificationCompat.Action.Builder(
+                0,
+                context.getString(R.string.action_add_task),
+                quickAdd,
+            )
+                .addRemoteInput(reply)
+                .setAllowGeneratedReplies(false)
+                .build()
+
+            return NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.overlay_notification_title))
+                .setContentText(context.getString(R.string.overlay_notification_text))
+                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(openApp)
+                .addAction(addTask)
+                .addAction(0, context.getString(R.string.action_turn_off), turnOff)
+                .build()
+        }
+
+        /** Posts the notice again — the "+ Task" box keeps spinning until it is. */
+        @SuppressLint("MissingPermission")
+        fun repostNotification(context: Context) {
+            if (!isRunning) return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+            runCatching { NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, buildNotification(context)) }
+        }
         private const val TAP_TIMEOUT_MS = 400L
 
         /** Geometry of the drop target, shared by the window placement and the hit test. */

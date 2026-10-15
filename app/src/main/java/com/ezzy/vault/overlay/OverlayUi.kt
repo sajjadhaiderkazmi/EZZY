@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -257,6 +258,7 @@ private data class PanelEntry(
 /** Where the panel currently is: the rail is always visible, this is what fills the sheet. */
 private sealed interface PanelView {
     data object Quick : PanelView
+    data object Todo : PanelView
     data class Section(val categoryId: String) : PanelView
     data class Group(val groupId: String) : PanelView
     data class Entry(val itemId: String, val fromCategoryId: String?) : PanelView
@@ -377,7 +379,14 @@ fun OverlayPanel(
                         // translucent overlay window was paying for itself in dropped frames.
                         shadowElevation = 8.dp,
                     ) {
-                        if (locked) {
+                        if (view is PanelView.Todo) {
+                            OverlayTodoSheet(
+                                maxListHeight = panelMaxHeight - 60.dp,
+                                onInteraction = onInteraction,
+                                onOpenApp = onOpenApp,
+                                onClose = onDismiss,
+                            )
+                        } else if (locked) {
                             LockedSheet(onUnlock = { onRequestUnlock(null) })
                         } else {
                             PanelSheet(
@@ -418,7 +427,9 @@ fun OverlayPanel(
                         showQuick = showQuickAccess,
                         activeCategoryId = (view as? PanelView.Section)?.categoryId,
                         quickActive = view is PanelView.Quick,
+                        todoActive = view is PanelView.Todo,
                         onQuick = { navigate(PanelView.Quick) },
+                        onTodo = { navigate(PanelView.Todo) },
                         onSection = { navigate(PanelView.Section(it)) },
                         onClose = onDismiss,
                     )
@@ -435,7 +446,9 @@ private fun SectionRail(
     showQuick: Boolean,
     activeCategoryId: String?,
     quickActive: Boolean,
+    todoActive: Boolean,
     onQuick: () -> Unit,
+    onTodo: () -> Unit,
     onSection: (String) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -466,6 +479,20 @@ private fun SectionRail(
                         modifier = Modifier.size(22.dp),
                     )
                 }
+            }
+
+            RailButton(
+                selected = todoActive,
+                accent = MaterialTheme.colorScheme.primary,
+                onClick = onTodo,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.TaskAlt,
+                    contentDescription = "To Do",
+                    tint = if (todoActive) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
             }
 
             categories.forEach { category ->
@@ -568,6 +595,7 @@ private fun PanelSheet(
     Column(modifier = Modifier.fillMaxWidth()) {
         val title = when (view) {
             is PanelView.Quick -> "Quick access"
+            is PanelView.Todo -> "To Do"
             is PanelView.Section -> categories.firstOrNull { it.id == view.categoryId }?.name ?: "Section"
             is PanelView.Group -> groups.firstOrNull { it.group.id == view.groupId }?.group?.name ?: "Group"
             is PanelView.Entry -> "Details"
@@ -577,6 +605,7 @@ private fun PanelSheet(
             title = title,
             showBack = when (view) {
                 is PanelView.Quick -> false
+                is PanelView.Todo -> false
                 // A section is the root once the star is gone; there is nowhere back to.
                 is PanelView.Section -> showQuickAccess
                 is PanelView.Group -> true
@@ -737,6 +766,9 @@ private fun PanelSheet(
                 }
             }
 
+            // Drawn by OverlayTodoSheet instead; this sheet never sees it.
+            is PanelView.Todo -> Unit
+
             is PanelView.Entry -> {
                 val entry by remember(view.itemId) { repository.observeItem(view.itemId) }
                     .collectAsStateWithLifecycle(initialValue = null)
@@ -841,7 +873,7 @@ private fun PanelSheet(
 }
 
 @Composable
-private fun PanelHeader(
+internal fun PanelHeader(
     title: String,
     showBack: Boolean,
     onBack: () -> Unit,
