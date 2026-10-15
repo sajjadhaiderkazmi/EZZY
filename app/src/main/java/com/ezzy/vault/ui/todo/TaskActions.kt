@@ -89,7 +89,7 @@ fun rememberCompleteWithUndo(actions: TaskActions): (TaskEntity) -> Unit {
     val snackbar = LocalSnackbar.current
     val uiScope = rememberCoroutineScope()
     return remember(actions, snackbar) {
-        { task ->
+        { task: TaskEntity ->
             actions.complete(task.id) { undo ->
                 if (undo != null) {
                     uiScope.launch {
@@ -116,7 +116,7 @@ fun rememberCompleteWithUndo(actions: TaskActions): (TaskEntity) -> Unit {
 fun rememberNotificationAsker(): () -> Unit {
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    return remember(context, launcher) {
+    return remember<() -> Unit>(context, launcher) {
         {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
